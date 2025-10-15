@@ -9,6 +9,7 @@ import com.svenruppert.urlshortener.api.handler.ShortenHandler;
 import com.svenruppert.urlshortener.api.store.InMemoryUrlMappingStore;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
@@ -31,7 +32,7 @@ public class ShortenerServer
 
   public void init(String host, int port)
       throws IOException {
-    var store = new InMemoryUrlMappingStore();
+    var store = new InMemoryUrlMappingStore(new ShortCodeGenerator(0));
 
     logger().info("Starting URL Shortener server... with params: host={}, port={}", host, port);
     this.server = HttpServer.create(new InetSocketAddress(host, port), 0);
@@ -53,5 +54,13 @@ public class ShortenerServer
       server.stop(0);
       logger().info("URL Shortener server stopped");
     }
+  }
+
+  public int getPort() {
+    return server.getAddress().getPort();
+  }
+
+  public InetAddress getInetAddress() {
+    return server.getAddress().getAddress();
   }
 }

@@ -11,30 +11,50 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public final class DeleteMappingHandler implements HttpHandler, HasLogger {
+import static com.svenruppert.urlshortener.core.DefaultValues.ALLOWED_SHORTCODES;
+
+public final class DeleteMappingHandler
+    implements HttpHandler, HasLogger {
 
   // Erlaubt klassische Base62-ähnliche Shortcodes; passe den Regex bei Bedarf an dein Projekt an.
-  private static final Pattern PATH = Pattern.compile("^/delete/([A-Za-z0-9]+)$");
+  private static final Pattern PATH = Pattern.compile("^/delete/" + ALLOWED_SHORTCODES);
+
   private final UrlMappingUpdater updater;
 
   public DeleteMappingHandler(UrlMappingUpdater updater) {
     this.updater = updater;
   }
 
+  private static void sendJson(HttpExchange ex, int status, String body)
+      throws IOException {
+    var bytes = body.getBytes(StandardCharsets.UTF_8);
+    ex.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+    ex.sendResponseHeaders(status, bytes.length);
+    try (OutputStream os = ex.getResponseBody()) {
+      os.write(bytes);
+    }
+  }
+
   @Override
-  public void handle(HttpExchange exchange) throws IOException {
+  public void handle(HttpExchange exchange)
+      throws IOException {
     final String method = exchange.getRequestMethod();
-    final String path   = exchange.getRequestURI().getPath();
+    final String path = exchange.getRequestURI().getPath();
     logger().info("DeleteMappingHandler invoked: {} {}", method, path);
 
     if (!"DELETE".equalsIgnoreCase(method)) {
+      logger().warn("no DELETE Req - {}", method);
       exchange.getResponseHeaders().add("Allow", "DELETE");
       exchange.sendResponseHeaders(405, -1);
       return;
     }
 
+
+    //TODO check with AliasPolicy.isValid(alias)
+
     final Matcher m = PATH.matcher(path);
     if (!m.matches()) {
+      logger().warn("no matches - {}", path);
       sendJson(exchange, 400, "{\"error\":\"bad_request\",\"message\":\"expected DELETE /delete/{shortCode}\"}");
       return;
     }
@@ -52,15 +72,6 @@ public final class DeleteMappingHandler implements HttpHandler, HasLogger {
     } catch (Exception e) {
       logger().error("Delete failed for shortCode={}", shortCode, e);
       sendJson(exchange, 500, "{\"error\":\"internal_error\"}");
-    }
-  }
-
-  private static void sendJson(HttpExchange ex, int status, String body) throws IOException {
-    var bytes = body.getBytes(StandardCharsets.UTF_8);
-    ex.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-    ex.sendResponseHeaders(status, bytes.length);
-    try (OutputStream os = ex.getResponseBody()) {
-      os.write(bytes);
     }
   }
 }

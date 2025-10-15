@@ -1,10 +1,13 @@
 package com.svenruppert.urlshortener.api.store;
 
+import com.svenruppert.functional.model.Result;
 import com.svenruppert.urlshortener.core.ShortUrlMapping;
 
 public interface UrlMappingUpdater {
-  ShortUrlMapping createMapping(String originalUrl);
-  boolean delete(String shortCode);
-  ShortUrlMapping createCustomMapping(String alias, String url);
 
+  Result<ShortUrlMapping> createMapping(String originalUrl);
+  Result<ShortUrlMapping> createMapping(String alias, String url);
+
+  boolean delete(String shortCode);
+  boolean existsByCode(String shortCode);
 }

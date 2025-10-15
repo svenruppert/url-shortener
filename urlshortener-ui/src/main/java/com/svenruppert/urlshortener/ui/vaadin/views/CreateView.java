@@ -1,7 +1,7 @@
 package com.svenruppert.urlshortener.ui.vaadin.views;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
-import com.svenruppert.urlshortener.client.ShortenRequest;
+import com.svenruppert.urlshortener.core.ShortenRequest;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.vaadin.flow.component.button.Button;
@@ -51,7 +51,7 @@ public class CreateView
         .bind(ShortenRequest::getUrl, ShortenRequest::setUrl);
 
     binder.forField(aliasField)
-        .bind(ShortenRequest::getAlias, ShortenRequest::setAlias);
+        .bind(ShortenRequest::getShortURL, ShortenRequest::setShortURL);
 
     shortenButton.addClickListener(click -> {
       if (binder.writeBeanIfValid(request)) {
@@ -69,9 +69,9 @@ public class CreateView
 
   private Optional<String> createShortCode(ShortenRequest req) {
     try {
-      String value = req.getAlias() == null || req.getAlias().isBlank()
+      String value = req.getShortURL() == null || req.getShortURL().isBlank()
           ? urlShortenerClient.createMapping(req.getUrl()).shortCode()
-          : urlShortenerClient.createCustomMapping(req.getAlias(), req.getUrl()).shortCode();
+          : urlShortenerClient.createCustomMapping(req.getShortURL(), req.getUrl()).shortCode();
       logger().info("UrlMapping : {}", value);
       return Optional.ofNullable(value);
     } catch (IllegalArgumentException | IOException e) {

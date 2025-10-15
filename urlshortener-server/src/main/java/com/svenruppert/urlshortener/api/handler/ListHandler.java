@@ -15,15 +15,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
+import static com.svenruppert.urlshortener.core.DefaultValues.*;
 import static com.svenruppert.urlshortener.core.JsonUtils.toJsonListing;
 import static java.time.Instant.now;
 
 public class ListHandler
     implements HttpHandler, HasLogger {
 
-  public static final String PATH_LIST_ALL = "/list/all";
-  public static final String PATH_LIST_EXPIRED = "/list/expired";
-  public static final String PATH_LIST_ACTIVE = "/list/active";
+//  public static final String PATH_LIST_ALL = "/list/all";
+//  public static final String PATH_LIST_EXPIRED = "/list/expired";
+//  public static final String PATH_LIST_ACTIVE = "/list/active";
 
   private final UrlMappingLookup store;
 

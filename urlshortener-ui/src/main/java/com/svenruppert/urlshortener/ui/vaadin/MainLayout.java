@@ -53,10 +53,8 @@ public class MainLayout
   private SideNav getPrimaryNavigation() {
     SideNav sideNav = new SideNav();
     sideNav.addItem(
-        new SideNavItem("Admin", "/" + AdminView.PATH, DASHBOARD.create()),
-        new SideNavItem("Create", "/" + CreateView.PATH, DASHBOARD.create()),
         new SideNavItem("Overview", "/" + OverviewView.PATH, DASHBOARD.create()),
-        new SideNavItem("Shortener", "/" + ShortenerView.PATH, DASHBOARD.create()),
+        new SideNavItem("Create", "/" + CreateView.PATH, DASHBOARD.create()),
         new SideNavItem("Youtube", "/" + YoutubeView.PATH, CART.create()),
         new SideNavItem("About", "/" + AboutView.PATH, USER_HEART.create())
     );

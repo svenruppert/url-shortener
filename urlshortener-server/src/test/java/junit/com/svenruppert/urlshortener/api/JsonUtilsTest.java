@@ -1,12 +1,15 @@
 package junit.com.svenruppert.urlshortener.api;
 
 import com.svenruppert.urlshortener.core.JsonUtils;
+import com.svenruppert.urlshortener.core.ShortUrlMapping;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -54,4 +57,21 @@ class JsonUtilsTest {
     String json = JsonUtils.toJson(map);
     assertTrue(json.contains("\\\""));
   }
+
+  @Test
+  void shortUrlMapping_toJson() {
+    ShortUrlMapping m = new ShortUrlMapping(
+        "abc123",
+        "https://example.com/page",
+        Instant.parse("2025-10-13T10:15:30Z"),
+        Optional.empty()
+    );
+
+    String json = JsonUtils.toJson(m);
+
+    assertTrue(json.contains("\"shortCode\":\"abc123\""));
+    assertTrue(json.contains("\"originalUrl\":\"https://example.com/page\""));
+    assertTrue(json.contains("\"createdAt\":\"2025-10-13T10:15:30Z\""));
+  }
+
 }
