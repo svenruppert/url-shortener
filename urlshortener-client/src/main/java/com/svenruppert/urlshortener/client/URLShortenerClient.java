@@ -223,7 +223,7 @@ public class URLShortenerClient
     }
 
     int status = connection.getResponseCode();
-    if (status == 200) {
+    if (status == 200 || status == 201) {
       try (InputStream is = connection.getInputStream()) {
         String jsonResponse = new String(is.readAllBytes(), UTF_8);
         String extractedShortCode = JsonUtils.extractShortCode(jsonResponse);

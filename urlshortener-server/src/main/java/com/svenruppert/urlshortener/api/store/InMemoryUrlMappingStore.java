@@ -88,7 +88,7 @@ public class InMemoryUrlMappingStore
         Instant.now(),
         Optional.empty()
     );
-    store.put(alias, shortMapping);
+    store.put(shortCode, shortMapping);
     return Result.success(shortMapping);
   }
 

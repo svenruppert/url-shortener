@@ -32,7 +32,7 @@ public class ShortenerServer
 
   public void init(String host, int port)
       throws IOException {
-    var store = new InMemoryUrlMappingStore(new ShortCodeGenerator(0));
+    var store = new InMemoryUrlMappingStore(new ShortCodeGenerator(1));
 
     logger().info("Starting URL Shortener server... with params: host={}, port={}", host, port);
     this.server = HttpServer.create(new InetSocketAddress(host, port), 0);
