@@ -217,12 +217,13 @@ public class URLShortenerClient
     connection.setRequestProperty("Content-Type", "application/json");
 
     String body = "{\"url\":\"" + originalUrl + "\"}";
-
+    logger().info("body - '{}'", body);
     try (OutputStream os = connection.getOutputStream()) {
       os.write(body.getBytes());
     }
 
     int status = connection.getResponseCode();
+    logger().info("Response Code from Server - {}", status);
     if (status == 200 || status == 201) {
       try (InputStream is = connection.getInputStream()) {
         String jsonResponse = new String(is.readAllBytes(), UTF_8);

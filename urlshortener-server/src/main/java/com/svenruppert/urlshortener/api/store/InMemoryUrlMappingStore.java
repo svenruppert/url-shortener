@@ -60,28 +60,36 @@ public class InMemoryUrlMappingStore
   @Override
   public Result<ShortUrlMapping> createMapping(String alias, String url) {
     String shortCode;
-    logger().info("createMapping - alias - {} / url - {} ", alias, url);
+    logger().info("createMapping - alias - '{}' / url - '{}' ", alias, url);
     if (!isNullOrBlank(alias)) {
+      logger().info("Alias is set to '{}'", alias);
       if (!AliasPolicy.isValid(alias)) {
         var errorMessage = toJson("400", "Invalid alias (allowed: [A-Za-z0-9_-], length 3..32, not reserved)");
         logger().warn("createMapping - {}", errorMessage);
         return Result.failure(errorMessage);
       }
-      final String normalized = AliasPolicy.normalize(alias);
-      if (store.containsKey(normalized)) {
-        var errorMessage = toJson("409", "Alias already in use");
+      logger().info("Alias is valid");
+      final String normalizedAlias = AliasPolicy.normalize(alias);
+      logger().info("normalizedAlias Alias is'{}'", alias);
+      if (store.containsKey(normalizedAlias)) {
+        var errorMessage = toJson("409", "normalizedAlias already in use");
         logger().warn("createMapping - {}", errorMessage);
         return Result.failure(errorMessage);
+      } else {
+        logger().info("normalizedAlias is not in store.. ");
       }
-      shortCode = normalized; // Alias wird verwendet
+      shortCode = normalizedAlias; // Alias wird verwendet
     } else {
+      logger().info("Alias is NOT set");
       String generated = generator.nextCode();
+      logger().info("generated shortCode '{}'", generated);
       while (existsByCode(generated)) {
         generated = generator.nextCode();
+        logger().info("generated shortCode '{}'", generated);
       }
       shortCode = generated;
     }
-
+    logger().info("final shortCode '{}'", shortCode);
     ShortUrlMapping shortMapping = new ShortUrlMapping(
         shortCode,
         url,

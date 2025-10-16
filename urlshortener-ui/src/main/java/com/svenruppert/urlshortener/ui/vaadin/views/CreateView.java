@@ -1,8 +1,8 @@
 package com.svenruppert.urlshortener.ui.vaadin.views;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
-import com.svenruppert.urlshortener.core.ShortenRequest;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
+import com.svenruppert.urlshortener.core.ShortenRequest;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -68,10 +68,21 @@ public class CreateView
   }
 
   private Optional<String> createShortCode(ShortenRequest req) {
+    logger().info("createShortCode with ShortenRequest '{}'", req);
     try {
-      String value = req.getShortURL() == null || req.getShortURL().isBlank()
-          ? urlShortenerClient.createMapping(req.getUrl()).shortCode()
-          : urlShortenerClient.createCustomMapping(req.getShortURL(), req.getUrl()).shortCode();
+      var shortUrlIsNull = req.getShortURL() == null;
+      var shortUrlIsBlank = req.getShortURL().isBlank();
+      logger().info("shortUrlIsNull '{}' / shortUrlIsBlank '{}' ", shortUrlIsNull, shortUrlIsBlank);
+      String value;
+      if (shortUrlIsNull || shortUrlIsBlank) {
+        var mapping = urlShortenerClient.createMapping(req.getUrl());
+        logger().info("mapping - {}", mapping);
+        value = mapping.shortCode();
+      } else {
+        var customMapping = urlShortenerClient.createCustomMapping(req.getShortURL(), req.getUrl());
+        logger().info("customMapping - {}", customMapping);
+        value = customMapping.shortCode();
+      }
       logger().info("UrlMapping : {}", value);
       return Optional.ofNullable(value);
     } catch (IllegalArgumentException | IOException e) {
