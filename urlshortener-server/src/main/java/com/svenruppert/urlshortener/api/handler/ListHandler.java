@@ -43,11 +43,11 @@ public class ListHandler
     logger().info("List request: {}", path);
 
     String responseJson;
-    if (path.endsWith(PATH_LIST_ALL)) {
+    if (path.endsWith(PATH_ADMIN_LIST_ALL)) {
       responseJson = listAll();
-    } else if (path.endsWith(PATH_LIST_EXPIRED)) {
+    } else if (path.endsWith(PATH_ADMIN_LIST_EXPIRED)) {
       responseJson = listExpired();
-    } else if (path.endsWith(PATH_LIST_ACTIVE)) {
+    } else if (path.endsWith(PATH_ADMIN_LIST_ACTIVE)) {
       responseJson = listActive();
     } else {
       logger().info("undefined path {}", path);

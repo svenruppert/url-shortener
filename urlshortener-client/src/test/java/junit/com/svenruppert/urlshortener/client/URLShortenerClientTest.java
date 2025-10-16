@@ -61,7 +61,7 @@ public class URLShortenerClientTest
     var shortCode = client.createMapping(HTTP_SVENRUPPERT_COM);
     logger().info("shortCode: {}", shortCode);
 
-    assertEquals("1", shortCode.shortCode()); //TODO will break soo after int will be replaced with hash value
+    assertEquals("100", shortCode.shortCode()); //TODO will break soo after int will be replaced with hash value
     assertEquals(HTTP_SVENRUPPERT_COM, shortCode.originalUrl());
     assertTrue(shortCode.expiresAt().isEmpty());
     var createdAt = shortCode.createdAt();

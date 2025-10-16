@@ -30,16 +30,16 @@ public class RedirectHandler
       return;
     }
     final String path = exchange.getRequestURI().getPath(); // z.B. "/r/ABC123"
-    if (path == null || !path.startsWith(PATH_REDIRECT + "/")) {
+    if (path == null || !path.startsWith(PATH_REDIRECT)) {
       exchange.sendResponseHeaders(400, -1);
       return;
     }
-    final String code = path.substring((PATH_REDIRECT + "/").length());
+    final String code = path.substring((PATH_REDIRECT).length());
     if (code.isBlank()) {
       exchange.sendResponseHeaders(400, -1);
       return;
     }
-
+    logger().info("looking for short code {}", code);
     Optional<String> target = store
         .findByShortCode(code)
         .map(ShortUrlMapping::originalUrl);

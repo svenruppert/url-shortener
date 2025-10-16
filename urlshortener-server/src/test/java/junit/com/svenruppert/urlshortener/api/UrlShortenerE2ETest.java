@@ -23,7 +23,8 @@ public class UrlShortenerE2ETest
     implements HasLogger {
 
   private static ShortenerServer server;
-  private static String baseUrl;
+  private static String baseUrlREDIRECT;
+  private static String baseUrlADMIN;
   private static HttpClient http;
 
   @BeforeAll
@@ -32,8 +33,10 @@ public class UrlShortenerE2ETest
     // Server auf Port 0 starten -> Ephemeral-Port, kollisionsfrei
     server = new ShortenerServer();
     server.init(DEFAULT_SERVER_HOST, 0);
-    int port = server.getPort();
-    baseUrl = DEFAULT_SERVER_PROTOCOL + "://" + DEFAULT_SERVER_HOST + ":" + port;
+    int portRedirect = server.getPortRedirect();
+    var portAdmin = server.getPortAdmin();
+    baseUrlREDIRECT = DEFAULT_SERVER_PROTOCOL + "://" + DEFAULT_SERVER_HOST + ":" + portRedirect;
+    baseUrlADMIN = ADMIN_SERVER_PROTOCOL + "://" + ADMIN_SERVER_HOST + ":" + portAdmin;
     http = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(3))
         .followRedirects(HttpClient.Redirect.NEVER)    // Redirects selbst prüfen
@@ -47,24 +50,38 @@ public class UrlShortenerE2ETest
 
   // --- Helper ---------------------------------------------------------------
 
-  private static HttpResponse<String> POST(String path, String json)
+  private HttpResponse<String> POST(String path, String json)
       throws Exception {
-    var req = HttpRequest.newBuilder(URI.create(baseUrl + path))
+    var uri = URI.create(baseUrlADMIN + path);
+    logger().info("POST Path - {}", uri);
+    var req = HttpRequest.newBuilder(uri)
         .header("Content-Type", "application/json")
         .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8))
         .build();
     return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
   }
 
-  private static HttpResponse<String> GET(String path)
+  private HttpResponse<String> GET(String path)
       throws Exception {
-    var req = HttpRequest.newBuilder(URI.create(baseUrl + path)).GET().build();
+    var uri = URI.create(baseUrlADMIN + path);
+    logger().info("GET Path - {}", uri);
+    var req = HttpRequest.newBuilder(uri).GET().build();
     return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
   }
 
-  private static HttpResponse<String> DELETE(String path)
+  private HttpResponse<String> GET_REDIRECT(String path)
       throws Exception {
-    var req = HttpRequest.newBuilder(URI.create(baseUrl + path)).DELETE().build();
+    var uri = URI.create(baseUrlREDIRECT + path);
+    logger().info("GET REDIRECT Path - {}", uri);
+    var req = HttpRequest.newBuilder(uri).GET().build();
+    return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+  }
+
+  private HttpResponse<String> DELETE(String path)
+      throws Exception {
+    var uri = URI.create(baseUrlADMIN + path);
+    logger().info("DELETE Path - {}", uri);
+    var req = HttpRequest.newBuilder(uri).DELETE().build();
     return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
   }
 
@@ -86,7 +103,7 @@ public class UrlShortenerE2ETest
   @Order(2)
   void redirect_returns302_with_location()
       throws Exception {
-    var res = GET("/r/e2e-alias");
+    var res = GET_REDIRECT("/e2e-alias");
     assertEquals(302, res.statusCode());
     String loc = res.headers().firstValue("Location").orElse("");
     assertEquals("https://example.com/x", loc);
@@ -96,7 +113,7 @@ public class UrlShortenerE2ETest
   @Order(3)
   void list_contains_mapping()
       throws Exception {
-    var res = GET(PATH_LIST_ALL);
+    var res = GET(PATH_ADMIN_LIST_ALL);
     assertEquals(200, res.statusCode());
     assertTrue(res.headers().firstValue("Content-Type").orElse("").toLowerCase().contains("application/json"));
     assertTrue(res.body().contains("\"shortCode\":\"e2e-alias\""));
@@ -107,7 +124,7 @@ public class UrlShortenerE2ETest
   void duplicate_alias_conflict_409()
       throws Exception {
     String body = JsonUtils.toJson(new ShortenRequest("https://example.com/other", "e2e-alias"));
-    var res = POST(PATH_SHORTEN, body);
+    var res = POST(PATH_ADMIN_SHORTEN, body);
 
     logger().info("expected response code - {} ", CONFLICT);
 
@@ -121,7 +138,7 @@ public class UrlShortenerE2ETest
   @Order(5)
   void invalid_json_returns500()
       throws Exception {
-    var res = POST(PATH_SHORTEN, "{not-json}");
+    var res = POST(PATH_ADMIN_SHORTEN, "{not-json}");
 
     logger().info("expected response code - {} ", INTERNAL_SERVER_ERROR);
 
@@ -134,7 +151,7 @@ public class UrlShortenerE2ETest
   void crlf_in_url_returns400()
       throws Exception {
     String body = JsonUtils.toJson(new ShortenRequest("https://ex\r\nample.com", "bad"));
-    var res = POST(PATH_SHORTEN, body);
+    var res = POST(PATH_ADMIN_SHORTEN, body);
     logger().info("response - {}", res.body());
 
     logger().info("expected response code - {} ", BAD_REQUEST);
@@ -146,12 +163,12 @@ public class UrlShortenerE2ETest
   @Order(7)
   void delete_returns204_and_second_delete_404_or_204_idempotent()
       throws Exception {
-    var res1 = DELETE(PATH_DELETE + "/e2e-alias"); // oder /mappings/e2e-alias – je nach API
+    var res1 = DELETE(PATH_ADMIN_DELETE + "/e2e-alias"); // oder /mappings/e2e-alias – je nach API
 
     logger().info("expected response code - {} ", NO_CONTENT);
     assertEquals(NO_CONTENT.code(), res1.statusCode());
 
-    var res2 = DELETE(PATH_DELETE + "/e2e-alias");
+    var res2 = DELETE(PATH_ADMIN_DELETE + "/e2e-alias");
 
     logger().info("expected response code - {} ", NOT_FOUND);
 

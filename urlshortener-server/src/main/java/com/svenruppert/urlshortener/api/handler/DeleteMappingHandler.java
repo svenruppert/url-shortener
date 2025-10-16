@@ -4,20 +4,17 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.store.UrlMappingUpdater;
+import com.svenruppert.urlshortener.core.AliasPolicy;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import static com.svenruppert.urlshortener.core.DefaultValues.ALLOWED_SHORTCODES;
+import static com.svenruppert.urlshortener.core.DefaultValues.PATH_ADMIN_DELETE;
+
 
 public final class DeleteMappingHandler
     implements HttpHandler, HasLogger {
-
-  // Erlaubt klassische Base62-ähnliche Shortcodes; passe den Regex bei Bedarf an dein Projekt an.
-  private static final Pattern PATH = Pattern.compile("^/delete/" + ALLOWED_SHORTCODES);
 
   private final UrlMappingUpdater updater;
 
@@ -51,15 +48,21 @@ public final class DeleteMappingHandler
 
 
     //TODO check with AliasPolicy.isValid(alias)
-
-    final Matcher m = PATH.matcher(path);
-    if (!m.matches()) {
+    if (!path.startsWith(PATH_ADMIN_DELETE)) {
       logger().warn("no matches - {}", path);
       sendJson(exchange, 400, "{\"error\":\"bad_request\",\"message\":\"expected DELETE /delete/{shortCode}\"}");
       return;
     }
 
-    final String shortCode = m.group(1);
+    var shortCode = path.substring((PATH_ADMIN_DELETE.length() + 1));
+    logger().info("Alias to delete '{}'", shortCode);
+
+    var validated = AliasPolicy.validate(shortCode);
+    if (!validated.valid()) {
+      logger().info("kein valider ShortCode/Alias .. Abbruch ");
+      sendJson(exchange, 400, "{\"error\":\"bad_request\",\"message\":\"expected valid shortCode\"}");
+      return;
+    }
 
     // Delegation an den Updater/Store
     try {

@@ -3,7 +3,7 @@ package com.svenruppert.urlshortener.api.store;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.functional.model.Result;
 import com.svenruppert.urlshortener.api.ShortCodeGenerator;
-import com.svenruppert.urlshortener.api.handler.AliasPolicy;
+import com.svenruppert.urlshortener.core.AliasPolicy;
 import com.svenruppert.urlshortener.core.ShortUrlMapping;
 
 import java.time.Instant;
@@ -34,6 +34,7 @@ public class InMemoryUrlMappingStore
 
   @Override
   public Optional<ShortUrlMapping> findByShortCode(String shortCode) {
+    logger().info("findByShortCode '{}'", shortCode);
     return Optional.ofNullable(store.get(shortCode));
   }
 
@@ -63,10 +64,19 @@ public class InMemoryUrlMappingStore
     logger().info("createMapping - alias - '{}' / url - '{}' ", alias, url);
     if (!isNullOrBlank(alias)) {
       logger().info("Alias is set to '{}'", alias);
-      if (!AliasPolicy.isValid(alias)) {
-        var errorMessage = toJson("400", "Invalid alias (allowed: [A-Za-z0-9_-], length 3..32, not reserved)");
+      var aliasCheck = AliasPolicy.validate(alias);
+      if (!aliasCheck.valid()) {
+        // optional: maschinenlesbarer Code zusätzlich
+        String code = switch (aliasCheck.reason()) {
+          case NULL_OR_BLANK -> "ALIAS_EMPTY";
+          case TOO_SHORT     -> "ALIAS_TOO_SHORT";
+          case TOO_LONG      -> "ALIAS_TOO_LONG";
+          case INVALID_CHARS -> "ALIAS_INVALID_CHARS";
+          case RESERVED      -> "ALIAS_RESERVED";
+        };
+        var errorMessage = toJson("400", aliasCheck.reason().defaultMessage, code);
         logger().warn("createMapping - {}", errorMessage);
-        return Result.failure(errorMessage);
+        return Result.failure(errorMessage); // führt zu HTTP 400 mit diesem Body
       }
       logger().info("Alias is valid");
       final String normalizedAlias = AliasPolicy.normalize(alias);

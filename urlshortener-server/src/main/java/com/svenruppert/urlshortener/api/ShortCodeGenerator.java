@@ -1,7 +1,5 @@
 package com.svenruppert.urlshortener.api;
 
-import com.svenruppert.urlshortener.core.Base62Encoder;
-
 import java.util.concurrent.atomic.AtomicLong;
 
 public final class ShortCodeGenerator {
@@ -9,12 +7,16 @@ public final class ShortCodeGenerator {
   private final AtomicLong counter;
 
   public ShortCodeGenerator(long initialValue) {
-    this.counter = new AtomicLong(initialValue);
+    if (initialValue <= 99) {
+      this.counter = new AtomicLong(100);
+    } else {
+      this.counter = new AtomicLong(initialValue);
+    }
   }
 
   public String nextCode() {
     long id = counter.getAndIncrement();
-    return Base62Encoder.encode(id);
+    return String.valueOf(id);
   }
 
   public long currentId() {

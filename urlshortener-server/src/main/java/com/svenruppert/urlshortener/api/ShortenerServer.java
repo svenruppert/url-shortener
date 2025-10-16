@@ -9,7 +9,6 @@ import com.svenruppert.urlshortener.api.handler.ShortenHandler;
 import com.svenruppert.urlshortener.api.store.InMemoryUrlMappingStore;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
@@ -17,7 +16,8 @@ import static com.svenruppert.urlshortener.core.DefaultValues.*;
 public class ShortenerServer
     implements HasLogger {
 
-  private HttpServer server;
+  private HttpServer serverRedirect;
+  private HttpServer serverAdmin;
 
   public static void main(String[] args)
       throws IOException {
@@ -30,37 +30,54 @@ public class ShortenerServer
     init(DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT);
   }
 
-  public void init(String host, int port)
+  public void init(String hostRedirect, int portRedirect)
       throws IOException {
     var store = new InMemoryUrlMappingStore(new ShortCodeGenerator(1));
 
-    logger().info("Starting URL Shortener server... with params: host={}, port={}", host, port);
-    this.server = HttpServer.create(new InetSocketAddress(host, port), 0);
-    server.createContext(PATH_SHORTEN, new ShortenHandler(store));
-    server.createContext(PATH_LIST, new ListHandler(store));
-    server.createContext(PATH_DELETE, new DeleteMappingHandler(store)); // DELETE /mapping/{code}
-    server.createContext(PATH_REDIRECT, new RedirectHandler(store));
+    logger().info("Starting URL Shortener server (redirect)... with params: host={}, port={}", hostRedirect, portRedirect);
+    this.serverRedirect = HttpServer.create(new InetSocketAddress(hostRedirect, portRedirect), 0);
+    serverRedirect.createContext(PATH_REDIRECT, new RedirectHandler(store));
 
-    server.setExecutor(null); // default executor
-    server.start();
+    logger().info("Starting URL Shortener server (admin)... with params: host={}, port={}", ADMIN_SERVER_HOST, ADMIN_SERVER_PORT);
+    this.serverAdmin = HttpServer.create(new InetSocketAddress(ADMIN_SERVER_HOST, ADMIN_SERVER_PORT), 0);
+    serverAdmin.createContext(PATH_ADMIN_SHORTEN, new ShortenHandler(store));
+    serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(store));
+    serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(store)); // DELETE /mapping/{code}
 
-    logger().info("URL Shortener server running at {}:{}...",
-                  server.getAddress().getHostName(),
-                  server.getAddress().getPort());
+
+    serverRedirect.setExecutor(null); // default executor
+    serverRedirect.start();
+
+    serverAdmin.setExecutor(null); // default executor
+    serverAdmin.start();
+
+
+    logger().info("URL Shortener server (redirect) running at {}:{}...",
+                  serverRedirect.getAddress().getHostName(),
+                  serverRedirect.getAddress().getPort());
+    logger().info("URL Shortener server (admin) running at {}:{}...",
+                  serverAdmin.getAddress().getHostName(),
+                  serverAdmin.getAddress().getPort());
   }
 
   public void shutdown() {
-    if (server != null) {
-      server.stop(0);
-      logger().info("URL Shortener server stopped");
+    if (serverRedirect != null) {
+      serverRedirect.stop(0);
+      logger().info("URL Shortener server stopped (redirect)");
+    }
+    if (serverAdmin != null) {
+      serverAdmin.stop(0);
+      logger().info("URL Shortener server stopped (admin)");
     }
   }
 
-  public int getPort() {
-    return server.getAddress().getPort();
+  public int getPortRedirect() {
+    return serverRedirect.getAddress().getPort();
   }
 
-  public InetAddress getInetAddress() {
-    return server.getAddress().getAddress();
+  public int getPortAdmin() {
+    return serverAdmin.getAddress().getPort();
   }
+
+
 }

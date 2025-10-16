@@ -109,6 +109,11 @@ public final class JsonUtils
         "}";
   }
 
+//TODO - in ein DTO verpacken?
+  public static String toJson(String httpCode, String message, String appCode) {
+    return "{\"code\":\"" + httpCode + "\",\"appCode\":\"" + appCode + "\",\"message\":\"" + escape(message) + "\"}";
+  }
+
   /**
    * Serialisiert eine Map<String, ?> zu JSON.
    */
@@ -161,6 +166,7 @@ public final class JsonUtils
       }
       return toJson(m);
     }
+
     throw new UnsupportedOperationException("Unsupported DTO: " + dto.getClass());
   }
 

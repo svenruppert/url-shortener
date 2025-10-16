@@ -88,7 +88,7 @@ public class ShortenHandler
 
       final String body = readBody(ex.getRequestBody());
       ShortenRequest req = JsonUtils.fromJson(body, ShortenRequest.class);
-      if (req == null || isNullOrBlank(req.getUrl())) {
+      if (isNullOrBlank(req.getUrl())) {
         writeJson(ex, BAD_REQUEST, "Missing 'url'");
         return;
       }
