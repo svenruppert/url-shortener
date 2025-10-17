@@ -96,7 +96,7 @@ public final class JsonUtils
 
 
   /**
-   * Minimaler JSON-Parser für ShortenRequest.
+   * Minimal JSON parser for ShortenRequest.
    */
   public static ShortenRequest fromJson(String json, Class<ShortenRequest> type) {
     return parseShortenRequest(json);
@@ -115,7 +115,7 @@ public final class JsonUtils
   }
 
   /**
-   * Serialisiert eine Map<String, ?> zu JSON.
+   * Serializes a Map<String, ?> to JSON.
    */
   public static String toJson(Map<String, ?> map) {
     StringBuilder sb = new StringBuilder();
@@ -129,7 +129,7 @@ public final class JsonUtils
       if (v == null) {
         sb.append("null");
       } else if (v instanceof Number || v instanceof Boolean) {
-        sb.append(v.toString());
+        sb.append(v);
       } else {
         sb.append('"').append(escape(v.toString())).append('"');
       }
@@ -139,7 +139,7 @@ public final class JsonUtils
   }
 
   /**
-   * Serialisiert einfache DTOs, z.B. ShortenRequest → JSON.
+   * Serializes simple DTOs, e.g. ShortenRequest → JSON.
    */
   public static String toJson(Object dto) {
     if (dto instanceof ShortenRequest req) {
@@ -273,7 +273,7 @@ public final class JsonUtils
   }
 
   /**
-   * Serialisiert eine Liste flacher Objekte (String->String) als JSON-Array.
+   * Serializes a list of flat objects (String->String) as a JSON array.
    */
   public static String toJsonArrayOfObjects(List<Map<String, String>> items) {
     StringBuilder sb = new StringBuilder();
@@ -302,7 +302,7 @@ public final class JsonUtils
   }
 
   /**
-   * Baut das Antwortobjekt für die List-Endpunkte.
+   * Builds the response object for the list endpoints.
    */
   public static String toJsonListing(String mode, int count, List<Map<String, String>> items) {
     StringBuilder sb = new StringBuilder(64 + items.size() * 64);

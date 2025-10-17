@@ -1,66 +1,180 @@
-# core-vaadin-project-template
+# URL Shortener – Core Java + Vaadin Flow
 
-A Template that can be used to start a Core Vaadin Flow Project.
-In this demo you will find a simple UI, based on Vaadin Flow.
+A fully self-contained **URL Shortener** implemented in **pure Java 24**, featuring a lightweight REST service, a Vaadin Flow–based administration UI, and a simple Java client SDK.  
+The project demonstrates how to build a secure, modular web application **without using any external frameworks** like Spring Boot or Jakarta EE.
 
-## What is offered by this template?
+---
 
-* TDD with Junit5
-* MutationCoverage with PiTest
-* Compile via Dockerimage
-* Deployment via Dockerimage
-* Development Dockerimage with JDK and Maven
-* Production Dockerimage with JDK
-* Issuetracker via Github Issues
-* Projectplanning via Github Projects
-* Create SBOM (cyclonedx)
-* Dependency Version Management via versions plugin
-* Integration Tests for the REST Server
-*
+## 🧩 Project Overview
 
-## Vulnerability - Hunting
+### Modules
 
-Even in small projects it is importand to scann for vulnerabilities.
-But mostly there is no budget for personal projects.
-What should you do? Well, you can combine different free offerings
-to see who is reporting faster in wich case. Most vendors are implementing it as Github-PR.
-So, see who is fast and what you will get.
-I will list a few provider so that you have a solid base to start with.
+| Module | Description |
+|---------|-------------|
+| **urlshortener-core** | Core logic, DTOs, encoding utilities, and validation policies. |
+| **urlshortener-server** | REST server for administration and redirection, implemented using `com.sun.net.httpserver.HttpServer`. |
+| **urlshortener-client** | Minimal Java client that communicates with the admin API. |
+| **urlshortener-ui** | Vaadin Flow 24.9.0 web application (WAR) providing a graphical interface for managing shortened URLs. |
 
-* Snyk: https://snyk.io/
-* OXSecurity: https://app.ox.security/
-* FaradaySec: https://faradaysec.com/
+---
 
-## Todos
+## ⚙️ Architecture
 
-* Wie mache ich ein release? -jreleaser?
-* Compile in Docker
-* Run in Docker - Webservices..
-* PiTest in Docker mit Source Snapshot
+```
+┌────────────────────────────────────────────────────────────┐
+│                         UI (Vaadin)                        │
+│  - Create new short links                                  │
+│  - Manage and delete existing mappings                     │
+│  - Visualize statistics and status                         │
+└──────────────▲───────────────────────────────┬─────────────┘
+               │ REST (JSON over HTTP)         │
+               │                               │
+┌──────────────┴───────────────────────────────▼───────────────┐
+│                    Admin REST Server                         │
+│  /shorten     → Create new mapping                           │
+│  /delete      → Remove existing mapping                      │
+│  /list        → List active and expired mappings             │
+│  /{code}      → Redirect to original URL                     │
+│                                                    Port 8081 │
+└──────────────────────────────────────────────────────────────┘
+```
 
-## How to start
+All data is currently stored **in-memory**.  
+Future extensions will include file-based persistence, access control, and live synchronization with the UI.
 
-* search and replace inside pom.xml - "https://github.com/svenruppert/core-vaadin-project-template" with your coordinates.
-* define what is your JDK you want to use and change it - default is the latest Temurin LTS
-  * inside the Docker image definitions
-  * inside your pom.xml
-* change the properties **pitest-prod-classes** and **pitest-test-classes**
-* change the properties for the deployment repositories
-* change the repositories, you are resolving from. Default is maven central
-* if you have a main class, change the property **app.main.class** or comment it out
-* create the docker images under _tools/docker
-  * develop/build.sh
-  * runtime/build.sh
-  * application/build.sh - first time after you created your shaded application.jar
+---
 
-## Docker Images for Develop and Runtime
+## 🧰 Technology Stack
 
-### Developer Images
+- **Java 24**
+- **Vaadin Flow 24.9.0**
+- **Jetty 12 (WAR Deployment)** – for the UI
+- **Core JDK HttpServer** – for the REST and redirect endpoints
+- **No frameworks**, no Spring, no external dependencies
 
-Here we are creating an image with JDK and maven (or gradle if you are using it).
+---
 
-### Best practices
+## 🧪 Running the Application
 
-From time to time update the core Images with the latest updates on OS system base.
-For this tag the image with the update date, so tht everybody know how old the updated
-image is.
+### Start the REST Server
+```bash
+cd urlshortener-server
+mvn clean package
+java -jar target/urlshortener-server-*.jar
+```
+
+Default ports:
+- **Admin API:** `http://localhost:9090`
+- **Redirect Server:** `http://localhost:8081`
+
+### Start the Vaadin UI
+Deploy the WAR file from `urlshortener-ui/target/` into your Jetty installation:
+```bash
+cp target/urlshortener-ui.war /opt/jetty-base/webapps/
+```
+
+The UI connects to the Admin API (default: `localhost:9090`) and allows you to create, list, and delete short URLs.
+
+---
+
+## 🧩 Example API Calls
+
+### Create a new mapping
+```bash
+curl -X POST http://localhost:9090/shorten   -H "Content-Type: application/json"   -d '{"originalUrl":"https://svenruppert.com"}'
+```
+
+### List all mappings
+```bash
+curl http://localhost:9090/list
+```
+
+### Redirect
+Visit `http://localhost:8081/{shortCode}` in your browser.
+
+---
+
+## 🧑‍💻 Development Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-repo/url-shortener.git
+   cd url-shortener
+   ```
+
+2. **Build all modules**
+   ```bash
+   mvn clean verify
+   ```
+
+3. **Run tests**
+   ```bash
+   mvn test
+   ```
+
+4. **Open the UI**
+   Deploy the WAR or start Vaadin in development mode.
+
+---
+
+## 🧱 Testing
+
+- Unit tests cover:
+  - Base62 encoding / decoding
+  - JSON utilities
+  - Alias validation
+- Integration tests:
+  - Full end-to-end flow (`Shorten → Redirect → Delete`)
+
+To run all tests:
+```bash
+mvn verify
+```
+
+---
+
+## 🔒 Security Notes
+
+- The Admin API should **not be publicly accessible**.  
+  Restrict it to `localhost` or a private subnet.
+- Redirect endpoints are public by design.
+- Planned improvements:
+  - Authenticated admin interface
+  - Access control for administrative operations
+  - Secure configuration and API tokens
+
+---
+
+## 🌍 Deployment Notes
+
+Typical deployment setup:
+- **Server 1 (public):** Redirect server on port 80/8081  
+- **Server 2 (private or localhost):** Admin server + Vaadin UI (port 9090)
+
+You can connect both servers on the same host using `localhost` communication.
+
+---
+
+## 📚 Upcoming Features (for Advent Calendar Series)
+
+This project serves as the foundation for a **24-day educational series** that incrementally improves the shortener with:
+- Vaadin features (Grid, Dialogs, Charts, Theming, i18n, PWA)
+- Security layers (login, role-based access, CORS handling)
+- File persistence and export/import
+- Live updates via Server-Sent Events (SSE)
+- Deployment & packaging best practices
+
+---
+
+## 🧑‍🏫 Author
+
+**Sven Ruppert**  
+Developer Advocate for Secure Coding and Vaadin Flow  
+🌐 [svenruppert.com](https://svenruppert.com)  
+📫 [LinkedIn](https://www.linkedin.com/in/svenruppert/)
+
+---
+
+## 📄 License
+
+Licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).

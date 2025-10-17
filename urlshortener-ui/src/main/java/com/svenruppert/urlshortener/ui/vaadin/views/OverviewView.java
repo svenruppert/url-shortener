@@ -35,42 +35,42 @@ public class OverviewView
 
     grid.addColumn(ShortUrlMapping::shortCode).setHeader("Short Code");
     grid.addColumn(ShortUrlMapping::originalUrl).setHeader("Original URL").setFlexGrow(1);
-    grid.addColumn(m -> m.createdAt().toString()).setHeader("Erstellt am");
-    grid.addComponentColumn(this::buildActionButtons).setHeader("Aktionen");
+    grid.addColumn(m -> m.createdAt().toString()).setHeader("Created on");
+    grid.addComponentColumn(this::buildActionButtons).setHeader("Actions");
 
     var all = urlShortenerClient.listAll();
     logger().info("findAll - {}", all);
     grid.setItems(all);
     grid.setSizeFull();
 
-    add(new H2("Alle Kurzlinks"), grid);
+    add(new H2("All short links"), grid);
   }
 
   private Component buildActionButtons(ShortUrlMapping mapping) {
-    Button delete = new Button("Löschen", e -> openConfirmDialog(mapping));
+    Button delete = new Button("Delete", e -> openConfirmDialog(mapping));
     delete.addThemeVariants(ButtonVariant.LUMO_ERROR);
     return delete;
   }
 
   private void openConfirmDialog(ShortUrlMapping mapping) {
     Dialog dialog = new Dialog();
-    dialog.add(new Text("Kurzlink wirklich löschen? (" + mapping.shortCode() + ")"));
+    dialog.add(new Text("Really delete short link? (" + mapping.shortCode() + ")"));
 
     Button confirm = new Button("Ja", e -> {
       try {
         urlShortenerClient.delete(mapping.shortCode());
         grid.setItems(urlShortenerClient.listAll());
         dialog.close();
-        Notification.show("Kurzlink gelöscht.");
+        Notification.show("Short link deleted.");
       } catch (IOException ex) {
-        Notification.show("Operation fehlgeschlagen");
+        Notification.show("Operation failed");
         throw new RuntimeException(ex);
       }
 
     });
     confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-    Button cancel = new Button("Abbrechen", e -> dialog.close());
+    Button cancel = new Button("Cancel", e -> dialog.close());
 
     dialog.add(new HorizontalLayout(confirm, cancel));
     dialog.open();

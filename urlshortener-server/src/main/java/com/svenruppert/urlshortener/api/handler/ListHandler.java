@@ -22,10 +22,6 @@ import static java.time.Instant.now;
 public class ListHandler
     implements HttpHandler, HasLogger {
 
-//  public static final String PATH_LIST_ALL = "/list/all";
-//  public static final String PATH_LIST_EXPIRED = "/list/expired";
-//  public static final String PATH_LIST_ACTIVE = "/list/active";
-
   private final UrlMappingLookup store;
 
   public ListHandler(UrlMappingLookup store) {

@@ -170,7 +170,7 @@ public class ShortenHandler
   //TODO extract into Utils Class
   private void withCors(Headers h) {
     if (!enableCors) return;
-    // Ggf. anpassen oder deaktivieren, wenn CORS nicht gewünscht
+    // If necessary, adjust or deactivate if CORS is not desired
     h.add("Access-Control-Allow-Origin", "*");
     h.add("Access-Control-Allow-Methods", "POST, OPTIONS");
     h.add("Access-Control-Allow-Headers", CONTENT_TYPE);

@@ -10,7 +10,7 @@ public final class AliasPolicy {
   public static final int MAX = 32;
   public static final String REGEX_ALLOWED = "^[A-Za-z0-9_-]+$";
   private static final Pattern ALLOWED = Pattern.compile(REGEX_ALLOWED);
-  //TODO - muss dynamisch gegen alle Pfade der UI validiert werden.
+  //TODO - must be dynamically validated against all paths of the UI.
   private static final Set<String> RESERVED = Set.of("api", "about", "create", "delete", "list");
 
   private AliasPolicy() {

@@ -41,10 +41,10 @@ public class ShortenRequest {
   }
 
   /**
-   * Gibt die JSON-Repräsentation dieses Objekts zurück.
-   * Ohne externe Libraries, mit korrektem Escaping für einfache Fälle.
+   * Returns the JSON representation of this object.
+   * No external libraries required, with correct escaping for simple cases.
    */
-  //TODO Design Fehler, da Abhaengigkeit zu UtilsKlasse
+  //TODO Design error due to dependency on Utils class
   public String toJson() {
     return """
         {

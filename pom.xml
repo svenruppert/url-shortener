@@ -97,7 +97,7 @@
         <vaadin.version>24.9.0</vaadin.version>
         <drivers.downloader.phase>pre-integration-test</drivers.downloader.phase>
         <jetty.version>11.0.25</jetty.version>
-        <warName>ui</warName>
+        <warName>ROOT</warName>
         <restServiceName>urlshortener</restServiceName>
     </properties>
 
@@ -190,14 +190,6 @@
             <artifactId>functional-reactive</artifactId>
         </dependency>
 
-        <!--    REST-Testing-->
-        <dependency>
-            <groupId>io.rest-assured</groupId>
-            <artifactId>rest-assured</artifactId>
-            <version>5.5.5</version>
-            <scope>test</scope>
-        </dependency>
-
         <!--    Logging-->
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -219,12 +211,6 @@
                     <skip>true</skip>
                 </configuration>
             </plugin>
-
-
-
-
-
-
             <plugin>
                 <inherited>true</inherited>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -441,46 +427,46 @@
                 </plugins>
             </build>
         </profile>
-        <profile>
-            <id>_shadejar</id>
-            <build>
-                <finalName>application</finalName>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-shade-plugin</artifactId>
-                        <configuration>
-                            <transformers>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>${app.main.class}
-                                    </mainClass> <!-- Here you should put the main class of your application -->
-                                </transformer>
-                            </transformers>
-                            <filters>
-                                <filter> <!-- This filter is needed to avoid a bug in the shade plugin -->
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>shade</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
+<!--        <profile>-->
+<!--            <id>_shadejar</id>-->
+<!--            <build>-->
+<!--                <finalName>application</finalName>-->
+<!--                <plugins>-->
+<!--                    <plugin>-->
+<!--                        <groupId>org.apache.maven.plugins</groupId>-->
+<!--                        <artifactId>maven-shade-plugin</artifactId>-->
+<!--                        <configuration>-->
+<!--                            <transformers>-->
+<!--                                <transformer-->
+<!--                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">-->
+<!--                                    <mainClass>${app.main.class}-->
+<!--                                    </mainClass> &lt;!&ndash; Here you should put the main class of your application &ndash;&gt;-->
+<!--                                </transformer>-->
+<!--                            </transformers>-->
+<!--                            <filters>-->
+<!--                                <filter> &lt;!&ndash; This filter is needed to avoid a bug in the shade plugin &ndash;&gt;-->
+<!--                                    <artifact>*:*</artifact>-->
+<!--                                    <excludes>-->
+<!--                                        <exclude>META-INF/*.SF</exclude>-->
+<!--                                        <exclude>META-INF/*.DSA</exclude>-->
+<!--                                        <exclude>META-INF/*.RSA</exclude>-->
+<!--                                    </excludes>-->
+<!--                                </filter>-->
+<!--                            </filters>-->
+<!--                        </configuration>-->
+<!--                        <executions>-->
+<!--                            <execution>-->
+<!--                                <phase>package</phase>-->
+<!--                                <goals>-->
+<!--                                    <goal>shade</goal>-->
+<!--                                </goals>-->
+<!--                            </execution>-->
+<!--                        </executions>-->
+<!--                    </plugin>-->
+<!--                </plugins>-->
+<!--            </build>-->
 
-        </profile>
+<!--        </profile>-->
 
 
     </profiles>

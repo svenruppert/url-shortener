@@ -32,13 +32,13 @@ public class CreateView
     setSpacing(true);
     setPadding(true);
 
-    TextField urlField = new TextField("Ziel-URL");
+    TextField urlField = new TextField("Target URL");
     urlField.setWidthFull();
 
     TextField aliasField = new TextField("Alias (optional)");
     aliasField.setWidth("300px");
 
-    Button shortenButton = new Button("Verkürzen");
+    Button shortenButton = new Button("Shorten");
     shortenButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
     HorizontalLayout actions = new HorizontalLayout(shortenButton);
@@ -48,19 +48,19 @@ public class CreateView
     ShortenRequest request = new ShortenRequest();
 
     binder.forField(urlField)
-        .asRequired("URL darf nicht leer sein")
-        //TODO - besseren Validator verwenden
+        .asRequired("URL must not be empty")
+        //TODO - use better validator
         .withValidator(url -> url.startsWith("http://") || url.startsWith("https://"),
-                       "Nur HTTP(S)-URLs erlaubt")
+                       "Only HTTP(S) URLs allowed")
         .bind(ShortenRequest::getUrl, ShortenRequest::setUrl);
 
     binder.forField(aliasField)
         .withValidator(a -> a == null || a.isBlank() || a.length() >= AliasPolicy.MIN,
-                       "Alias ist zu kurz (min " + AliasPolicy.MIN + ")")
+                       "Alias is too short (min " + AliasPolicy.MIN + ")")
         .withValidator(a -> a == null || a.isBlank() || a.length() <= AliasPolicy.MAX,
-                       "Alias ist zu lang (max " + AliasPolicy.MAX + ")")
+                       "Alias is too long (max " + AliasPolicy.MAX + ")")
         .withValidator(a -> a == null || a.isBlank() || a.matches(REGEX_ALLOWED),
-                       "Nur [A-Za-z0-9_-] erlaubt")
+                       "only [A-Za-z0-9_-] allowed")
         .bind(ShortenRequest::getShortURL, ShortenRequest::setShortURL);
 
 
@@ -71,17 +71,17 @@ public class CreateView
       if (binder.writeBeanIfValid(request)) {
         Optional<String> code = createShortCode(request);
         code.ifPresentOrElse(c -> {
-          Notification.show("Kurzlink erstellt: " + c);
+          Notification.show("Short link created:" + c);
           urlField.clear();
           aliasField.clear();
           binder.setBean(new ShortenRequest());
           urlField.setInvalid(false);
           aliasField.setInvalid(false);
-        }, () -> Notification.show("Alias bereits vergeben oder Fehler beim Speichern", 3000, Notification.Position.MIDDLE));
+        }, () -> Notification.show("Alias already assigned or error saving", 3000, Notification.Position.MIDDLE));
       }
     });
 
-    add(new H2("Neuen Kurzlink erstellen"), urlField, aliasField, actions);
+    add(new H2("Create new short link"), urlField, aliasField, actions);
   }
 
   private Optional<String> createShortCode(ShortenRequest req) {
@@ -103,7 +103,7 @@ public class CreateView
       logger().info("UrlMapping : {}", value);
       return Optional.ofNullable(value);
     } catch (IllegalArgumentException | IOException e) {
-      logger().error("Fehler beim Speichern", e);
+      logger().error("Error saving", e);
       return Optional.empty();
     }
   }

@@ -96,7 +96,7 @@ public class URLShortenerClientTest
   }
 
   // ————————————————————————————————————————————————————————————————
-  // NEU: listActive – leer -> 1 Eintrag nach Create
+  // NEU: listActive – leer -> 1 entry after Create
   // ————————————————————————————————————————————————————————————————
   @Test
   void test003_findActive_initiallyEmpty_thenOne()
@@ -114,7 +114,7 @@ public class URLShortenerClientTest
   }
 
   // ————————————————————————————————————————————————————————————————
-  // NEU: listExpired – derzeit immer leer (keine Expiries in Store)
+  // listExpired – currently always empty (no expiries in store)
   // ————————————————————————————————————————————————————————————————
   @Test
   void test004_findExpired_isEmpty_withoutExpirySupport()
@@ -132,7 +132,7 @@ public class URLShortenerClientTest
   }
 
   // ————————————————————————————————————————————————————————————————
-  // NEU: Konsistenzcheck findAll vs. findActive (ohne Expiries)
+  // Consistency check findAll vs. findActive (without expiries)
   // ————————————————————————————————————————————————————————————————
   @Test
   void test005_findAll_equals_findActive_withoutExpiries()
@@ -152,34 +152,34 @@ public class URLShortenerClientTest
 
   @Test
   void delete_existingMapping_returnsTrue_andRemovesIt() throws IOException {
-    // Arrange: Ein Mapping anlegen und Existenz verifizieren
+    // Arrange: Create a mapping and verify its existence
     var created = client.createMapping(HTTP_SVENRUPPERT_COM);
     assertNotNull(created);
     var before = client.listAll();
     assertEquals(1, before.size());
 
-    // Act: Löschen
+    // Act: delete
     boolean removed = client.delete(created.shortCode());
 
-    // Assert: true zurück, Liste leer, zweiter Löschversuch -> false
-    assertTrue(removed, "delete(...) muss true liefern bei HTTP 204");
+    // Assert: true returns, list empty, second deletion attempt -> false
+    assertTrue(removed, "delete(...) must return true for HTTP 204");
     var after = client.listAll();
-    assertEquals(0, after.size(), "Nach dem Löschen muss die Liste leer sein");
+    assertEquals(0, after.size(), "After deletion, the list must be empty");
 
     boolean removedAgain = client.delete(created.shortCode());
-    assertFalse(removedAgain, "Zweiter Löschversuch auf derselben Ressource muss false liefern (404 → false)");
+    assertFalse(removedAgain, "Second deletion attempt on the same resource must return false (404 → false)");
   }
 
   @Test
   void delete_nonExistingMapping_returnsFalse() throws IOException {
     boolean removed = client.delete("NoSuch123");
-    assertFalse(removed, "Nicht vorhandener Shortcode muss false liefern (HTTP 404)");
+    assertFalse(removed, "Non-existent shortcode must return false (HTTP 404)");
   }
 
   @Test
   void deleteOrThrow_nonExistingMapping_throwsIOException() {
     assertThrows(IOException.class, () -> client.deleteOrThrow("NoSuch999"),
-                 "deleteOrThrow(...) muss bei 404 eine IOException werfen");
+                 "deleteOrThrow(...) must throw an IOException on 404");
   }
 
   @Test
@@ -191,17 +191,17 @@ public class URLShortenerClientTest
     assertNotNull(m2);
 
     var allBefore = client.listAll();
-    assertEquals(2, allBefore.size(), "Vor dem Löschen müssen 2 Einträge existieren");
+    assertEquals(2, allBefore.size(), "Before deleting, 2 entries must exist");
 
     // Act: m1 löschen (zweimal, um Idempotenz zu prüfen)
-    assertTrue(client.delete(m1.shortCode()), "Erster Löschvorgang muss true liefern");
-    assertFalse(client.delete(m1.shortCode()), "Zweiter Löschvorgang muss false liefern (bereits gelöscht)");
+    assertTrue(client.delete(m1.shortCode()), "First delete operation must return true");
+    assertFalse(client.delete(m1.shortCode()), "Second deletion must return false (already deleted)");
 
     // Assert: m2 weiterhin vorhanden, m1 entfernt
     var allAfter = client.listAll();
-    assertEquals(1, allAfter.size(), "Nach dem Löschen muss genau 1 Eintrag verbleiben");
+    assertEquals(1, allAfter.size(), "After deletion, exactly 1 entry must remain");
     assertEquals(m2.shortCode(), allAfter.getFirst().shortCode(),
-                 "Der verbleibende Eintrag muss m2 sein");
+                 "The remaining entry must be m2");
   }
 
   @Test
@@ -209,13 +209,13 @@ public class URLShortenerClientTest
     // Arrange
     var m = client.createMapping(HTTP_SVENRUPPERT_COM);
     assertNotNull(m);
-    assertEquals(1, client.listActive().size(), "Ein aktiver Eintrag erwartet");
+    assertEquals(1, client.listActive().size(), "An active entry is expected");
 
     // Act
     assertTrue(client.delete(m.shortCode()));
 
     // Assert
-    assertTrue(client.listActive().isEmpty(), "Nach dem Löschen darf kein aktiver Eintrag verbleiben");
+    assertTrue(client.listActive().isEmpty(), "No active entry may remain after deletion");
   }
 
 

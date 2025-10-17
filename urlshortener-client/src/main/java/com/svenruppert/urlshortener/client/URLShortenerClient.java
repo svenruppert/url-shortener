@@ -48,7 +48,6 @@ public class URLShortenerClient
   }
 
 
-
   private static String readAllAsString(InputStream is)
       throws IOException {
     if (is == null) return "";
@@ -56,7 +55,7 @@ public class URLShortenerClient
   }
 
   /**
-   * Schneidet den Teil zwischen "items":[ und der korrespondierenden schließenden Klammer ] aus.
+   * Cuts the part between "items":[ and the corresponding closing bracket ].
    */
   private static String sliceItemsArray(String json) {
     final String key = "\"items\"";
@@ -72,7 +71,7 @@ public class URLShortenerClient
   }
 
   /**
-   * Findet die korrespondierende schließende Klammer, beachtet Strings und Escapes.
+   * Finds the corresponding closing bracket, respecting strings and escapes.
    */
   private static int findMatchingBracket(String s, int from, char open, char close) {
     int depth = 0;
@@ -105,7 +104,7 @@ public class URLShortenerClient
   }
 
   /**
-   * Zerlegt eine durch Kommas getrennte Liste top-level JSON-Objekte in einzelnen Strings.
+   * Splits a comma-separated list of top-level JSON objects into individual strings.
    */
   private static List<String> splitTopLevelObjects(String itemsInner) {
     List<String> out = new ArrayList<>();
@@ -133,7 +132,7 @@ public class URLShortenerClient
   }
 
   /**
-   * Parst ein einzelnes Mapping-Objekt. Erwartete Felder sind Strings bzw. null.
+   * Parses a single mapping object. Expected fields are strings or null.
    */
   private static ShortUrlMapping parseOneMapping(String objJson) {
     String shortCode = extractString(objJson, "shortCode");
@@ -150,7 +149,7 @@ public class URLShortenerClient
   }
 
   /**
-   * Liest ein String-Feld "key":"value" aus, ohne die Anführungszeichen zu behalten.
+   * Reads a string field "key":"value" without keeping the quotes.
    */
   private static String extractString(String json, String key) {
     String v = extractNullableString(json, key);
@@ -158,7 +157,7 @@ public class URLShortenerClient
   }
 
   /**
-   * Liest ein Feld heraus und gibt den rohen Stringinhalt zurück oder null, falls Feld fehlt oder null ist.
+   * Reads a field and returns the raw string contents or null if the field is missing or null.
    */
   private static String extractNullableString(String json, String key) {
     final String pattern = "\"" + key + "\"";
@@ -167,26 +166,26 @@ public class URLShortenerClient
     int colon = json.indexOf(':', p + pattern.length());
     if (colon < 0) return null;
 
-    // überspringe Whitespace
+    // jump over Whitespace
     int i = colon + 1;
     while (i < json.length() && Character.isWhitespace(json.charAt(i))) i++;
     if (i >= json.length()) return null;
 
     char c = json.charAt(i);
     if (c == 'n') { // null
-      // schnellpfad: erwartet "null"
+      // expected "null"
       return "null";
     }
     if (c != '"') return null;
 
-    // String lesen, respektiere escapes
+    // Read string, respect escapes
     StringBuilder sb = new StringBuilder();
-    i++; // nach das öffnende "
+    i++;
     boolean escape = false;
     for (; i < json.length(); i++) {
       char ch = json.charAt(i);
       if (escape) {
-        // Für unsere Felder reichen die Standard-Escapes, wir übernehmen roh
+        // For our fields, the standard escapes are sufficient, we take raw
         sb.append(ch);
         escape = false;
       } else {
@@ -273,13 +272,13 @@ public class URLShortenerClient
   }
 
   // ————————————————————————————————————————————————————————————————————————————
-  // Minimal-Parser für die bekannte Antwortstruktur
-  // Erwartetes Format: {"mode":"...","count":N,"items":[{...},{...}]}
-  // Wir extrahieren nur items[], die Felder: shortCode, originalUrl, createdAt, expiresAt
+// Minimal parser for the known response structure
+// Expected format: {"mode":"...","count":N,"items":[{...},{...}]}
+// We only extract items[], the fields: shortCode, originalUrl, createdAt, expiresAt
   // ————————————————————————————————————————————————————————————————————————————
 
   /**
-   * Liefert alle Mappings.
+   * Returns all mappings.
    */
   public List<ShortUrlMapping> listAll()
       throws IOException {
@@ -288,7 +287,7 @@ public class URLShortenerClient
   }
 
   /**
-   * Liefert abgelaufene Mappings.
+   * Returns expired mappings.
    */
   public List<ShortUrlMapping> listExpired()
       throws IOException {
@@ -297,7 +296,7 @@ public class URLShortenerClient
   }
 
   /**
-   * Liefert aktive Mappings.
+   * Returns active mappings.
    */
   public List<ShortUrlMapping> listActive()
       throws IOException {
@@ -306,7 +305,7 @@ public class URLShortenerClient
   }
 
   /**
-   * Optional: Roh-JSON falls ein Client Metadaten wie count/mode benötigt.
+   * Optional: Raw JSON if a client needs metadata like count/mode.
    */
   public String listAllJson()
       throws IOException {
@@ -413,10 +412,10 @@ public class URLShortenerClient
   }
 
   /**
-   * Entfernt ein bestehendes Mapping. Entspricht DELETE /mapping/{shortCode}.
+   * Removes an existing mapping. Equivalent to DELETE /mapping/{shortCode}.
    *
-   * @return true, wenn gelöscht (HTTP 204); false, wenn nicht gefunden (HTTP 404).
-   * @throws IOException bei unerwarteten HTTP-Codes oder I/O-Problemen.
+   * @return true if deleted (HTTP 204); false if not found (HTTP 404).
+   * @throws IOException for unexpected HTTP codes or I/O problems.
    */
   public boolean delete(String shortCode)
       throws IOException {
@@ -439,7 +438,7 @@ public class URLShortenerClient
         return true;
       }
       if (code == 404) {
-        // optional: Error-Body lesen, falls der Server etwas liefert
+        // optional: read error body if the server returns something
         drainQuietly(con.getErrorStream());
         return false;
       }
@@ -451,8 +450,8 @@ public class URLShortenerClient
   }
 
   /**
-   * Variante, die beim Nichtauffinden eine IOException wirft.
-   * Praktisch in Workflows, die hart auf Konsistenz prüfen möchten.
+   * Variant that throws an IOException if not found.
+   * Useful in workflows that require strict consistency checks.
    */
   public void deleteOrThrow(String shortCode)
       throws IOException {

@@ -59,7 +59,7 @@ public final class DeleteMappingHandler
 
     var validated = AliasPolicy.validate(shortCode);
     if (!validated.valid()) {
-      logger().info("kein valider ShortCode/Alias .. Abbruch ");
+      logger().info("no valid shortcode/alias .. Abort ");
       sendJson(exchange, 400, "{\"error\":\"bad_request\",\"message\":\"expected valid shortCode\"}");
       return;
     }
