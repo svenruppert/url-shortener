@@ -10,6 +10,7 @@ import com.svenruppert.urlshortener.api.store.InMemoryUrlMappingStore;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
 
@@ -19,9 +20,30 @@ public class ShortenerServer
   private HttpServer serverRedirect;
   private HttpServer serverAdmin;
 
+  //TODO CLI Argumente - IP Address
   public static void main(String[] args)
       throws IOException {
-    new ShortenerServer().init();
+    // Defaults (Fallbacks)
+    String host = DEFAULT_SERVER_HOST;
+    int port = DEFAULT_SERVER_PORT;
+    HasLogger.staticLogger().info("main is called with {}", Arrays.toString(args));
+
+    // Parameter aus CLI lesen
+    if (args.length > 0 && !args[0].isBlank()) {
+      host = args[0].trim();
+      HasLogger.staticLogger().info("host is {}", host);
+    }
+    if (args.length > 1) {
+      try {
+        port = Integer.parseInt(args[1].trim());
+      } catch (NumberFormatException e) {
+        HasLogger.staticLogger().warn("Invalid port argument: {} → using default {}", args[1], port);
+      }
+    }
+
+    HasLogger.staticLogger().warn("Starting ShortenerServer on {}:{}", host, port);
+
+    new ShortenerServer().init(host, port);
   }
 
   public void init()

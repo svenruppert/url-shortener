@@ -29,7 +29,7 @@ public class RedirectHandler
       exchange.sendResponseHeaders(405, -1);
       return;
     }
-    final String path = exchange.getRequestURI().getPath(); // z.B. "/r/ABC123"
+    final String path = exchange.getRequestURI().getPath(); // z.B. "/ABC123"
     if (path == null || !path.startsWith(PATH_REDIRECT)) {
       exchange.sendResponseHeaders(400, -1);
       return;

@@ -97,7 +97,8 @@
         <vaadin.version>24.9.0</vaadin.version>
         <drivers.downloader.phase>pre-integration-test</drivers.downloader.phase>
         <jetty.version>11.0.25</jetty.version>
-        <warName>application</warName>
+        <warName>ui</warName>
+        <restServiceName>urlshortener</restServiceName>
     </properties>
 
     <repositories>

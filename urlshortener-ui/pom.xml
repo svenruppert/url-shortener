@@ -25,6 +25,14 @@
     </dependencyManagement>
 
     <dependencies>
+
+        <!-- Nur zum Kompilieren, nicht bundlen -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>5.0.0</version>
+            <scope>provided</scope>
+        </dependency>
         <!--Vaadin Flow Dependencies-->
         <dependency>
             <groupId>com.vaadin</groupId>
@@ -38,10 +46,7 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <dependency>
-            <groupId>com.svenruppert.urlshortener</groupId>
-            <artifactId>server</artifactId>
-        </dependency>
+
         <dependency>
             <groupId>com.svenruppert.urlshortener</groupId>
             <artifactId>core</artifactId>
@@ -98,6 +103,7 @@
                 <artifactId>maven-war-plugin</artifactId>
                 <configuration>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
+                    <warName>${warName}</warName>
                 </configuration>
             </plugin>
         </plugins>
@@ -107,6 +113,9 @@
             <!-- Production mode is activated using -Pproduction -->
             <id>vaadin-production</id>
 
+            <properties>
+                <vaadin.productionMode>true</vaadin.productionMode>
+            </properties>
             <dependencies>
                 <!-- Exclude development dependencies from production -->
                 <dependency>
@@ -116,6 +125,10 @@
                         <exclusion>
                             <groupId>com.vaadin</groupId>
                             <artifactId>vaadin-dev</artifactId>
+                        </exclusion>
+                        <exclusion>
+                            <groupId>com.vaadin</groupId>
+                            <artifactId>vaadin-dev-server</artifactId>
                         </exclusion>
                     </exclusions>
                 </dependency>
