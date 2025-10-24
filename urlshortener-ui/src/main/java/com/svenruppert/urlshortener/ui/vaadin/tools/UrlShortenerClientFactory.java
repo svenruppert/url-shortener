@@ -4,11 +4,11 @@ import com.svenruppert.urlshortener.client.URLShortenerClient;
 
 public class UrlShortenerClientFactory {
 
+  private UrlShortenerClientFactory() {
+  }
 
-
-
-public static URLShortenerClient newInstance(){
-  return new URLShortenerClient();
-}
+  public static URLShortenerClient newInstance() {
+    return new URLShortenerClient();
+  }
 
 }
