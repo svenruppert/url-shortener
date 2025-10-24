@@ -35,12 +35,17 @@ public class InMemoryUrlMappingStore
   @Override
   public Optional<ShortUrlMapping> findByShortCode(String shortCode) {
     logger().info("findByShortCode '{}'", shortCode);
-    return Optional.ofNullable(store.get(shortCode));
+    String normalized = AliasPolicy.normalize(shortCode);
+    logger().info("findByShortCode normalized for search '{}'", shortCode);
+    return Optional.ofNullable(store.get(normalized));
   }
 
   @Override
   public boolean exists(String shortCode) {
-    return store.containsKey(shortCode);
+    logger().info("exists '{}'", shortCode);
+    String normalized = AliasPolicy.normalize(shortCode);
+    logger().info("exists - normalized for search '{}'", shortCode);
+    return store.containsKey(normalized);
   }
 
   @Override
@@ -50,7 +55,10 @@ public class InMemoryUrlMappingStore
 
   @Override
   public boolean delete(String shortCode) {
-    return store.remove(shortCode) != null;
+    logger().info("delete '{}'", shortCode);
+    String normalized = AliasPolicy.normalize(shortCode);
+    logger().info("delete - normalized for deletion '{}'", normalized);
+    return store.remove(normalized) != null;
   }
 
   @Override
@@ -92,9 +100,11 @@ public class InMemoryUrlMappingStore
     } else {
       logger().info("Alias is NOT set");
       String generated = generator.nextCode();
+      generated = AliasPolicy.normalize(generated);
       logger().info("generated shortCode '{}'", generated);
       while (existsByCode(generated)) {
         generated = generator.nextCode();
+        generated = AliasPolicy.normalize(generated);
         logger().info("generated shortCode '{}'", generated);
       }
       shortCode = generated;
@@ -112,6 +122,9 @@ public class InMemoryUrlMappingStore
 
   @Override
   public boolean existsByCode(String shortCode) {
-    return store.containsKey(shortCode);
+    logger().info("existsByCode '{}'", shortCode);
+    String normalized = AliasPolicy.normalize(shortCode);
+    logger().info("existsByCode - normalized for search '{}'", normalized);
+    return store.containsKey(normalized);
   }
 }
