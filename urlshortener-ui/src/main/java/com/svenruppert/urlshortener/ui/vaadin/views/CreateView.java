@@ -5,6 +5,7 @@ import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.AliasPolicy;
 import com.svenruppert.urlshortener.core.ShortenRequest;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
+import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H2;
@@ -26,7 +27,7 @@ public class CreateView
     implements HasLogger {
 
   public static final String PATH = "create";
-  private final URLShortenerClient urlShortenerClient = new URLShortenerClient();
+  private final URLShortenerClient urlShortenerClient = UrlShortenerClientFactory.newInstance();
 
   public CreateView() {
     setSpacing(true);

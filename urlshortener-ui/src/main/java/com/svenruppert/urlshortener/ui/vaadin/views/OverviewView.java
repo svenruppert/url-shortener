@@ -4,6 +4,7 @@ import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.ShortUrlMapping;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
+import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
@@ -24,7 +25,7 @@ public class OverviewView
     implements HasLogger {
 
   public static final String PATH = "";
-  private final URLShortenerClient urlShortenerClient = new URLShortenerClient();
+  private final URLShortenerClient urlShortenerClient = UrlShortenerClientFactory.newInstance();
   private final Grid<ShortUrlMapping> grid = new Grid<>(ShortUrlMapping.class, false);
 
   public OverviewView()
