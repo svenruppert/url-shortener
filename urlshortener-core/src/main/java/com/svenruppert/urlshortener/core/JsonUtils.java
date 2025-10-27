@@ -313,4 +313,25 @@ public final class JsonUtils
     sb.append("}");
     return sb.toString();
   }
+
+  public static String toJsonListingPaged(
+      String mode,
+      int countOnPage,
+      List<Map<String, String>> items,
+      int page, int size, int total,
+      Object sort, Object dir
+  ) {
+    StringBuilder sb = new StringBuilder(128 + items.size() * 64);
+    sb.append("{");
+    sb.append("\"mode\":\"").append(escape(mode)).append("\",");
+    sb.append("\"page\":").append(page).append(",");
+    sb.append("\"size\":").append(size).append(",");
+    sb.append("\"total\":").append(total).append(",");
+    if (sort != null) sb.append("\"sort\":\"").append(escape(String.valueOf(sort))).append("\",");
+    if (dir  != null) sb.append("\"dir\":\"").append(escape(String.valueOf(dir))).append("\",");
+    sb.append("\"count\":").append(countOnPage).append(",");
+    sb.append("\"items\":").append(toJsonArrayOfObjects(items));
+    sb.append("}");
+    return sb.toString();
+  }
 }

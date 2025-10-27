@@ -1,10 +1,7 @@
 package com.svenruppert.urlshortener.client;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
-import com.svenruppert.urlshortener.core.AliasPolicy;
-import com.svenruppert.urlshortener.core.JsonUtils;
-import com.svenruppert.urlshortener.core.ShortUrlMapping;
-import com.svenruppert.urlshortener.core.ShortenRequest;
+import com.svenruppert.urlshortener.core.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -210,7 +207,7 @@ public class URLShortenerClient
 
 
   // ————————————————————————————————————————————————————————————————————————————
-  // HTTP-Hilfen
+  // HTTP-Helper
   // ————————————————————————————————————————————————————————————————————————————
 
   /**
@@ -271,11 +268,36 @@ public class URLShortenerClient
     }
   }
 
-  // ————————————————————————————————————————————————————————————————————————————
-// Minimal parser for the known response structure
-// Expected format: {"mode":"...","count":N,"items":[{...},{...}]}
-// We only extract items[], the fields: shortCode, originalUrl, createdAt, expiresAt
-  // ————————————————————————————————————————————————————————————————————————————
+  public int listCount(UrlMappingListRequest req)
+      throws IOException {
+    String qs = (req == null) ? "" : req.toQueryStringForCount(); // siehe unten
+    var uri = qs.isEmpty()
+        ? serverBaseAdmin.resolve(PATH_ADMIN_LIST_COUNT)
+        : serverBaseAdmin.resolve(PATH_ADMIN_LIST_COUNT + "?" + qs);
+
+    var con = (java.net.HttpURLConnection) uri.toURL().openConnection();
+    con.setRequestMethod("GET");
+    con.setRequestProperty("Accept", "application/json");
+    con.setConnectTimeout(10_000);
+    con.setReadTimeout(15_000);
+
+    int sc = con.getResponseCode();
+    if (sc != 200) {
+      String err = readAllAsString(con.getErrorStream() != null ? con.getErrorStream() : con.getInputStream());
+      throw new IOException("Unexpected HTTP " + sc + " for " + uri + " body=" + err);
+    }
+    try (var is = con.getInputStream()) {
+      String body = readAllAsString(is);
+      int i = body.indexOf("\"total\"");
+      if (i < 0) return 0;
+      int colon = body.indexOf(':', i);
+      int end = body.indexOf('}', colon + 1);
+      String num = body.substring(colon + 1, end).trim();
+      return Integer.parseInt(num);
+    } finally {
+      con.disconnect();
+    }
+  }
 
   /**
    * Returns all mappings.
@@ -304,22 +326,38 @@ public class URLShortenerClient
     return parseItemsAsMappings(json);
   }
 
+  public List<ShortUrlMapping> list(UrlMappingListRequest request)
+      throws IOException {
+    final String json = listAsJson(request);
+    return parseItemsAsMappings(json);
+  }
+
+
   /**
    * Optional: Raw JSON if a client needs metadata like count/mode.
    */
-  public String listAllJson()
+  public String listAllAsJson()
       throws IOException {
     return fetchJson(PATH_ADMIN_LIST_ALL);
   }
 
-  public String listExpiredJson()
+  public String listExpiredAsJson()
       throws IOException {
     return fetchJson(PATH_ADMIN_LIST_EXPIRED);
   }
 
-  public String listActiveJson()
+  public String listActiveAsJson()
       throws IOException {
     return fetchJson(PATH_ADMIN_LIST_ACTIVE);
+  }
+
+  public String listAsJson(UrlMappingListRequest request)
+      throws IOException {
+    final String qs = (request == null) ? "" : request.toQueryString();
+    String relativePath = qs.isEmpty()
+        ? PATH_ADMIN_LIST
+        : PATH_ADMIN_LIST + "?" + qs;
+    return fetchJson(relativePath);
   }
 
   private String fetchJson(String relativePath)

@@ -19,6 +19,10 @@ public final class DefaultValues {
   public static final String PATH_ADMIN_LIST_ALL = "/list/all";
   public static final String PATH_ADMIN_LIST_EXPIRED = "/list/expired";
   public static final String PATH_ADMIN_LIST_ACTIVE = "/list/active";
+  public static final String PATH_ADMIN_LIST_COUNT  = "/list/count";
+
+
+  public static final String PATTERN_DATE_TIME = "yyyy.MM.dd HH:mm";
 
   private DefaultValues() {
   }

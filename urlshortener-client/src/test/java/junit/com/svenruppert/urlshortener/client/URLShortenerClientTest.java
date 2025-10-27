@@ -38,18 +38,18 @@ public class URLShortenerClientTest
 
   @Test
   void listEndpoints_useGET_and_returnJson() throws IOException {
-    var allRaw = client.listAllJson();
+    var allRaw = client.listAllAsJson();
     assertNotNull(allRaw);
     assertTrue(allRaw.contains("\"mode\""));
     assertTrue(allRaw.contains("\"count\""));
     assertTrue(allRaw.contains("\"items\""));
 
-    var activeRaw = client.listActiveJson();
+    var activeRaw = client.listActiveAsJson();
     assertNotNull(activeRaw);
     assertTrue(activeRaw.contains("\"mode\""));
     assertTrue(activeRaw.contains("\"items\""));
 
-    var expiredRaw = client.listExpiredJson();
+    var expiredRaw = client.listExpiredAsJson();
     assertNotNull(expiredRaw);
     assertTrue(expiredRaw.contains("\"mode\""));
     assertTrue(expiredRaw.contains("\"items\""));

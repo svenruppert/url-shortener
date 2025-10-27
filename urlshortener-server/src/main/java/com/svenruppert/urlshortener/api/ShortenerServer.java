@@ -2,10 +2,7 @@ package com.svenruppert.urlshortener.api;
 
 import com.sun.net.httpserver.HttpServer;
 import com.svenruppert.dependencies.core.logger.HasLogger;
-import com.svenruppert.urlshortener.api.handler.DeleteMappingHandler;
-import com.svenruppert.urlshortener.api.handler.ListHandler;
-import com.svenruppert.urlshortener.api.handler.RedirectHandler;
-import com.svenruppert.urlshortener.api.handler.ShortenHandler;
+import com.svenruppert.urlshortener.api.handler.*;
 import com.svenruppert.urlshortener.api.store.InMemoryUrlMappingStore;
 
 import java.io.IOException;
@@ -64,15 +61,14 @@ public class ShortenerServer
     this.serverAdmin = HttpServer.create(new InetSocketAddress(ADMIN_SERVER_HOST, ADMIN_SERVER_PORT), 0);
     serverAdmin.createContext(PATH_ADMIN_SHORTEN, new ShortenHandler(store));
     serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(store));
+    serverAdmin.createContext(PATH_ADMIN_LIST_COUNT, new ListCountHandler(store));
     serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(store)); // DELETE /mapping/{code}
 
-
-    serverRedirect.setExecutor(null); // default executor
+    serverRedirect.setExecutor(null);
     serverRedirect.start();
 
-    serverAdmin.setExecutor(null); // default executor
+    serverAdmin.setExecutor(null);
     serverAdmin.start();
-
 
     logger().info("URL Shortener server (redirect) running at {}:{}...",
                   serverRedirect.getAddress().getHostName(),
