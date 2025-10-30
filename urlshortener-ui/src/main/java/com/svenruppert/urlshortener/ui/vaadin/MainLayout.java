@@ -1,9 +1,15 @@
 package com.svenruppert.urlshortener.ui.vaadin;
 
-import com.svenruppert.urlshortener.ui.vaadin.views.*;
+import com.svenruppert.urlshortener.ui.vaadin.components.StoreIndicator;
+import com.svenruppert.urlshortener.ui.vaadin.tools.AdminClientFactory;
+import com.svenruppert.urlshortener.ui.vaadin.views.AboutView;
+import com.svenruppert.urlshortener.ui.vaadin.views.CreateView;
+import com.svenruppert.urlshortener.ui.vaadin.views.OverviewView;
+import com.svenruppert.urlshortener.ui.vaadin.views.YoutubeView;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
@@ -23,24 +29,29 @@ public class MainLayout
 
   private void createHeader() {
     H1 appTitle = new H1("URL Shortener");
+    appTitle.getStyle()
+        .set("font-size", "1.1rem")
+        .set("margin", "0");
 
     SideNav views = getPrimaryNavigation();
     Scroller scroller = new Scroller(views);
     scroller.setClassName(LumoUtility.Padding.SMALL);
 
     DrawerToggle toggle = new DrawerToggle();
-//    H2 viewTitle = new H2("Orders");
 
-//    HorizontalLayout subViews = getSecondaryNavigation();
-//    Element element = subViews.getElement();
+    var adminClient = AdminClientFactory.newInstance();
+    var storeIndicator = new StoreIndicator(adminClient);
+    storeIndicator.getStyle().set("margin-left", "auto"); // nach rechts schieben
 
-//    HorizontalLayout wrapper = new HorizontalLayout(toggle, viewTitle);
-    HorizontalLayout wrapper = new HorizontalLayout(toggle);
-    wrapper.setAlignItems(FlexComponent.Alignment.CENTER);
-    wrapper.setSpacing(false);
+    HorizontalLayout headerRow = new HorizontalLayout(toggle, appTitle, new Span(), storeIndicator);
+    headerRow.setWidthFull();
+    headerRow.setAlignItems(FlexComponent.Alignment.CENTER);
+    headerRow.setSpacing(true);
+    headerRow.setPadding(true);
+    headerRow.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+    headerRow.expand(headerRow.getComponentAt(2));
 
-//    VerticalLayout viewHeader = new VerticalLayout(wrapper, subViews);
-    VerticalLayout viewHeader = new VerticalLayout(wrapper);
+    VerticalLayout viewHeader = new VerticalLayout(headerRow);
     viewHeader.setPadding(false);
     viewHeader.setSpacing(false);
 
@@ -60,32 +71,4 @@ public class MainLayout
     );
     return sideNav;
   }
-
-//  private HorizontalLayout getSecondaryNavigation() {
-//    HorizontalLayout navigation = new HorizontalLayout();
-//    navigation.addClassNames(LumoUtility.JustifyContent.CENTER,
-//                             LumoUtility.Gap.SMALL, LumoUtility.Height.MEDIUM);
-//    RouterLink all = createLink("All");
-//    RouterLink open = createLink("Open");
-//    RouterLink completed = createLink("Completed");
-//    RouterLink cancelled = createLink("Cancelled");
-//    navigation.add(all, open, completed, cancelled);
-//    return navigation;
-//  }
-
-//  private RouterLink createLink(String viewName) {
-//    RouterLink link = new RouterLink();
-//    link.add(viewName);
-//    // Demo has no routes
-//    // link.setRoute(viewClass.java);
-//
-//    link.addClassNames(LumoUtility.Display.FLEX,
-//                       LumoUtility.AlignItems.CENTER,
-//                       LumoUtility.Padding.Horizontal.MEDIUM,
-//                       LumoUtility.TextColor.SECONDARY,
-//                       LumoUtility.FontWeight.MEDIUM);
-//    link.getStyle().set("text-decoration", "none");
-//
-//    return link;
-//  }
 }

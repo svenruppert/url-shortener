@@ -16,6 +16,15 @@
             <groupId>com.svenruppert.urlshortener</groupId>
             <artifactId>core</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.store</groupId>
+            <artifactId>storage-embedded</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.serializer</groupId>
+            <artifactId>serializer</artifactId>
+        </dependency>
     </dependencies>
 
 

@@ -175,6 +175,17 @@
                 <artifactId>ui</artifactId>
                 <version>00.00.01-SNAPSHOT</version>
             </dependency>
+
+            <dependency>
+                <groupId>org.eclipse.store</groupId>
+                <artifactId>storage-embedded</artifactId>
+                <version>3.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.serializer</groupId>
+                <artifactId>serializer</artifactId>
+                <version>3.0.1</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

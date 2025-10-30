@@ -21,8 +21,11 @@ public final class DefaultValues {
   public static final String PATH_ADMIN_LIST_ACTIVE = "/list/active";
   public static final String PATH_ADMIN_LIST_COUNT  = "/list/count";
 
+  public static final String PATH_ADMIN_STORE_INFO = "/store/info";
 
   public static final String PATTERN_DATE_TIME = "yyyy.MM.dd HH:mm";
+
+  public static final String STORAGE_DATA_PATH = "data";
 
   private DefaultValues() {
   }

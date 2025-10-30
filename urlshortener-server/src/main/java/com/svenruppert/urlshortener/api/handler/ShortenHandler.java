@@ -5,9 +5,10 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.dependencies.core.net.HttpStatus;
-import com.svenruppert.urlshortener.api.ShortCodeGenerator;
+import com.svenruppert.functional.model.Result;
 import com.svenruppert.urlshortener.api.store.UrlMappingStore;
 import com.svenruppert.urlshortener.core.JsonUtils;
+import com.svenruppert.urlshortener.core.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.ShortenRequest;
 
 import java.io.IOException;
@@ -40,22 +41,15 @@ public class ShortenHandler
   protected static final String CONTENT_TYPE = "Content-Type";
   protected static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
   private final UrlMappingStore store;
-  private final ShortCodeGenerator generator;
   private final boolean enableCors;
 
   public ShortenHandler(UrlMappingStore store) {
     this.store = store;
-    this.generator = new ShortCodeGenerator(0);
     this.enableCors = false;
   }
 
-  public ShortenHandler(UrlMappingStore store, ShortCodeGenerator generator) {
-    this(store, generator, false);
-  }
-
-  public ShortenHandler(UrlMappingStore store, ShortCodeGenerator generator, boolean enableCors) {
+  public ShortenHandler(UrlMappingStore store, boolean enableCors) {
     this.store = store;
-    this.generator = generator;
     this.enableCors = enableCors;
   }
 
@@ -69,6 +63,7 @@ public class ShortenHandler
   @Override
   public void handle(HttpExchange ex)
       throws IOException {
+    logger().info("handle ... {} ", ex.getRequestMethod());
     try {
       // Optional: CORS Preflight
       if (REQUEST_METHOD_OPTIONS.equalsIgnoreCase(ex.getRequestMethod())) {
@@ -113,20 +108,28 @@ public class ShortenHandler
         writeJson(ex, BAD_REQUEST, "Only http/https allowed");
         return;
       }
-      var urlMappingResult = store.createMapping(req.getShortURL(), req.getUrl());
 
+      logger().info("ShortenHandler - createMapping start");
+      final Result<ShortUrlMapping> urlMappingResult = store.createMapping(req.getShortURL(), req.getUrl());
+      logger().info("ShortenHandler - createMapping stop");
+      urlMappingResult
+          .ifPresentOrElse(success -> {
+            logger().info("mapping created success {}", success.toString());
+          }, failed -> {
+            logger().info("mapping created failed - {}", failed);
+          });
+
+      logger().info("ShortenHandler - createMapping consuming urlMappingResult");
       urlMappingResult
           .ifFailed(errorJson -> {
             try {
               var parsed = JsonUtils.parseJson(errorJson);
-              logger().info("createMapping failed . {}", errorJson);
-              for (var entry : parsed.entrySet()) {
-                logger().info("entry - {}", entry);
-                var entryKey = entry.getKey();
-                var errorCode = Integer.parseInt(entryKey);
+              logger().info("parsed Json {}", parsed);
 
-                writeJson(ex, HttpStatus.fromCode(errorCode), entry.getValue());
-              }
+              var code = parsed.get("code");
+              var errorCode = Integer.parseInt(code);
+              var message = parsed.get("message");
+              writeJson(ex, HttpStatus.fromCode(errorCode), message);
             } catch (IOException e) {
               throw new RuntimeException(e);
             }
@@ -141,11 +144,12 @@ public class ShortenHandler
               throw new RuntimeException(e);
             }
           });
-
+      logger().info("hortenHandler .. try block .. done");
     } catch (Exception e) {
-      logger().warn(e.toString());
+      logger().warn("catch - {}", e.toString());
       writeJson(ex, INTERNAL_SERVER_ERROR);
     } finally {
+      logger().info("ShortenHandler .. finally");
       ex.close();
     }
   }
@@ -157,6 +161,7 @@ public class ShortenHandler
 
   private void writeJson(HttpExchange ex, HttpStatus httpStatus, String message)
       throws IOException {
+    logger().info("writeJson {}, {}", httpStatus, message);
     byte[] data = message.getBytes(UTF_8);
     Headers h = ex.getResponseHeaders();
     h.set(CONTENT_TYPE, JSON_CONTENT_TYPE);

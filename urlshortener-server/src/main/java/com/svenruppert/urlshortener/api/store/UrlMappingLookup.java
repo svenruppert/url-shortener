@@ -7,12 +7,12 @@ import java.util.Optional;
 
 public interface UrlMappingLookup {
 
-  boolean exists(String shortCode);
+  boolean existsByCode(String shortCode);
 
   Optional<ShortUrlMapping> findByShortCode(String shortCode);
   List<ShortUrlMapping> findAll();
   List<ShortUrlMapping> find(UrlMappingFilter filter);
 
-  int mappingCount();
   int count(UrlMappingFilter filter);
+  int countAll();
 }

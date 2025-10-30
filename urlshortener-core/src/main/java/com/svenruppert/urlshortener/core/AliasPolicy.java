@@ -52,5 +52,9 @@ public final class AliasPolicy {
     public static Validation fail(Reason r) {
       return new Validation(false, r);
     }
+
+    public boolean failed() {
+      return !valid;
+    }
   }
 }

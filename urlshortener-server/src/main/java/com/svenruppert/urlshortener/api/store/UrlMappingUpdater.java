@@ -9,5 +9,5 @@ public interface UrlMappingUpdater {
   Result<ShortUrlMapping> createMapping(String alias, String url);
 
   boolean delete(String shortCode);
-  boolean existsByCode(String shortCode);
+
 }

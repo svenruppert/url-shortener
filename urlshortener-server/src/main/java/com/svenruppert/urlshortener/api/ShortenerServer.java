@@ -3,10 +3,14 @@ package com.svenruppert.urlshortener.api;
 import com.sun.net.httpserver.HttpServer;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.handler.*;
-import com.svenruppert.urlshortener.api.store.InMemoryUrlMappingStore;
+import com.svenruppert.urlshortener.api.store.UrlMappingStore;
+import com.svenruppert.urlshortener.api.store.eclipsestore.EclipseStoreUrlMappingStore;
+import com.svenruppert.urlshortener.api.store.inmemory.InMemoryUrlMappingStore;
+import com.svenruppert.urlshortener.core.JsonUtils;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Clock;
 import java.util.Arrays;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
@@ -38,9 +42,8 @@ public class ShortenerServer
       }
     }
 
-    HasLogger.staticLogger().warn("Starting ShortenerServer on {}:{}", host, port);
-
-    new ShortenerServer().init(host, port);
+    boolean persistent = true;
+    new ShortenerServer().init(host, port, persistent);
   }
 
   public void init()
@@ -51,7 +54,26 @@ public class ShortenerServer
 
   public void init(String hostRedirect, int portRedirect)
       throws IOException {
-    var store = new InMemoryUrlMappingStore(new ShortCodeGenerator(1));
+    init(hostRedirect, portRedirect, false);
+  }
+
+  public void init(String hostRedirect, int portRedirect, boolean persistent)
+      throws IOException {
+    logger().info("starting server with store ==> persistent == {}", persistent);
+    final long startedAt = System.currentTimeMillis();
+    var shortCodeGenerator = new ShortCodeGenerator(1);
+
+    UrlMappingStore store;
+    if (persistent) {
+      store = new EclipseStoreUrlMappingStore(
+          STORAGE_DATA_PATH,
+          shortCodeGenerator,
+          Clock.systemUTC(),
+          err -> JsonUtils.toJson(err.httpStatus(), err.message(), err.reasonCode())
+      );
+    } else {
+      store = new InMemoryUrlMappingStore(shortCodeGenerator);
+    }
 
     logger().info("Starting URL Shortener server (redirect)... with params: host={}, port={}", hostRedirect, portRedirect);
     this.serverRedirect = HttpServer.create(new InetSocketAddress(hostRedirect, portRedirect), 0);
@@ -63,6 +85,7 @@ public class ShortenerServer
     serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(store));
     serverAdmin.createContext(PATH_ADMIN_LIST_COUNT, new ListCountHandler(store));
     serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(store)); // DELETE /mapping/{code}
+    serverAdmin.createContext(PATH_ADMIN_STORE_INFO, new StoreInfoHandler(store, startedAt));
 
     serverRedirect.setExecutor(null);
     serverRedirect.start();
@@ -76,6 +99,19 @@ public class ShortenerServer
     logger().info("URL Shortener server (admin) running at {}:{}...",
                   serverAdmin.getAddress().getHostName(),
                   serverAdmin.getAddress().getPort());
+
+    logger().info("register ShutdownHook for store..");
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      shutdown();
+      if (store instanceof EclipseStoreUrlMappingStore es) {
+        logger().info("closing EclipseStore..");
+        try {
+          es.close();
+        } catch (Exception ignored) {
+        }
+      }
+      logger().info("Server shutdown complete");
+    }));
   }
 
   public void shutdown() {

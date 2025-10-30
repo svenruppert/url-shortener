@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static com.svenruppert.dependencies.core.net.HttpStatus.OK;
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -372,7 +373,7 @@ public class URLShortenerClient
     con.setReadTimeout(15_000);
 
     final int code = con.getResponseCode();
-    if (code != 200) {
+    if (code != OK.code()) {
       final String err = readAllAsString(
           con.getErrorStream() != null ? con.getErrorStream() : con.getInputStream());
       throw new IOException("Unexpected HTTP " + code + " for " + url + " body=" + err);

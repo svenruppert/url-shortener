@@ -125,9 +125,7 @@ public class UrlShortenerE2ETest
       throws Exception {
     String body = JsonUtils.toJson(new ShortenRequest("https://example.com/other", "e2e-alias"));
     var res = POST(PATH_ADMIN_SHORTEN, body);
-
     logger().info("expected response code - {} ", CONFLICT);
-
     assertEquals(CONFLICT.code(), res.statusCode(), "Doppelter Alias sollte Konflikt liefern");
     var responseBody = res.body();
     logger().info("responseBody - {}", responseBody);

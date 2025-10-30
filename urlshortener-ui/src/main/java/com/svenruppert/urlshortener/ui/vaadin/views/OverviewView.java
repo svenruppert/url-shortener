@@ -5,8 +5,11 @@ import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.UrlMappingListRequest;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
+import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
 import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
+import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -76,6 +79,7 @@ public class OverviewView
   private int currentPage = 1;
   private int totalCount = 0;
   private CallbackDataProvider<ShortUrlMapping, Void> dataProvider;
+  private AutoCloseable subscription;
 
   public OverviewView() {
     setSizeFull();
@@ -90,11 +94,30 @@ public class OverviewView
     configureGrid();
     add(grid);
 
-    // Default values
     pageSize.setValue(25);
     sortBy.setValue("createdAt");
     dir.setValue("desc");
 
+  }
+
+  @Override
+  protected void onAttach(AttachEvent attachEvent) {
+    super.onAttach(attachEvent);
+    refresh();
+    subscription = StoreEvents.subscribe(_ -> getUI()
+        .ifPresent(ui -> ui.access(this::refresh)));
+  }
+
+  @Override
+  protected void onDetach(DetachEvent detachEvent) {
+    super.onDetach(detachEvent);
+    if (subscription != null) {
+      try {
+        subscription.close();
+      } catch (Exception ignored) {
+      }
+      subscription = null;
+    }
   }
 
   private Component buildSearchBar() {
@@ -237,13 +260,13 @@ public class OverviewView
   private void initDataProvider() {
     dataProvider = new CallbackDataProvider<>(
         q -> {
-          final int uiSize   = Optional.ofNullable(pageSize.getValue()).orElse(25);
+          final int uiSize = Optional.ofNullable(pageSize.getValue()).orElse(25);
           final int pageStart = (currentPage - 1) * uiSize;
 
-          final int vLimit   = q.getLimit();
-          final int vOffset  = q.getOffset();
+          final int vLimit = q.getLimit();
+          final int vOffset = q.getOffset();
 
-          final int effectiveLimit  = (vLimit > 0) ? vLimit : uiSize;
+          final int effectiveLimit = (vLimit > 0) ? vLimit : uiSize;
           final int effectiveOffset = pageStart + vOffset;
 
           final int page = (effectiveLimit > 0) ? (effectiveOffset / effectiveLimit) + 1 : 1;
@@ -265,7 +288,7 @@ public class OverviewView
             final UrlMappingListRequest base = buildFilter(null, null);
             totalCount = urlShortenerClient.listCount(base);
 
-            final int uiSize    = Optional.ofNullable(pageSize.getValue()).orElse(25);
+            final int uiSize = Optional.ofNullable(pageSize.getValue()).orElse(25);
             final int pageStart = (currentPage - 1) * uiSize;
             final int remaining = Math.max(0, totalCount - pageStart);
             final int pageCount = Math.min(uiSize, remaining);
@@ -284,9 +307,6 @@ public class OverviewView
     grid.setPageSize(Optional.ofNullable(pageSize.getValue()).orElse(25));
     grid.setDataProvider(dataProvider);
   }
-
-
-
 
   private void refreshPageInfo() {
     logger().info("refreshPageInfo");
@@ -334,7 +354,7 @@ public class OverviewView
     }
 
     if (sortBy.getValue() != null && !sortBy.getValue().isBlank()) b.sort(sortBy.getValue());
-    if (dir.getValue()    != null && !dir.getValue().isBlank())    b.dir(dir.getValue());
+    if (dir.getValue() != null && !dir.getValue().isBlank()) b.dir(dir.getValue());
 
     if (page != null && size != null) {
       b.page(page).size(size);
