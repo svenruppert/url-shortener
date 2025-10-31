@@ -4,11 +4,12 @@ import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.StoreInfo;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.PATH_ADMIN_STORE_INFO;
-import static java.nio.charset.StandardCharsets.*;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class AdminClient
     implements HasLogger {
@@ -38,7 +39,9 @@ public class AdminClient
       var storeInfo = JsonUtils.fromJson(json, StoreInfo.class);
       logger().info("getStoreInfo - storeInfo {}", storeInfo);
       return storeInfo;
-
+    } catch (Exception e) {
+      logger().warn(" getStoreInfo - Failed {}", e.getMessage());
+      throw new IOException(e.getMessage());
     }
   }
 

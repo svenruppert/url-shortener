@@ -11,6 +11,10 @@ public final class DefaultValues {
   public static final String DEFAULT_SERVER_PROTOCOL = "http";
   public static final String DEFAULT_SERVER_URL = DEFAULT_SERVER_PROTOCOL + "://" + DEFAULT_SERVER_HOST + ":" + DEFAULT_SERVER_PORT;
 
+  public static final String CONTENT_TYPE = "Content-Type";
+  public static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
+
+
   public static final String PATH_REDIRECT = "/";
 
   public static final String PATH_ADMIN_SHORTEN = "/shorten";

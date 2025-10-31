@@ -9,7 +9,6 @@ import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.ShortUrlMapping;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -19,9 +18,11 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.function.Predicate;
 
+import static com.svenruppert.dependencies.core.net.HttpStatus.OK;
+import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
+import static com.svenruppert.urlshortener.api.utils.QueryUtils.*;
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
 import static com.svenruppert.urlshortener.core.JsonUtils.toJsonListingPaged;
-import static com.svenruppert.urlshortener.api.utils.QueryUtils.*;
 
 public class ListHandler
     implements HttpHandler, HasLogger {
@@ -29,7 +30,7 @@ public class ListHandler
   private final UrlMappingLookup store;
 
   public ListHandler(UrlMappingLookup store) {
-    this.store = Objects.requireNonNull(store);
+    this.store = store;
   }
 
   private static String first(Map<String, List<String>> q, String key) {
@@ -75,13 +76,13 @@ public class ListHandler
   }
 
   @Override
-  public void handle(HttpExchange exchange)
+  public void handle(HttpExchange ex)
       throws IOException {
-    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-      exchange.sendResponseHeaders(405, -1);
+    if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) {
+      ex.sendResponseHeaders(405, -1);
       return;
     }
-    final String path = exchange.getRequestURI().getPath();
+    final String path = ex.getRequestURI().getPath();
     logger().info("List request: {}", path);
 
     String responseJson;
@@ -92,19 +93,13 @@ public class ListHandler
     } else if (path.endsWith(PATH_ADMIN_LIST_ACTIVE)) {
       responseJson = listActive();
     } else if (path.endsWith(PATH_ADMIN_LIST)) {
-      responseJson = listFiltered(exchange);
+      responseJson = listFiltered(ex);
     } else {
       logger().info("undefined path {}", path);
-      exchange.sendResponseHeaders(404, -1);
+      ex.sendResponseHeaders(404, -1);
       return;
     }
-
-    final byte[] payload = responseJson.getBytes(StandardCharsets.UTF_8);
-    exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
-    exchange.sendResponseHeaders(200, payload.length);
-    try (OutputStream os = exchange.getResponseBody()) {
-      os.write(payload);
-    }
+    writeJson(ex, OK, responseJson);
   }
 
   private String listAll() {

@@ -2,6 +2,7 @@ package com.svenruppert.urlshortener.api;
 
 import com.sun.net.httpserver.HttpServer;
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.api.filter.BlockBrowserPreflightFilter;
 import com.svenruppert.urlshortener.api.handler.*;
 import com.svenruppert.urlshortener.api.store.UrlMappingStore;
 import com.svenruppert.urlshortener.api.store.eclipsestore.EclipseStoreUrlMappingStore;
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.util.Arrays;
+import java.util.concurrent.Executors;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
 
@@ -41,6 +43,8 @@ public class ShortenerServer
         HasLogger.staticLogger().warn("Invalid port argument: {} → using default {}", args[1], port);
       }
     }
+
+
 
     boolean persistent = true;
     new ShortenerServer().init(host, port, persistent);
@@ -81,16 +85,18 @@ public class ShortenerServer
 
     logger().info("Starting URL Shortener server (admin)... with params: host={}, port={}", ADMIN_SERVER_HOST, ADMIN_SERVER_PORT);
     this.serverAdmin = HttpServer.create(new InetSocketAddress(ADMIN_SERVER_HOST, ADMIN_SERVER_PORT), 0);
-    serverAdmin.createContext(PATH_ADMIN_SHORTEN, new ShortenHandler(store));
-    serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(store));
-    serverAdmin.createContext(PATH_ADMIN_LIST_COUNT, new ListCountHandler(store));
-    serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(store)); // DELETE /mapping/{code}
-    serverAdmin.createContext(PATH_ADMIN_STORE_INFO, new StoreInfoHandler(store, startedAt));
+    serverAdmin.createContext(PATH_ADMIN_SHORTEN, new ShortenHandler(store)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(store)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_LIST_COUNT, new ListCountHandler(store)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(store)).getFilters().add(new BlockBrowserPreflightFilter()); // DELETE /mapping/{code}
+    serverAdmin.createContext(PATH_ADMIN_STORE_INFO, new StoreInfoHandler(store, startedAt)).getFilters().add(new BlockBrowserPreflightFilter());
 
-    serverRedirect.setExecutor(null);
+    var execRedirect = Executors.newVirtualThreadPerTaskExecutor();
+    serverRedirect.setExecutor(execRedirect);
     serverRedirect.start();
 
-    serverAdmin.setExecutor(null);
+    var execAdmin = Executors.newVirtualThreadPerTaskExecutor();
+    serverAdmin.setExecutor(execAdmin);
     serverAdmin.start();
 
     logger().info("URL Shortener server (redirect) running at {}:{}...",
@@ -112,6 +118,7 @@ public class ShortenerServer
       }
       logger().info("Server shutdown complete");
     }));
+    Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
   }
 
   public void shutdown() {

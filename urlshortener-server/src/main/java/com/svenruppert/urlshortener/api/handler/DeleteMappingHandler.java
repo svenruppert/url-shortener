@@ -7,9 +7,9 @@ import com.svenruppert.urlshortener.api.store.UrlMappingUpdater;
 import com.svenruppert.urlshortener.core.AliasPolicy;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 
+import static com.svenruppert.dependencies.core.net.HttpStatus.fromCode;
+import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
 import static com.svenruppert.urlshortener.core.DefaultValues.PATH_ADMIN_DELETE;
 
 
@@ -20,16 +20,6 @@ public final class DeleteMappingHandler
 
   public DeleteMappingHandler(UrlMappingUpdater updater) {
     this.updater = updater;
-  }
-
-  private static void sendJson(HttpExchange ex, int status, String body)
-      throws IOException {
-    var bytes = body.getBytes(StandardCharsets.UTF_8);
-    ex.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-    ex.sendResponseHeaders(status, bytes.length);
-    try (OutputStream os = ex.getResponseBody()) {
-      os.write(bytes);
-    }
   }
 
   @Override
@@ -46,11 +36,10 @@ public final class DeleteMappingHandler
       return;
     }
 
-
     //TODO check with AliasPolicy.isValid(alias)
     if (!path.startsWith(PATH_ADMIN_DELETE)) {
       logger().warn("no matches - {}", path);
-      sendJson(exchange, 400, "{\"error\":\"bad_request\",\"message\":\"expected DELETE /delete/{shortCode}\"}");
+      writeJson(exchange, fromCode(400), "{\"error\":\"bad_request\",\"message\":\"expected DELETE /delete/{shortCode}\"}");
       return;
     }
 
@@ -60,7 +49,7 @@ public final class DeleteMappingHandler
     var validated = AliasPolicy.validate(shortCode);
     if (!validated.valid()) {
       logger().info("no valid shortcode/alias .. Abort ");
-      sendJson(exchange, 400, "{\"error\":\"bad_request\",\"message\":\"expected valid shortCode\"}");
+      writeJson(exchange, fromCode(400), "{\"error\":\"bad_request\",\"message\":\"expected valid shortCode\"}");
       return;
     }
 
@@ -70,11 +59,11 @@ public final class DeleteMappingHandler
       if (removed) {
         exchange.sendResponseHeaders(204, -1); // No Content
       } else {
-        sendJson(exchange, 404, "{\"error\":\"not_found\",\"message\":\"shortCode not found\"}");
+        writeJson(exchange, fromCode(404), "{\"error\":\"not_found\",\"message\":\"shortCode not found\"}");
       }
     } catch (Exception e) {
       logger().error("Delete failed for shortCode={}", shortCode, e);
-      sendJson(exchange, 500, "{\"error\":\"internal_error\"}");
+      writeJson(exchange, fromCode(500), "{\"error\":\"internal_error\"}");
     }
   }
 }

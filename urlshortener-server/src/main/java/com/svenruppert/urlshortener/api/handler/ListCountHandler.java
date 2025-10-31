@@ -8,11 +8,12 @@ import com.svenruppert.urlshortener.api.store.UrlMappingFilter;
 import com.svenruppert.urlshortener.api.store.UrlMappingLookup;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URLDecoder;
 import java.time.Instant;
 import java.util.*;
 
+import static com.svenruppert.dependencies.core.net.HttpStatus.OK;
+import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public final class ListCountHandler
@@ -21,7 +22,7 @@ public final class ListCountHandler
   private final UrlMappingLookup store;
 
   public ListCountHandler(UrlMappingLookup store) {
-    this.store = Objects.requireNonNull(store);
+    this.store = store;
   }
 
   private static Map<String, List<String>> parseQuery(String raw) {
@@ -42,7 +43,7 @@ public final class ListCountHandler
 
   private static String first(Map<String, List<String>> m, String k) {
     var list = m.get(k);
-    return (list == null || list.isEmpty()) ? null : list.get(0);
+    return (list == null || list.isEmpty()) ? null : list.getFirst();
   }
 
   private static boolean bool(Map<String, List<String>> m, String k) {
@@ -63,15 +64,15 @@ public final class ListCountHandler
   }
 
   @Override
-  public void handle(HttpExchange exchange)
+  public void handle(HttpExchange ex)
       throws IOException {
-    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-      exchange.sendResponseHeaders(405, -1);
+    if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) {
+      ex.sendResponseHeaders(405, -1);
       return;
     }
 
     Map<String, List<String>> q = parseQuery(
-        Optional.ofNullable(exchange.getRequestURI().getRawQuery()).orElse(""));
+        Optional.ofNullable(ex.getRequestURI().getRawQuery()).orElse(""));
 
     UrlMappingFilter filter = UrlMappingFilter.builder()
         .codePart(first(q, "code"))
@@ -84,12 +85,9 @@ public final class ListCountHandler
         .build();
 
     int total = store.count(filter);
-    byte[] body = ("{\"total\":" + total + "}").getBytes(UTF_8);
+    var data = "{\"total\":" + total + "}";
 
-    exchange.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
-    exchange.sendResponseHeaders(200, body.length);
-    try (OutputStream os = exchange.getResponseBody()) {
-      os.write(body);
-    }
+    writeJson(ex, OK, data);
+
   }
 }
