@@ -41,8 +41,8 @@ public final class MappingCreator
   /**
    * Main method: creates mapping with optional alias.
    */
-  public Result<ShortUrlMapping> create(String alias, String url) {
-    logger().info("createMapping - alias='{}' / url='{}'", alias, url);
+  public Result<ShortUrlMapping> create(String alias, String url, Instant expiredAt) {
+    logger().info("createMapping - alias='{}' / url='{}' / expiredAt='{}'", alias, url, expiredAt);
 
     final String shortCode;
     if (!isNullOrBlank(alias)) {
@@ -77,7 +77,7 @@ public final class MappingCreator
       }
       shortCode = gen;
     }
-    var mapping = new ShortUrlMapping(shortCode, url, Instant.now(clock), Optional.empty());
+    var mapping = new ShortUrlMapping(shortCode, url, Instant.now(clock), Optional.ofNullable(expiredAt));
     logger().info("mapping to store .. {}", mapping);
     store.accept(mapping);
     logger().info("mapping stored .. {}", mapping);

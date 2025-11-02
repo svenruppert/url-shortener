@@ -13,7 +13,7 @@ class ShortenRequestJsonTest {
     ShortenRequest req = new ShortenRequest("https://example.com/path?q=\"x\"", null);
     String json = req.toJson();
     assertTrue(json.contains("\"url\": \"https://example.com/path?q=\\\"x\\\"\""));
-    assertTrue(json.contains("\"alias\": null"));
+    assertTrue(json.contains("\"alias\": \"null\""));
   }
 
   @Test

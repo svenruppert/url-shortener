@@ -1,6 +1,9 @@
 package com.svenruppert.urlshortener.core;
 
 public final class DefaultValues {
+  //TODO - must be editable by user
+  public static final String SHORTCODE_BASE_URL = "https://3g3.eu/";
+
   public static final int ADMIN_SERVER_PORT = 9090;
   public static final String ADMIN_SERVER_HOST = "localhost";
   public static final String ADMIN_SERVER_PROTOCOL = "http";
@@ -23,7 +26,7 @@ public final class DefaultValues {
   public static final String PATH_ADMIN_LIST_ALL = "/list/all";
   public static final String PATH_ADMIN_LIST_EXPIRED = "/list/expired";
   public static final String PATH_ADMIN_LIST_ACTIVE = "/list/active";
-  public static final String PATH_ADMIN_LIST_COUNT  = "/list/count";
+  public static final String PATH_ADMIN_LIST_COUNT = "/list/count";
 
   public static final String PATH_ADMIN_STORE_INFO = "/store/info";
 

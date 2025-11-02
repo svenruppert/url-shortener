@@ -13,7 +13,6 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import static com.svenruppert.dependencies.core.logger.HasLogger.staticLogger;
-import static com.svenruppert.dependencies.core.net.HttpStatus.OK;
 import static java.util.stream.Collectors.joining;
 
 public final class JsonUtils
@@ -56,8 +55,6 @@ public final class JsonUtils
 
     /* ---- StoreInfo ---- */
     if (type == StoreInfo.class) {
-      var storeInfoJson = m.get(OK.code());
-
       String mode = m.getOrDefault("mode", "InMemory");
       int mappings = parseIntSafe(m.get("mappings"), 0);
       long startedAt = parseLongSafe(m.get("startedAtEpochMs"), 0L);
@@ -71,13 +68,15 @@ public final class JsonUtils
       if (url == null || url.isEmpty()) {
         throw new IllegalArgumentException("Field 'url' missing or empty");
       }
-      return (T) new ShortenRequest(url, alias);
+      Instant expiresAt = parseInstantSafe(m.get("expiresAt"));
+      return (T) new ShortenRequest(url, alias, expiresAt);
     }
 
     /* ---- ShortenResponse ---- */
     if (type == ShortenResponse.class) {
       String shortCode = m.get("shortCode");
       String originalUrl = m.get("originalUrl");
+//      String expiresAt = m.get("expiresAt");
       return (T) new ShortenResponse(shortCode, originalUrl);
     }
 
@@ -140,6 +139,7 @@ public final class JsonUtils
       Map<String, Object> m = new LinkedHashMap<>();
       m.put("url", req.getUrl());
       m.put("alias", req.getShortURL());
+      m.put("expiresAt", req.getExpiresAt());
       return toJson(m);
     }
     if (dto instanceof ShortenResponse(String shortCode, String originalUrl)) {
@@ -187,13 +187,11 @@ public final class JsonUtils
   }
 
   public static String toJsonListing(String mode, int count, List<Map<String, String>> items) {
-    StringBuilder sb = new StringBuilder(64 + items.size() * 64);
-    sb.append("{");
-    sb.append("\"mode\":\"").append(escape(mode)).append("\",");
-    sb.append("\"count\":").append(count).append(",");
-    sb.append("\"items\":").append(toJsonArrayOfObjects(items));
-    sb.append("}");
-    return sb.toString();
+    return "{" +
+        "\"mode\":\"" + escape(mode) + "\"," +
+        "\"count\":" + count + "," +
+        "\"items\":" + toJsonArrayOfObjects(items) +
+        "}";
   }
 
   public static String toJsonListingPaged(
@@ -337,6 +335,8 @@ public final class JsonUtils
     if (!(s.startsWith("{") && s.endsWith("}")))
       throw new IOException("Invalid JSON object");
     s = s.substring(1, s.length() - 1); // Inhalt ohne { }
+
+    s = s.replaceAll("\\n", "");
 
     Map<String, String> map = new LinkedHashMap<>();
     var entries = getEntries(s);

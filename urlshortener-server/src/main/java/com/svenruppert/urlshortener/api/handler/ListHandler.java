@@ -35,7 +35,7 @@ public class ListHandler
 
   private static String first(Map<String, List<String>> q, String key) {
     var v = q.get(key);
-    return (v == null || v.isEmpty()) ? null : v.get(0);
+    return (v == null || v.isEmpty()) ? null : v.getFirst();
   }
 
   private static Optional<Instant> parseInstant(String raw, boolean startOfDayIfDate) {

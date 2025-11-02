@@ -1,4 +1,4 @@
-package com.svenruppert.urlshortener.ui.vaadin.views;
+package com.svenruppert.urlshortener.ui.vaadin.views.overview;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
@@ -7,10 +7,7 @@ import com.svenruppert.urlshortener.core.UrlMappingListRequest;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
 import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
-import com.vaadin.flow.component.AttachEvent;
-import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.DetachEvent;
-import com.vaadin.flow.component.Text;
+import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -19,7 +16,10 @@ import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
+import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
@@ -30,11 +30,13 @@ import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.timepicker.TimePicker;
 import com.vaadin.flow.data.provider.CallbackDataProvider;
+import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -44,6 +46,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.PATTERN_DATE_TIME;
+import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL;
 
 @PageTitle("Overview")
 @Route(value = OverviewView.PATH, layout = MainLayout.class)
@@ -123,7 +126,14 @@ public class OverviewView
   private Component buildSearchBar() {
     // Hints
     codePart.setPlaceholder("e.g. ex-");
+    codePart.setValueChangeMode(ValueChangeMode.LAZY);
+    codePart.setValueChangeTimeout(400);
+    codePart.addValueChangeListener(e -> refresh());
+
     urlPart.setPlaceholder("e.g. docs");
+    urlPart.setValueChangeMode(ValueChangeMode.LAZY);
+    urlPart.setValueChangeTimeout(400);
+    urlPart.addValueChangeListener(e -> refresh());
 
     sortBy.setItems("createdAt", "shortCode", "originalUrl", "expiresAt");
     dir.setItems("asc", "desc");
@@ -220,31 +230,120 @@ public class OverviewView
     logger().info("configureGrid..");
     grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES, GridVariant.LUMO_COMPACT);
     grid.setHeight("70vh");
+    grid.setSelectionMode(Grid.SelectionMode.SINGLE);
 
-    grid.addColumn(ShortUrlMapping::shortCode)
-        .setHeader("Shortcode")
+    // Shortcode column (frozen, monospace font, copy button)
+    grid.addComponentColumn(m -> {
+          var code = new Span(m.shortCode());
+          code.getStyle().set("font-family", "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace");
+
+          var copy = new Button(new Icon(VaadinIcon.COPY));
+          copy.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+          copy.getElement().setProperty("title", "Copy ShortUrl");
+          copy.addClickListener(_ -> {
+            UI.getCurrent()
+                .getPage()
+                .executeJs("navigator.clipboard.writeText($0)", SHORTCODE_BASE_URL + m.shortCode());
+            Notification.show("Shortcode copied");
+          });
+          var wrap = new HorizontalLayout(code, copy);
+          wrap.setSpacing(true);
+          wrap.setPadding(false);
+          return wrap;
+        }).setHeader("Shortcode")
         .setAutoWidth(true)
-        .setSortable(true);
+        .setFrozen(true)
+        .setResizable(true)
+        .setFlexGrow(0);
 
-    grid.addColumn(ShortUrlMapping::originalUrl)
-        .setHeader("Original URL")
+    // Original URL column (ellipsised + tooltip)
+    grid.addComponentColumn(m -> {
+          var a = new Anchor(m.originalUrl(), m.originalUrl());
+          a.setTarget("_blank");
+          a.getStyle()
+              .set("white-space", "nowrap")
+              .set("overflow", "hidden")
+              .set("text-overflow", "ellipsis")
+              .set("display", "inline-block")
+              .set("max-width", "100%");
+          a.getElement().setProperty("title", m.originalUrl());
+          return a;
+        }).setHeader("URL")
         .setFlexGrow(1)
-        .setSortable(true);
+        .setResizable(true);
 
+    // Created column
     grid.addColumn(m -> DATE_TIME_FMT.format(m.createdAt()))
-        .setHeader("Created at")
+        .setHeader("Created")
         .setAutoWidth(true)
-        .setSortable(true);
+        .setResizable(true)
+        .setSortable(true)
+        .setFlexGrow(0);
 
-    grid.addColumn(m -> m.expiresAt().map(DATE_TIME_FMT::format).orElse(""))
-        .setHeader("Expires at")
+    // Expiry column (status pill)
+    grid.addComponentColumn(m -> {
+          var pill = new Span(m.expiresAt()
+                                  .map(ts -> {
+                                    var days = Duration.between(Instant.now(), ts).toDays();
+                                    if (days < 0) return "Expired";
+                                    if (days == 0) return "Today";
+                                    return "in " + days + " days";
+                                  })
+                                  .orElse("No expiry"));
+          pill.getElement().getThemeList().add("badge pill small");
+
+          // Colour indicator
+          m.expiresAt().ifPresent(ts -> {
+            long d = Duration.between(Instant.now(), ts).toDays();
+            if (d < 0) pill.getElement().getThemeList().add("error");
+            else if (d <= 3) pill.getElement().getThemeList().add("warning");
+            else pill.getElement().getThemeList().add("success");
+          });
+          return pill;
+        }).setHeader("Expires")
         .setAutoWidth(true)
-        .setSortable(true);
+        .setResizable(true)
+        .setFlexGrow(0);
 
+    // Actions (delete remains)
     grid.addComponentColumn(this::buildActions)
         .setHeader("Actions")
         .setAutoWidth(true)
-        .setFlexGrow(0);
+        .setFlexGrow(0)
+        .setResizable(true);
+
+    // Interactions
+    grid.addItemDoubleClickListener(ev -> openDetailsDialog(ev.getItem()));
+    grid.addItemClickListener(ev -> {
+      if (ev.getClickCount() == 2) openDetailsDialog(ev.getItem());
+    });
+    grid.getElement().addEventListener("keydown", _ -> {
+      grid.getSelectedItems().stream().findFirst().ifPresent(this::openDetailsDialog);
+    }).setFilter("event.key === 'Enter'");
+
+    // Optional: context menu
+    GridContextMenu<ShortUrlMapping> menu = new GridContextMenu<>(grid);
+    menu.addItem("Show details", e -> e.getItem()
+        .ifPresent(this::openDetailsDialog));
+    menu.addItem("Open URL", e -> e.getItem()
+        .ifPresent(m ->
+                       UI.getCurrent().getPage().open(m.originalUrl(), "_blank")));
+    menu.addItem("Copy shortcode", e -> e.getItem()
+        .ifPresent(m ->
+                       UI.getCurrent().getPage().executeJs("navigator.clipboard.writeText($0)", m.shortCode())));
+    menu.addItem("Delete…", e -> e.getItem()
+        .ifPresent(m -> confirmDelete(m.shortCode())));
+  }
+
+
+  private void openDetailsDialog(ShortUrlMapping item) {
+    var dlg = new DetailsDialog(item);
+    dlg.addDeleteListener(ev -> confirmDelete(ev.shortCode));
+    dlg.addOpenListener(ev -> logger().info("Open URL {}", ev.originalUrl));
+    dlg.addCopyShortListener(ev -> logger().info("Copied shortcode {}", ev.shortCode));
+    dlg.addCopyUrlListener(ev -> logger().info("Copied URL {}", ev.url));
+
+    dlg.open();
   }
 
   private Component buildActions(ShortUrlMapping m) {
@@ -252,7 +351,12 @@ public class OverviewView
     Button delete = new Button(new Icon(VaadinIcon.TRASH));
     delete.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
     delete.addClickListener(e -> confirmDelete(m.shortCode()));
-    var row = new HorizontalLayout(delete);
+
+    var details = new Button(new Icon(VaadinIcon.SEARCH));
+    details.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+    details.addClickListener(_ -> openDetailsDialog(m));
+
+    var row = new HorizontalLayout(details, delete);
     row.setSpacing(true);
     return row;
   }

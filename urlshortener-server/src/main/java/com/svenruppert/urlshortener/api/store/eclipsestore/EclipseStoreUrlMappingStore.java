@@ -14,6 +14,7 @@ import java.io.Closeable;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
 
@@ -70,13 +71,19 @@ public final class EclipseStoreUrlMappingStore
 
   @Override
   public Result<ShortUrlMapping> createMapping(String originalUrl) {
-    return createMapping(null, originalUrl);
+    return createMapping(null, originalUrl, null);
   }
 
   @Override
   public Result<ShortUrlMapping> createMapping(String alias, String originalUrl) {
-    logger().info("alias: {} - originalUrl: {} ->", alias, originalUrl);
-    return creator.create(alias, originalUrl);
+    logger().info("alias: {} - originalUrl: {} ", alias, originalUrl);
+    return creator.create(alias, originalUrl, null);
+  }
+
+  @Override
+  public Result<ShortUrlMapping> createMapping(String alias, String originalUrl, Instant expiredArt) {
+    logger().info("alias: {} - originalUrl: {} - expiredAt: {}", alias, originalUrl, expiredArt);
+    return creator.create(alias, originalUrl, expiredArt);
   }
 
   @Override

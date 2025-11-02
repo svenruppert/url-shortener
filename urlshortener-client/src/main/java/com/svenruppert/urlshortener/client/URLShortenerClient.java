@@ -16,6 +16,7 @@ import java.util.Optional;
 
 import static com.svenruppert.dependencies.core.net.HttpStatus.OK;
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
+import static com.svenruppert.urlshortener.core.JsonUtils.fromJson;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class URLShortenerClient
@@ -225,10 +226,10 @@ public class URLShortenerClient
     HttpURLConnection connection = (HttpURLConnection) shortenUrl.openConnection();
     connection.setRequestMethod("POST");
     connection.setDoOutput(true);
-    connection.setRequestProperty("Content-Type", "application/json");
+    connection.setRequestProperty(CONTENT_TYPE, JSON_CONTENT_TYPE);
 
     String body = "{\"url\":\"" + originalUrl + "\"}";
-    logger().info("body - '{}'", body);
+    logger().info("shortenURL - body - '{}'", body);
     try (OutputStream os = connection.getOutputStream()) {
       os.write(body.getBytes());
     }
@@ -406,25 +407,31 @@ public class URLShortenerClient
       throws IOException {
     logger().info("Create custom mapping alias='{}' url='{}'", alias, url);
 
-    if (alias == null || alias.isBlank()) {
-      return createMapping(url);
-    }
+    return createCustomMapping(alias, url, null);
+  }
 
-    var validate = AliasPolicy.validate(alias);
-    if (!validate.valid()) {
-      var reason = validate.reason();
-      throw new IllegalArgumentException(reason.defaultMessage);
-    }
 
+  public ShortUrlMapping createCustomMapping(String alias, String url, Instant expiredAt)
+      throws IOException {
+    logger().info("Create custom mapping alias='{}' url='{}' expiredAt='{}'", alias, url, expiredAt);
+
+    if (alias != null && !alias.isBlank()) {
+      var validate = AliasPolicy.validate(alias);
+      if (!validate.valid()) {
+        var reason = validate.reason();
+        throw new IllegalArgumentException(reason.defaultMessage);
+      }
+    }
     URL shortenUrl = serverBaseAdmin.resolve(PATH_ADMIN_SHORTEN).toURL();
     logger().info("connecting to .. shortenUrl {} (custom)", shortenUrl);
     HttpURLConnection connection = (HttpURLConnection) shortenUrl.openConnection();
     connection.setRequestMethod("POST");
     connection.setDoOutput(true);
-    connection.setRequestProperty("Content-Type", "application/json");
+    connection.setRequestProperty(CONTENT_TYPE, JSON_CONTENT_TYPE);
 
-    String body = new ShortenRequest(url, alias).toJson();
-    logger().info("body - '{}'", body);
+    var shortenRequest = new ShortenRequest(url, alias, expiredAt);
+    String body = shortenRequest.toJson();
+    logger().info("createCustomMapping - body - '{}'", body);
     try (OutputStream os = connection.getOutputStream()) {
       os.write(body.getBytes(UTF_8));
     }
@@ -434,9 +441,11 @@ public class URLShortenerClient
     if (status == 200 || status == 201) {
       try (InputStream is = connection.getInputStream()) {
         String jsonResponse = new String(is.readAllBytes(), UTF_8);
+        logger().info("createCustomMapping - jsonResponse - {}", jsonResponse);
         String extractedShortCode = JsonUtils.extractShortCode(jsonResponse);
-        logger().info("extractedShortCode .. {}", extractedShortCode);
-        return new ShortUrlMapping(extractedShortCode, url, Instant.now(), Optional.empty());
+        ShortUrlMapping shortUrlMapping = fromJson(jsonResponse, ShortUrlMapping.class);
+        logger().info("shortUrlMapping .. {}", shortUrlMapping);
+        return shortUrlMapping;
       }
     }
     if (status == 409) {

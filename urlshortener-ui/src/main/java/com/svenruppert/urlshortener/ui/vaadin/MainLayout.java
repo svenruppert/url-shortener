@@ -4,7 +4,7 @@ import com.svenruppert.urlshortener.ui.vaadin.components.StoreIndicator;
 import com.svenruppert.urlshortener.ui.vaadin.tools.AdminClientFactory;
 import com.svenruppert.urlshortener.ui.vaadin.views.AboutView;
 import com.svenruppert.urlshortener.ui.vaadin.views.CreateView;
-import com.svenruppert.urlshortener.ui.vaadin.views.OverviewView;
+import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
 import com.svenruppert.urlshortener.ui.vaadin.views.YoutubeView;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;

@@ -17,6 +17,8 @@ import java.net.URI;
 
 import static com.svenruppert.dependencies.core.net.HttpStatus.*;
 import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
+import static com.svenruppert.urlshortener.core.JsonUtils.fromJson;
+import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
 import static com.svenruppert.urlshortener.core.StringUtils.isNullOrBlank;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -70,7 +72,7 @@ public class ShortenHandler
       }
 
       final String body = readBody(ex.getRequestBody());
-      ShortenRequest req = JsonUtils.fromJson(body, ShortenRequest.class);
+      ShortenRequest req = fromJson(body, ShortenRequest.class);
       if (isNullOrBlank(req.getUrl())) {
         writeJson(ex, BAD_REQUEST, "Missing 'url'");
         return;
@@ -98,14 +100,13 @@ public class ShortenHandler
       }
 
       logger().info("ShortenHandler - createMapping start");
-      final Result<ShortUrlMapping> urlMappingResult = store.createMapping(req.getShortURL(), req.getUrl());
+      final Result<ShortUrlMapping> urlMappingResult = store.createMapping(req.getShortURL(),
+                                                                           req.getUrl(),
+                                                                           req.getExpiresAt());
       logger().info("ShortenHandler - createMapping stop");
       urlMappingResult
-          .ifPresentOrElse(success -> {
-            logger().info("mapping created success {}", success.toString());
-          }, failed -> {
-            logger().info("mapping created failed - {}", failed);
-          });
+          .ifPresentOrElse(success -> logger().info("mapping created success {}", success.toString()),
+                           failed -> logger().info("mapping created failed - {}", failed));
 
       logger().info("ShortenHandler - createMapping consuming urlMappingResult");
       urlMappingResult
@@ -113,7 +114,6 @@ public class ShortenHandler
             try {
               var parsed = JsonUtils.parseJson(errorJson);
               logger().info("parsed Json {}", parsed);
-
               var code = parsed.get("code");
               var errorCode = Integer.parseInt(code);
               var message = parsed.get("message");
@@ -127,7 +127,7 @@ public class ShortenHandler
             final Headers h = ex.getResponseHeaders();
             h.add("Location", "/r/" + mapping.shortCode());
             try {
-              writeJson(ex, fromCode(201), JsonUtils.toJson(mapping));
+              writeJson(ex, fromCode(201), toJson(mapping));
             } catch (IOException e) {
               throw new RuntimeException(e);
             }

@@ -1,8 +1,11 @@
 package com.svenruppert.urlshortener.core;
 
+import java.time.Instant;
+
 public class ShortenRequest {
   private String url;
   private String shortURL;
+  private Instant expiresAt;
 
   public ShortenRequest() {
   }
@@ -10,22 +13,37 @@ public class ShortenRequest {
   public ShortenRequest(String url, String shortURL) {
     this.url = url;
     this.shortURL = shortURL;
+    this.expiresAt = null;
   }
 
-  public void setUrl(String url) {
+  public ShortenRequest(String url, String shortURL, Instant expiresAt) {
     this.url = url;
+    this.shortURL = shortURL;
+    this.expiresAt = expiresAt;
   }
 
-  public void setShortURL(String shortURL) {
-    this.shortURL = shortURL;
+  public Instant getExpiresAt() {
+    return expiresAt;
+  }
+
+  public void setExpiresAt(Instant expiresAt) {
+    this.expiresAt = expiresAt;
   }
 
   public String getShortURL() {
     return shortURL;
   }
 
+  public void setShortURL(String shortURL) {
+    this.shortURL = shortURL;
+  }
+
   public String getUrl() {
     return url;
+  }
+
+  public void setUrl(String url) {
+    this.url = url;
   }
 
   public boolean hasAlias() {
@@ -36,7 +54,8 @@ public class ShortenRequest {
   public String toString() {
     return "ShortenRequest{" +
         "url='" + url + '\'' +
-        ", alias='" + shortURL + '\'' +
+        ", shortURL='" + shortURL + '\'' +
+        ", expiresAt='" + expiresAt + '\'' +
         '}';
   }
 
@@ -46,14 +65,15 @@ public class ShortenRequest {
    */
   //TODO Design error due to dependency on Utils class
   public String toJson() {
+    var a = shortURL == null ? "\"null\"" : "\"" + JsonUtils.escape(shortURL) + "\"";
+    var b = expiresAt == null ? "\"null\"" : "\"" + JsonUtils.escape(expiresAt.toString()) + "\"";
     return """
         {
           "url": "%s",
-          "alias": %s
+          "alias": %s,
+          "expiresAt": %s
         }
-        """.formatted(
-        JsonUtils.escape(url),
-        shortURL == null ? "null" : "\"" + JsonUtils.escape(shortURL) + "\""
+        """.formatted(JsonUtils.escape(url), a, b
     );
   }
 }

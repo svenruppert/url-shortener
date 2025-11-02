@@ -1,10 +1,13 @@
 package com.svenruppert.urlshortener.core;
 
+import com.svenruppert.dependencies.core.logger.HasLogger;
+
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-public final class AliasPolicy {
+public final class AliasPolicy
+    implements HasLogger {
 
   public static final int MIN = 3;
   public static final int MAX = 32;
@@ -17,6 +20,7 @@ public final class AliasPolicy {
   }
 
   public static Validation validate(String alias) {
+    HasLogger.staticLogger().info("validate - {}", alias);
     if (alias == null || alias.isBlank()) return Validation.fail(Reason.NULL_OR_BLANK);
     if (alias.length() < MIN) return Validation.fail(Reason.TOO_SHORT);
     if (alias.length() > MAX) return Validation.fail(Reason.TOO_LONG);

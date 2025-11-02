@@ -8,6 +8,7 @@ import com.svenruppert.urlshortener.api.store.UrlMappingFilter;
 import com.svenruppert.urlshortener.api.store.UrlMappingStore;
 import com.svenruppert.urlshortener.core.ShortUrlMapping;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -83,8 +84,14 @@ public class InMemoryUrlMappingStore
 
   @Override
   public Result<ShortUrlMapping> createMapping(String alias, String originalUrl) {
-    logger().info("alias: {} - originalUrl: {} ->", alias, originalUrl);
-    return creator.create(alias, originalUrl);
+    logger().info("alias: {} - originalUrl: {} ", alias, originalUrl);
+    return creator.create(alias, originalUrl, null);
+  }
+
+  @Override
+  public Result<ShortUrlMapping> createMapping(String alias, String originalUrl, Instant expiredAt) {
+    logger().info("alias: {} - originalUrl: {} - expiredAt: {} ", alias, originalUrl, expiredAt);
+    return creator.create(alias, originalUrl, expiredAt);
   }
 
   private void storeMapping(ShortUrlMapping shortMapping) {
