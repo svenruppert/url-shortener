@@ -16,6 +16,8 @@ public final class DefaultValues {
 
   public static final String CONTENT_TYPE = "Content-Type";
   public static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
+  public static final String APPLICATION_JSON = "application/json";
+  public static final String ACCEPT = "Accept";
 
 
   public static final String PATH_REDIRECT = "/";
@@ -29,6 +31,12 @@ public final class DefaultValues {
   public static final String PATH_ADMIN_LIST_COUNT = "/list/count";
 
   public static final String PATH_ADMIN_STORE_INFO = "/store/info";
+
+  public static final String PATH_ADMIN_PREFERENCES_COLUMNS        = "/admin/preferences/columns";
+  public static final String PATH_ADMIN_PREFERENCES_COLUMNS_EDIT   = "/admin/preferences/columns/edit";
+  public static final String PATH_ADMIN_PREFERENCES_COLUMNS_SINGLE = "/admin/preferences/columns/single";
+
+
 
   public static final String PATTERN_DATE_TIME = "yyyy.MM.dd HH:mm";
 

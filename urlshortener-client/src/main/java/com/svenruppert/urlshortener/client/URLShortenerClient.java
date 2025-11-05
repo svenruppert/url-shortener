@@ -2,6 +2,9 @@ package com.svenruppert.urlshortener.client;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.core.*;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
+import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -128,75 +131,6 @@ public class URLShortenerClient
       i = end + 1;
     }
     return out;
-  }
-
-  /**
-   * Parses a single mapping object. Expected fields are strings or null.
-   */
-  private static ShortUrlMapping parseOneMapping(String objJson) {
-    String shortCode = extractString(objJson, "shortCode");
-    String originalUrl = extractString(objJson, "originalUrl");
-    String createdAtIso = extractString(objJson, "createdAt");
-    String expiresAtIso = extractNullableString(objJson, "expiresAt");
-
-    Instant createdAt = createdAtIso != null ? Instant.parse(createdAtIso) : Instant.EPOCH;
-    Optional<Instant> expiresAt = expiresAtIso != null && !expiresAtIso.isEmpty()
-        ? Optional.of(Instant.parse(expiresAtIso))
-        : Optional.empty();
-
-    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt);
-  }
-
-  /**
-   * Reads a string field "key":"value" without keeping the quotes.
-   */
-  private static String extractString(String json, String key) {
-    String v = extractNullableString(json, key);
-    return v == null || "null".equals(v) ? null : v;
-  }
-
-  /**
-   * Reads a field and returns the raw string contents or null if the field is missing or null.
-   */
-  private static String extractNullableString(String json, String key) {
-    final String pattern = "\"" + key + "\"";
-    int p = json.indexOf(pattern);
-    if (p < 0) return null;
-    int colon = json.indexOf(':', p + pattern.length());
-    if (colon < 0) return null;
-
-    // jump over Whitespace
-    int i = colon + 1;
-    while (i < json.length() && Character.isWhitespace(json.charAt(i))) i++;
-    if (i >= json.length()) return null;
-
-    char c = json.charAt(i);
-    if (c == 'n') { // null
-      // expected "null"
-      return "null";
-    }
-    if (c != '"') return null;
-
-    // Read string, respect escapes
-    StringBuilder sb = new StringBuilder();
-    i++;
-    boolean escape = false;
-    for (; i < json.length(); i++) {
-      char ch = json.charAt(i);
-      if (escape) {
-        // For our fields, the standard escapes are sufficient, we take raw
-        sb.append(ch);
-        escape = false;
-      } else {
-        if (ch == '\\') {
-          escape = true;
-          continue;
-        }
-        if (ch == '"') break;
-        sb.append(ch);
-      }
-    }
-    return sb.toString();
   }
 
   private static void drainQuietly(InputStream is) {
@@ -369,7 +303,7 @@ public class URLShortenerClient
     logger().info("fetchJson - url {}", url);
     final HttpURLConnection con = (HttpURLConnection) url.openConnection();
     con.setRequestMethod("GET");
-    con.setRequestProperty("Accept", "application/json");
+    con.setRequestProperty(ACCEPT, APPLICATION_JSON);
     con.setConnectTimeout(10_000);
     con.setReadTimeout(15_000);
 
@@ -390,8 +324,9 @@ public class URLShortenerClient
     final String items = sliceItemsArray(json);
     final List<String> objects = splitTopLevelObjects(items);
     final List<ShortUrlMapping> result = new ArrayList<>(objects.size());
-    for (String obj : objects) {
-      result.add(parseOneMapping(obj));
+    for (String mapping : objects) {
+      var shortUrlMapping = fromJson(mapping, ShortUrlMapping.class);
+      result.add(shortUrlMapping);
     }
     return result;
   }
@@ -442,7 +377,7 @@ public class URLShortenerClient
       try (InputStream is = connection.getInputStream()) {
         String jsonResponse = new String(is.readAllBytes(), UTF_8);
         logger().info("createCustomMapping - jsonResponse - {}", jsonResponse);
-        String extractedShortCode = JsonUtils.extractShortCode(jsonResponse);
+        //String extractedShortCode = JsonUtils.extractShortCode(jsonResponse);
         ShortUrlMapping shortUrlMapping = fromJson(jsonResponse, ShortUrlMapping.class);
         logger().info("shortUrlMapping .. {}", shortUrlMapping);
         return shortUrlMapping;

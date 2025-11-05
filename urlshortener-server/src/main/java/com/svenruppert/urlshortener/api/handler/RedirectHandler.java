@@ -3,8 +3,9 @@ package com.svenruppert.urlshortener.api.handler;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
-import com.svenruppert.urlshortener.api.store.UrlMappingLookup;
-import com.svenruppert.urlshortener.core.ShortUrlMapping;
+import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingLookup;
+import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -24,11 +25,13 @@ public class RedirectHandler
   public void handle(HttpExchange exchange)
       throws IOException {
 
-    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-      exchange.getResponseHeaders().add("Allow", "GET");
-      exchange.sendResponseHeaders(405, -1);
-      return;
-    }
+    if (!RequestMethodUtils.requireGet(exchange)) return;
+
+    //    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+    //      exchange.getResponseHeaders().add("Allow", "GET");
+    //      exchange.sendResponseHeaders(405, -1);
+    //      return;
+    //    }
     final String path = exchange.getRequestURI().getPath(); // z.B. "/ABC123"
     if (path == null || !path.startsWith(PATH_REDIRECT)) {
       exchange.sendResponseHeaders(400, -1);

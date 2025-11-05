@@ -3,8 +3,8 @@ package junit.com.svenruppert.urlshortener.client;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
-import com.svenruppert.urlshortener.core.ShortUrlMapping;
-import com.svenruppert.urlshortener.core.UrlMappingListRequest;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
 import org.junit.jupiter.api.*;
 
 import java.io.IOException;

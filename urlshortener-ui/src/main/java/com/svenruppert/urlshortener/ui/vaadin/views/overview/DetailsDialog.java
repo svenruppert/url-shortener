@@ -1,7 +1,7 @@
 package com.svenruppert.urlshortener.ui.vaadin.views.overview;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
-import com.svenruppert.urlshortener.core.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.vaadin.flow.component.ComponentEvent;
 import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.component.UI;

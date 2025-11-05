@@ -3,7 +3,7 @@ package junit.com.svenruppert.urlshortener.api;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.core.JsonUtils;
-import com.svenruppert.urlshortener.core.ShortenRequest;
+import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
 import org.junit.jupiter.api.*;
 
 import java.net.URI;

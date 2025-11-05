@@ -1,11 +1,15 @@
 package com.svenruppert.urlshortener.ui.vaadin.views.overview;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.client.ColumnVisibilityClient;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
-import com.svenruppert.urlshortener.core.ShortUrlMapping;
-import com.svenruppert.urlshortener.core.UrlMappingListRequest;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
+import com.svenruppert.urlshortener.ui.vaadin.components.ColumnVisibilityDialog;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
+import com.svenruppert.urlshortener.ui.vaadin.tools.ColumnVisibilityClientFactory;
+import com.svenruppert.urlshortener.ui.vaadin.tools.ColumnVisibilityService;
 import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
@@ -42,6 +46,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -60,6 +65,8 @@ public class OverviewView
           .withLocale(Locale.GERMANY)
           .withZone(ZoneId.systemDefault());
   private final URLShortenerClient urlShortenerClient = UrlShortenerClientFactory.newInstance();
+  private final ColumnVisibilityClient columnVisibilityClient = ColumnVisibilityClientFactory.newInstance();
+
   // Filter controls
   private final TextField codePart = new TextField("Shortcode contains");
   private final Checkbox codeCase = new Checkbox("Case-sensitive");
@@ -76,6 +83,8 @@ public class OverviewView
   private final Button resetBtn = new Button("Reset", new Icon(VaadinIcon.ROTATE_LEFT));
   private final Button prevBtn = new Button("‹ Prev");
   private final Button nextBtn = new Button("Next ›");
+  private final Button btnSettings = new Button(new Icon(VaadinIcon.COG));
+
   private final Text pageInfo = new Text("");
   // Grid
   private final Grid<ShortUrlMapping> grid = new Grid<>(ShortUrlMapping.class, false);
@@ -83,6 +92,7 @@ public class OverviewView
   private int totalCount = 0;
   private CallbackDataProvider<ShortUrlMapping, Void> dataProvider;
   private AutoCloseable subscription;
+  private ColumnVisibilityService columnVisibilityService;
 
   public OverviewView() {
     setSizeFull();
@@ -106,6 +116,21 @@ public class OverviewView
   @Override
   protected void onAttach(AttachEvent attachEvent) {
     super.onAttach(attachEvent);
+    //TODO  Initialize Column Visibility Client/Service (User ID later from security context)
+    this.columnVisibilityService = new ColumnVisibilityService(columnVisibilityClient, "admin", "overview");
+
+    // Remember and apply server state (Default: true)
+    var keys = grid.getColumns().stream()
+        .map(Grid.Column::getKey)
+        .filter(Objects::nonNull)
+        .toList();
+
+    var vis = columnVisibilityService.mergeWithDefaults(keys);
+    grid.getColumns().forEach(c -> {
+      var k = c.getKey();
+      if (k != null) c.setVisible(vis.getOrDefault(k, true));
+    });
+
     refresh();
     subscription = StoreEvents.subscribe(_ -> getUI()
         .ifPresent(ui -> ui.access(this::refresh)));
@@ -197,6 +222,11 @@ public class OverviewView
       refresh();
     });
 
+
+    btnSettings.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+    btnSettings.getElement().setProperty("title", "Column visibility");
+    btnSettings.addClickListener(_ -> new ColumnVisibilityDialog<>(grid, columnVisibilityService).open());
+
     var fromGroup = new HorizontalLayout(fromDate, fromTime);
     fromGroup.setDefaultVerticalComponentAlignment(Alignment.END);
     fromGroup.setSpacing(true);
@@ -205,7 +235,7 @@ public class OverviewView
     toGroup.setDefaultVerticalComponentAlignment(Alignment.END);
     toGroup.setSpacing(true);
 
-    var pagingBar = new HorizontalLayout(prevBtn, nextBtn, pageInfo);
+    var pagingBar = new HorizontalLayout(prevBtn, nextBtn, pageInfo, btnSettings);
     pagingBar.setDefaultVerticalComponentAlignment(Alignment.CENTER);
 
     var line1 = new HorizontalLayout(
@@ -250,7 +280,9 @@ public class OverviewView
           wrap.setSpacing(true);
           wrap.setPadding(false);
           return wrap;
-        }).setHeader("Shortcode")
+        })
+        .setHeader("Shortcode")
+        .setKey("shortcode")
         .setAutoWidth(true)
         .setFrozen(true)
         .setResizable(true)
@@ -268,13 +300,16 @@ public class OverviewView
               .set("max-width", "100%");
           a.getElement().setProperty("title", m.originalUrl());
           return a;
-        }).setHeader("URL")
+        })
+        .setHeader("URL")
+        .setKey("url")
         .setFlexGrow(1)
         .setResizable(true);
 
     // Created column
     grid.addColumn(m -> DATE_TIME_FMT.format(m.createdAt()))
         .setHeader("Created")
+        .setKey("created")
         .setAutoWidth(true)
         .setResizable(true)
         .setSortable(true)
@@ -300,7 +335,9 @@ public class OverviewView
             else pill.getElement().getThemeList().add("success");
           });
           return pill;
-        }).setHeader("Expires")
+        })
+        .setHeader("Expires")
+        .setKey("expires")
         .setAutoWidth(true)
         .setResizable(true)
         .setFlexGrow(0);
@@ -308,6 +345,7 @@ public class OverviewView
     // Actions (delete remains)
     grid.addComponentColumn(this::buildActions)
         .setHeader("Actions")
+        .setKey("actions")
         .setAutoWidth(true)
         .setFlexGrow(0)
         .setResizable(true);

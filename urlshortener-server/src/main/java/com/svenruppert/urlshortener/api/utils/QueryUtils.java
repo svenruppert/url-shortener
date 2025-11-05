@@ -1,6 +1,6 @@
 package com.svenruppert.urlshortener.api.utils;
 
-import com.svenruppert.urlshortener.api.store.UrlMappingFilter;
+import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingFilter;
 
 import java.util.Locale;
 import java.util.Optional;

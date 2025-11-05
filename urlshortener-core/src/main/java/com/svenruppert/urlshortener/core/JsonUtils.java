@@ -1,6 +1,10 @@
 package com.svenruppert.urlshortener.core;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.core.prefs.*;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
+import com.svenruppert.urlshortener.core.urlmapping.ShortenResponse;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
@@ -53,7 +57,6 @@ public final class JsonUtils
       throw new IllegalArgumentException("Invalid JSON: " + e.getMessage(), e);
     }
 
-    /* ---- StoreInfo ---- */
     if (type == StoreInfo.class) {
       String mode = m.getOrDefault("mode", "InMemory");
       int mappings = parseIntSafe(m.get("mappings"), 0);
@@ -61,7 +64,6 @@ public final class JsonUtils
       return (T) new StoreInfo(mode, mappings, startedAt);
     }
 
-    /* ---- ShortenRequest ---- */
     if (type == ShortenRequest.class) {
       String url = emptyToNull(m.get("url"));
       String alias = emptyToNull(m.get("alias"));
@@ -72,15 +74,12 @@ public final class JsonUtils
       return (T) new ShortenRequest(url, alias, expiresAt);
     }
 
-    /* ---- ShortenResponse ---- */
     if (type == ShortenResponse.class) {
       String shortCode = m.get("shortCode");
       String originalUrl = m.get("originalUrl");
-//      String expiresAt = m.get("expiresAt");
       return (T) new ShortenResponse(shortCode, originalUrl);
     }
 
-    /* ---- ShortUrlMapping ---- */
     if (type == ShortUrlMapping.class) {
       String code = m.get("shortCode");
       String url = m.get("originalUrl");
@@ -90,9 +89,66 @@ public final class JsonUtils
                                      Optional.ofNullable(expiresAtI));
     }
 
+    if (type == ColumnInfoRequest.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      return (T) new ColumnInfoRequest(userId, viewId);
+    }
+
+    if (type == ColumnInfoResponse.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      Map<String, Boolean> infos = castMap(m.get("columnInfos"));
+      return (T) new ColumnInfoResponse(userId, viewId, infos);
+    }
+
+    if (type == ColumnDeleteRequest.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      var columnKey = m.get("columnKey");
+      return (T) new ColumnDeleteRequest(userId, viewId, columnKey);
+    }
+
+    if (type == ColumnEditRequest.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      var changesJSON = m.get("changes");
+      try {
+        var changesMapRAW = parseJson(changesJSON);
+        Map<String, Boolean> changes = castMap(changesMapRAW);
+        return (T) new ColumnEditRequest(userId, viewId, changes);
+      } catch (IOException e) {
+        throw new IllegalArgumentException("changes map is invalid - " + e.getMessage());
+      }
+    }
+
+    if (type == ColumnSingleEditRequest.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      var columnKey = m.get("columnKey");
+      var visible = Boolean.parseBoolean(String.valueOf(m.get("visible")));
+      return (T) new ColumnSingleEditRequest(userId, viewId, columnKey, visible);
+    }
+
+
     throw new UnsupportedOperationException("Unsupported type for fromJson: " + type.getName());
   }
 
+
+  private static Map<String, Boolean> castMap(Object obj) {
+    if (obj == null) return java.util.Collections.emptyMap();
+    if (obj instanceof Map<?, ?> raw) {
+      Map<String, Boolean> result = new java.util.LinkedHashMap<>();
+      raw.forEach((k, v) -> {
+        if (k != null) {
+          result.put(k.toString(),
+                     v instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(v)));
+        }
+      });
+      return result;
+    }
+    return java.util.Collections.emptyMap();
+  }
   /* ======================
            WRITE
      ====================== */
@@ -170,6 +226,51 @@ public final class JsonUtils
       m.put("startedAtEpochMs", startedAtEpochMs);
       return toJson(m);
     }
+
+    if (dto instanceof ColumnInfoRequest(String userId, String viewId)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      return toJson(m);
+    }
+
+    if (dto instanceof ColumnInfoResponse(String userId, String viewId, Map<String, Boolean> columnInfos)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      if (columnInfos != null && !columnInfos.isEmpty()) {
+        m.put("columnInfos", columnInfos);
+      }
+      return toJson(m);
+    }
+
+    if (dto instanceof ColumnDeleteRequest(String userId, String viewId, String columnKey)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      m.put("columnKey", columnKey);
+      return toJson(m);
+    }
+
+    if (dto instanceof ColumnEditRequest(String userId, String viewId, Map<String, Boolean> changes)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      if (changes != null && !changes.isEmpty()) {
+        m.put("changes", toJson(changes));
+      }
+      return toJson(m);
+    }
+
+    if (dto instanceof ColumnSingleEditRequest req) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", req.userId());
+      m.put("viewId", req.viewId());
+      m.put("columnKey", req.columnKey());
+      m.put("visible", req.visible());
+      return toJson(m);
+    }
+
     throw new UnsupportedOperationException("Unsupported DTO: " + dto.getClass());
   }
 

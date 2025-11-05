@@ -1,7 +1,7 @@
 package junit.com.svenruppert.urlshortener.core;
 
 import com.svenruppert.urlshortener.core.JsonUtils;
-import com.svenruppert.urlshortener.core.ShortenRequest;
+import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
