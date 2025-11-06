@@ -3,6 +3,7 @@ package junit.com.svenruppert.urlshortener.client;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
+import com.svenruppert.urlshortener.core.validation.UrlValidator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,8 @@ public class URLShortenerClientTest
   }
 
   @Test
-  void listEndpoints_useGET_and_returnJson() throws IOException {
+  void listEndpoints_useGET_and_returnJson()
+      throws IOException {
     var allRaw = client.listAllAsJson();
     assertNotNull(allRaw);
     assertTrue(allRaw.contains("\"mode\""));
@@ -74,8 +76,8 @@ public class URLShortenerClientTest
 
     //TODO - impl. ShortCode with ExpiredAt
     //create second with expiredAt
-//    var shortCodeWithExpired = client.createMapping(HTTP_SVENRUPPERT_COM);
-//    assertEquals("1", shortCode.shortCode()); //TODO will break soo after int will be replaced with hash value
+    //    var shortCodeWithExpired = client.createMapping(HTTP_SVENRUPPERT_COM);
+    //    assertEquals("1", shortCode.shortCode()); //TODO will break soo after int will be replaced with hash value
 
   }
 
@@ -92,6 +94,17 @@ public class URLShortenerClientTest
     var listOneEntry = client.listAll();
     assertFalse(listOneEntry.isEmpty());
     assertEquals(1, listOneEntry.size());
+
+  }
+
+  @Test
+  void test003()
+      throws IOException {
+    assertThrows(IllegalArgumentException.class, () -> {
+      var mapping = client.createMapping("http://svende");
+    });
+    var listOneEntry = client.listAll();
+    assertTrue(listOneEntry.isEmpty());
 
   }
 
@@ -151,7 +164,8 @@ public class URLShortenerClientTest
 
 
   @Test
-  void delete_existingMapping_returnsTrue_andRemovesIt() throws IOException {
+  void delete_existingMapping_returnsTrue_andRemovesIt()
+      throws IOException {
     // Arrange: Create a mapping and verify its existence
     var created = client.createMapping(HTTP_SVENRUPPERT_COM);
     assertNotNull(created);
@@ -171,7 +185,8 @@ public class URLShortenerClientTest
   }
 
   @Test
-  void delete_nonExistingMapping_returnsFalse() throws IOException {
+  void delete_nonExistingMapping_returnsFalse()
+      throws IOException {
     boolean removed = client.delete("NoSuch123");
     assertFalse(removed, "Non-existent shortcode must return false (HTTP 404)");
   }
@@ -183,7 +198,8 @@ public class URLShortenerClientTest
   }
 
   @Test
-  void delete_isIdempotent_and_doesNotAffectOtherEntries() throws IOException {
+  void delete_isIdempotent_and_doesNotAffectOtherEntries()
+      throws IOException {
     // Arrange: Zwei Mappings anlegen
     var m1 = client.createMapping(HTTP_SVENRUPPERT_COM);
     var m2 = client.createMapping("https://example.org/path");
@@ -205,7 +221,8 @@ public class URLShortenerClientTest
   }
 
   @Test
-  void delete_then_listActive_reflectsRemoval() throws IOException {
+  void delete_then_listActive_reflectsRemoval()
+      throws IOException {
     // Arrange
     var m = client.createMapping(HTTP_SVENRUPPERT_COM);
     assertNotNull(m);

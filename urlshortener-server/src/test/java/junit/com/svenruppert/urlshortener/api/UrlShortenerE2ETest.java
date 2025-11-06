@@ -154,7 +154,7 @@ public class UrlShortenerE2ETest
 
     logger().info("expected response code - {} ", BAD_REQUEST);
     assertEquals(BAD_REQUEST.code(), res.statusCode());
-    assertTrue(res.body().contains("Invalid characters in 'url'"));
+    assertTrue(res.body().contains("URL must not contain whitespace or control characters"));
   }
 
   @Test

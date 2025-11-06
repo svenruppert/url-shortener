@@ -86,8 +86,8 @@ public class OverviewView
   private final Button btnSettings = new Button(new Icon(VaadinIcon.COG));
 
   private final Text pageInfo = new Text("");
-  // Grid
   private final Grid<ShortUrlMapping> grid = new Grid<>(ShortUrlMapping.class, false);
+
   private int currentPage = 1;
   private int totalCount = 0;
   private CallbackDataProvider<ShortUrlMapping, Void> dataProvider;
@@ -119,7 +119,6 @@ public class OverviewView
     //TODO  Initialize Column Visibility Client/Service (User ID later from security context)
     this.columnVisibilityService = new ColumnVisibilityService(columnVisibilityClient, "admin", "overview");
 
-    // Remember and apply server state (Default: true)
     var keys = grid.getColumns().stream()
         .map(Grid.Column::getKey)
         .filter(Objects::nonNull)
@@ -149,7 +148,6 @@ public class OverviewView
   }
 
   private Component buildSearchBar() {
-    // Hints
     codePart.setPlaceholder("e.g. ex-");
     codePart.setValueChangeMode(ValueChangeMode.LAZY);
     codePart.setValueChangeTimeout(400);
@@ -174,7 +172,7 @@ public class OverviewView
         refresh();
       }
     });
-    nextBtn.addClickListener(e -> {
+    nextBtn.addClickListener(_ -> {
       int size = Optional.ofNullable(pageSize.getValue()).orElse(25);
       int maxPage = Math.max(1, (int) Math.ceil((double) totalCount / size));
       if (currentPage < maxPage) {
@@ -204,7 +202,7 @@ public class OverviewView
       refresh();
     });
 
-    resetBtn.addClickListener(e -> {
+    resetBtn.addClickListener(_ -> {
       codePart.clear();
       codeCase.clear();
       urlPart.clear();
@@ -221,7 +219,6 @@ public class OverviewView
       currentPage = 1;
       refresh();
     });
-
 
     btnSettings.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
     btnSettings.getElement().setProperty("title", "Column visibility");
@@ -262,7 +259,6 @@ public class OverviewView
     grid.setHeight("70vh");
     grid.setSelectionMode(Grid.SelectionMode.SINGLE);
 
-    // Shortcode column (frozen, monospace font, copy button)
     grid.addComponentColumn(m -> {
           var code = new Span(m.shortCode());
           code.getStyle().set("font-family", "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace");
@@ -288,7 +284,6 @@ public class OverviewView
         .setResizable(true)
         .setFlexGrow(0);
 
-    // Original URL column (ellipsised + tooltip)
     grid.addComponentColumn(m -> {
           var a = new Anchor(m.originalUrl(), m.originalUrl());
           a.setTarget("_blank");
@@ -306,7 +301,6 @@ public class OverviewView
         .setFlexGrow(1)
         .setResizable(true);
 
-    // Created column
     grid.addColumn(m -> DATE_TIME_FMT.format(m.createdAt()))
         .setHeader("Created")
         .setKey("created")
@@ -315,7 +309,6 @@ public class OverviewView
         .setSortable(true)
         .setFlexGrow(0);
 
-    // Expiry column (status pill)
     grid.addComponentColumn(m -> {
           var pill = new Span(m.expiresAt()
                                   .map(ts -> {
@@ -327,7 +320,6 @@ public class OverviewView
                                   .orElse("No expiry"));
           pill.getElement().getThemeList().add("badge pill small");
 
-          // Colour indicator
           m.expiresAt().ifPresent(ts -> {
             long d = Duration.between(Instant.now(), ts).toDays();
             if (d < 0) pill.getElement().getThemeList().add("error");
@@ -342,7 +334,6 @@ public class OverviewView
         .setResizable(true)
         .setFlexGrow(0);
 
-    // Actions (delete remains)
     grid.addComponentColumn(this::buildActions)
         .setHeader("Actions")
         .setKey("actions")
@@ -350,7 +341,6 @@ public class OverviewView
         .setFlexGrow(0)
         .setResizable(true);
 
-    // Interactions
     grid.addItemDoubleClickListener(ev -> openDetailsDialog(ev.getItem()));
     grid.addItemClickListener(ev -> {
       if (ev.getClickCount() == 2) openDetailsDialog(ev.getItem());
@@ -359,7 +349,6 @@ public class OverviewView
       grid.getSelectedItems().stream().findFirst().ifPresent(this::openDetailsDialog);
     }).setFilter("event.key === 'Enter'");
 
-    // Optional: context menu
     GridContextMenu<ShortUrlMapping> menu = new GridContextMenu<>(grid);
     menu.addItem("Show details", e -> e.getItem()
         .ifPresent(this::openDetailsDialog));
@@ -373,14 +362,13 @@ public class OverviewView
         .ifPresent(m -> confirmDelete(m.shortCode())));
   }
 
-
   private void openDetailsDialog(ShortUrlMapping item) {
-    var dlg = new DetailsDialog(item);
+    var dlg = new DetailsDialog(urlShortenerClient, item);
     dlg.addDeleteListener(ev -> confirmDelete(ev.shortCode));
     dlg.addOpenListener(ev -> logger().info("Open URL {}", ev.originalUrl));
     dlg.addCopyShortListener(ev -> logger().info("Copied shortcode {}", ev.shortCode));
     dlg.addCopyUrlListener(ev -> logger().info("Copied URL {}", ev.url));
-
+    dlg.addSavedListener(_ -> refresh());
     dlg.open();
   }
 
@@ -388,12 +376,11 @@ public class OverviewView
     logger().info("buildActions..");
     Button delete = new Button(new Icon(VaadinIcon.TRASH));
     delete.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-    delete.addClickListener(e -> confirmDelete(m.shortCode()));
+    delete.addClickListener(_ -> confirmDelete(m.shortCode()));
 
     var details = new Button(new Icon(VaadinIcon.SEARCH));
     details.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
     details.addClickListener(_ -> openDetailsDialog(m));
-
     var row = new HorizontalLayout(details, delete);
     row.setSpacing(true);
     return row;

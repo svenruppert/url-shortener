@@ -41,28 +41,30 @@ class ColumnVisibilityClientIT {
       throws Exception {
 
     // initial load → empty
-    var m0 = client.load("u1", "overview");
+    var viewId = "overview";
+    var userId = "u1";
+    var m0 = client.load(userId, viewId);
     assertTrue(m0.isEmpty());
 
     // single edit
-    client.editSingle("u1", "overview", "shortCode", true);
-    var m1 = client.load("u1", "overview");
+    client.editSingle(userId, viewId, "shortCode", true);
+    var m1 = client.load(userId, viewId);
     assertEquals(Boolean.TRUE, m1.get("shortCode"));
 
     // bulk edit
     Map<String, Boolean> changes = new LinkedHashMap<>();
     changes.put("url", false);
     changes.put("created", true);
-    client.editBulk("u1", "overview", changes);
+    client.editBulk(userId, viewId, changes);
 
-    var m2 = client.load("u1", "overview");
+    var m2 = client.load(userId, viewId);
     assertEquals(Boolean.TRUE, m2.get("shortCode"));
     assertEquals(Boolean.FALSE, m2.get("url"));
     assertEquals(Boolean.TRUE, m2.get("created"));
 
     // delete all for view
-    client.deleteAllForView("u1", "overview");
-    var m3 = client.load("u1", "overview");
+    client.deleteAllForView(userId, viewId);
+    var m3 = client.load(userId, viewId);
     assertTrue(m3.isEmpty());
   }
 

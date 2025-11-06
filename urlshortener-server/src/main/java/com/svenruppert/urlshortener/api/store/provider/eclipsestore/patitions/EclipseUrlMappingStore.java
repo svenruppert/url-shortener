@@ -13,10 +13,7 @@ import org.eclipse.store.storage.types.StorageManager;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 
 import static com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingFilterHelper.filterSortAndPage;
@@ -59,6 +56,25 @@ public class EclipseUrlMappingStore
   public Result<ShortUrlMapping> createMapping(String alias, String originalUrl, Instant expiredArt) {
     logger().info("alias: {} - originalUrl: {} - expiredAt: {}", alias, originalUrl, expiredArt);
     return creator.create(alias, originalUrl, expiredArt);
+  }
+
+  @Override
+  public Result<ShortUrlMapping> editMapping(String shortCode, String url, Instant expiredAt) {
+    logger().info("editMapping - shortCode: {} - originalUrl: {} - expiredAt: {} ", shortCode, url, expiredAt);
+    var existsByCode = existsByCode(shortCode);
+    if (existsByCode) {
+      var urlMappings = dataRoot().shortUrlMappings();
+      var shortUrlMappingOLD = urlMappings.get(shortCode);
+      var originalOrNewUrl = url != null ? url : shortUrlMappingOLD.originalUrl();
+      var instant = expiredAt != null ? Optional.of(expiredAt) : shortUrlMappingOLD.expiresAt();
+      var shortUrlMapping = new ShortUrlMapping(shortCode, originalOrNewUrl, shortUrlMappingOLD.createdAt(), instant);
+      urlMappings.put(shortUrlMapping.shortCode(), shortUrlMapping);
+      storage.store(dataRoot().shortUrlMappings());
+      return Result.success(shortUrlMapping);
+    } else {
+      logger().info("editMapping - shortCode {} does not exists", shortCode);
+      return Result.failure("editMapping - shortCode '" + shortCode + "' does not exists");
+    }
   }
 
   @Override

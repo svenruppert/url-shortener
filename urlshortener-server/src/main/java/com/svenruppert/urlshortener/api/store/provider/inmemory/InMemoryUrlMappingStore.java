@@ -83,15 +83,32 @@ public class InMemoryUrlMappingStore
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(String alias, String originalUrl) {
-    logger().info("alias: {} - originalUrl: {} ", alias, originalUrl);
-    return creator.create(alias, originalUrl, null);
+  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl) {
+    logger().info("createMapping - shortCode: {} - originalUrl: {} ", shortCode, originalUrl);
+    return creator.create(shortCode, originalUrl, null);
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(String alias, String originalUrl, Instant expiredAt) {
-    logger().info("alias: {} - originalUrl: {} - expiredAt: {} ", alias, originalUrl, expiredAt);
-    return creator.create(alias, originalUrl, expiredAt);
+  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt) {
+    logger().info("createMapping - shortCode: {} - originalUrl: {} - expiredAt: {} ", shortCode, originalUrl, expiredAt);
+    return creator.create(shortCode, originalUrl, expiredAt);
+  }
+
+  @Override
+  public Result<ShortUrlMapping> editMapping(String shortCode, String url, Instant expiredAt) {
+    logger().info("editMapping - shortCode: {} - originalUrl: {} - expiredAt: {} ", shortCode, url, expiredAt);
+    var existsByCode = existsByCode(shortCode);
+    if (existsByCode) {
+      var shortUrlMappingOLD = store.get(shortCode);
+      var originalOrNewUrl = url != null ? url : shortUrlMappingOLD.originalUrl();
+      var instant = expiredAt != null ? Optional.of(expiredAt) : shortUrlMappingOLD.expiresAt();
+      var shortUrlMapping = new ShortUrlMapping(shortCode, originalOrNewUrl, shortUrlMappingOLD.createdAt(), instant);
+      store.put(shortUrlMapping.shortCode(), shortUrlMapping);
+      return Result.success(shortUrlMapping);
+    } else {
+      logger().info("editMapping - shortCode {} does not exists", shortCode);
+      return Result.failure("editMapping - shortCode '" + shortCode + "' does not exists");
+    }
   }
 
   private void storeMapping(ShortUrlMapping shortMapping) {

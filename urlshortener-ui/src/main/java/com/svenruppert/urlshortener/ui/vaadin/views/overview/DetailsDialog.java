@@ -1,24 +1,34 @@
 package com.svenruppert.urlshortener.ui.vaadin.views.overview;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.validation.UrlValidator;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentEvent;
 import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.binder.Binder;
+import com.vaadin.flow.data.binder.ValidationResult;
+import com.vaadin.flow.data.binder.ValueContext;
 import com.vaadin.flow.shared.Registration;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
@@ -30,7 +40,9 @@ import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL
  * Displays detailed information for a ShortUrlMapping.
  * Independent of any specific view; communicates through component events.
  */
-public class DetailsDialog extends Dialog implements HasLogger {
+public class DetailsDialog
+    extends Dialog
+    implements HasLogger {
 
   public static final ZoneId ZONE = ZoneId.systemDefault();
   private static final DateTimeFormatter DATE_TIME_FMT =
@@ -54,46 +66,83 @@ public class DetailsDialog extends Dialog implements HasLogger {
   private final Button deleteBtn = new Button("Delete…", new Icon(VaadinIcon.TRASH));
   private final Button closeBtn = new Button("Close");
 
+  private final Button editBtn = new Button("Edit", new Icon(VaadinIcon.EDIT));
+  private final Button saveBtn = new Button(new Icon(VaadinIcon.CHECK));
+  private final Button cancelBtn = new Button(new Icon(VaadinIcon.CLOSE));
+  private final DateTimePicker expiresField = new DateTimePicker("Expires");
+  private final URLShortenerClient client;
+  private final ShortUrlMapping item;
+  private final Binder<ShortUrlMapping> binder = new Binder<>(ShortUrlMapping.class);
+
   /**
    * @param mapping concrete ShortUrlMapping instance
    */
-  public DetailsDialog(ShortUrlMapping mapping) {
-    Objects.requireNonNull(mapping, "mapping");
+  public DetailsDialog(URLShortenerClient client, ShortUrlMapping mapping) {
+    Objects.requireNonNull(client, "URLShortenerClient");
+    Objects.requireNonNull(mapping, "ShortUrlMapping");
 
-    this.shortCode   = mapping.shortCode();
+    this.client = client;
+    this.item = mapping;
+
+    this.shortCode = mapping.shortCode();
     this.originalUrl = mapping.originalUrl();
-    this.createdAt   = mapping.createdAt();
-    this.expiresAt   = mapping.expiresAt();
+    this.createdAt = mapping.createdAt();
+    this.expiresAt = mapping.expiresAt();
 
     setHeaderTitle("Details: " + shortCode);
     setModal(true);
     setDraggable(true);
     setResizable(true);
-    setWidth("720px");
+    setWidth("820px");
 
-    // Header actions
     openBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+    saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    editBtn.addThemeVariants(ButtonVariant.LUMO_WARNING);
+    cancelBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
-    var headerActions = new HorizontalLayout(openBtn, copyShortBtn, copyUrlBtn, deleteBtn);
-    headerActions.setSpacing(true);
-    headerActions.setPadding(false);
-    getHeader().add(headerActions);
+    saveBtn.setVisible(false);
+    cancelBtn.setVisible(false);
 
-    // Content
+    binder.forField(tfUrl)
+        .asRequired("URL must not be blank")
+        .withValidator((String url, ValueContext ctx) -> {
+          var res = UrlValidator.validate(url);
+          if (res.valid()) return ValidationResult.ok();
+          else return ValidationResult.error(res.message());
+        })
+        .bind(ShortUrlMapping::originalUrl, (_, _) -> { });
+
+    binder.forField(expiresField)
+        .bind(
+            m -> m.expiresAt().map(i -> LocalDateTime.ofInstant(i, ZONE)).orElse(null),
+            (_, _) -> { }
+        );
+    binder.readBean(item);
+
+    HorizontalLayout rightHeader = new HorizontalLayout(editBtn, saveBtn, cancelBtn);
+    rightHeader.setSpacing(true);
+    rightHeader.setPadding(false);
+    rightHeader.setAlignItems(FlexComponent.Alignment.CENTER);
+
+    var leftHeader = new HorizontalLayout(openBtn, copyShortBtn, copyUrlBtn, deleteBtn);
+    leftHeader.setSpacing(true);
+    leftHeader.setPadding(false);
+
+    getHeader().add(leftHeader, rightHeader);
+
     configureFields();
+
     var form = new FormLayout();
     form.setResponsiveSteps(
         new FormLayout.ResponsiveStep("0", 1),
         new FormLayout.ResponsiveStep("600px", 2)
     );
-    form.add(tfShort, tfUrl, tfCreated, tfExpires, statusPill);
+    form.add(tfShort, tfUrl, tfCreated, tfExpires, buildExpiresRow(), statusPill);
     form.setColspan(tfUrl, 2);
-
     add(form);
 
-    // Footer
-    closeBtn.addClickListener(e -> close());
+    closeBtn.addClickListener(_ -> close());
     getFooter().add(closeBtn);
 
     wireActions();
@@ -125,6 +174,33 @@ public class DetailsDialog extends Dialog implements HasLogger {
     var statusText = computeStatusText();
     statusPill.setText(statusText.text());
     statusPill.getElement().getThemeList().add(statusText.theme());
+
+    editBtn.getElement().setAttribute("title", "Edit");
+    saveBtn.getElement().setAttribute("title", "Save");
+    cancelBtn.getElement().setAttribute("title", "Cancel");
+  }
+
+
+  private Component buildExpiresRow() {
+    expiresField.setLabel("Expires");
+    expiresField.setStep(Duration.ofMinutes(1));
+    expiresField.setWidthFull();
+    expiresField.setVisible(false);
+    expiresField.setWeekNumbersVisible(true);
+    expiresField.setDatePickerI18n(
+        new DatePicker.DatePickerI18n().setFirstDayOfWeek(1));
+    expiresField.setStep(Duration.ofMinutes(1));
+    expiresField.setWidthFull();
+    Button clearBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL), _ -> expiresField.clear());
+    clearBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+    clearBtn.getElement().setAttribute("title", "Clear expiry");
+
+    HorizontalLayout row = new HorizontalLayout(expiresField, clearBtn);
+    row.setSpacing(true);
+    row.setPadding(false);
+    row.setWidthFull();
+    row.setFlexGrow(1, expiresField);
+    return row;
   }
 
   /**
@@ -163,6 +239,15 @@ public class DetailsDialog extends Dialog implements HasLogger {
     });
 
     deleteBtn.addClickListener(_ -> fireEvent(new DeleteEvent(this, shortCode)));
+
+    editBtn.addClickListener(_ -> switchToEdit(true));
+    saveBtn.addClickListener(_ -> onSave());
+
+    cancelBtn.addClickListener(_ -> {
+      binder.readBean(item);
+      switchToEdit(false);
+    });
+
   }
 
   private void copyToClipboard(String value) {
@@ -171,11 +256,53 @@ public class DetailsDialog extends Dialog implements HasLogger {
         .ifPresent(page -> page.executeJs("navigator.clipboard.writeText($0)", value));
   }
 
-  // ---------- Public API
+  private void switchToEdit(boolean enable) {
+    tfUrl.setReadOnly(!enable);
+    tfExpires.setVisible(!enable);
+
+    expiresField.setVisible(enable);
+    expiresField.setReadOnly(!enable);
+
+    editBtn.setVisible(!enable);
+    saveBtn.setVisible(enable);
+    cancelBtn.setVisible(enable);
+
+    if (enable) {
+      tfUrl.focus();
+      tfUrl.getElement().executeJs("this.select()");
+    }
+  }
+
+  private void onSave() {
+    try {
+      String newUrl = tfUrl.getValue();
+      var validate = UrlValidator.validate(newUrl);
+      if (!validate.valid()) throw new RuntimeException(validate.message());
+
+      LocalDateTime ldt = expiresField.getValue();
+      Instant expires = (ldt == null) ? null : ldt.atZone(ZoneId.systemDefault()).toInstant();
+
+      boolean ok = client.edit(item.shortCode(), newUrl, expires);
+      if (ok) {
+        Notification.show("Saved.");
+        fireEvent(new SavedEvent(this, item.shortCode()));
+        switchToEdit(false);
+        fireEvent(new SavedEvent(this, item.shortCode()));
+        close();
+      } else {
+        Notification.show("No changes.");
+      }
+    } catch (Exception ex) {
+      logger().error("Save failed", ex);
+      Notification.show("Save failed: " + ex.getMessage(), 5000, Notification.Position.MIDDLE);
+    }
+  }
 
   public String getShortCode() {
     return shortCode;
   }
+
+  // ---------- Public API
 
   public String getOriginalUrl() {
     return originalUrl;
@@ -205,17 +332,38 @@ public class DetailsDialog extends Dialog implements HasLogger {
     return addListener(DeleteEvent.class, l);
   }
 
+  public Registration addSavedListener(ComponentEventListener<SavedEvent> listener) {
+    return addListener(SavedEvent.class, listener);
+  }
+
+  // ---- Event API ----
+  public static class SavedEvent
+      extends ComponentEvent<DetailsDialog> {
+    private final String shortCode;
+
+    public SavedEvent(DetailsDialog src, String shortCode) {
+      super(src, false);
+      this.shortCode = shortCode;
+    }
+
+    public String getShortCode() {
+      return shortCode;
+    }
+  }
+
   private record Status(String text, String theme) { }
 
   // ---------- Event classes
 
-  public static class DetailsEvent extends ComponentEvent<DetailsDialog> {
+  public static class DetailsEvent
+      extends ComponentEvent<DetailsDialog> {
     public DetailsEvent(DetailsDialog source) {
       super(source, false);
     }
   }
 
-  public static class OpenEvent extends DetailsEvent {
+  public static class OpenEvent
+      extends DetailsEvent {
     public final String shortCode;
     public final String originalUrl;
 
@@ -226,7 +374,8 @@ public class DetailsDialog extends Dialog implements HasLogger {
     }
   }
 
-  public static class CopyShortcodeEvent extends DetailsEvent {
+  public static class CopyShortcodeEvent
+      extends DetailsEvent {
     public final String shortCode;
 
     public CopyShortcodeEvent(DetailsDialog src, String sc) {
@@ -235,7 +384,8 @@ public class DetailsDialog extends Dialog implements HasLogger {
     }
   }
 
-  public static class CopyUrlEvent extends DetailsEvent {
+  public static class CopyUrlEvent
+      extends DetailsEvent {
     public final String url;
 
     public CopyUrlEvent(DetailsDialog src, String url) {
@@ -244,7 +394,8 @@ public class DetailsDialog extends Dialog implements HasLogger {
     }
   }
 
-  public static class DeleteEvent extends DetailsEvent {
+  public static class DeleteEvent
+      extends DetailsEvent {
     public final String shortCode;
 
     public DeleteEvent(DetailsDialog src, String sc) {
