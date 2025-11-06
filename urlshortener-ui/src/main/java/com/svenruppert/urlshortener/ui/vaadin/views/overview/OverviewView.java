@@ -199,7 +199,7 @@ public class OverviewView
     toTime.setPlaceholder("hh:mm");
 
     searchBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-    searchBtn.addClickListener(e -> {
+    searchBtn.addClickListener(_ -> {
       currentPage = 1;
       refresh();
     });

@@ -12,14 +12,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public final class ColumnVisibilityDialog<T> extends Dialog {
-
-  private final Grid<T> grid;
-  private final ColumnVisibilityService service;
+public final class ColumnVisibilityDialog<T>
+    extends Dialog {
 
   public ColumnVisibilityDialog(Grid<T> grid, ColumnVisibilityService service) {
-    this.grid = Objects.requireNonNull(grid);
-    this.service = Objects.requireNonNull(service);
+    Objects.requireNonNull(service);
     setHeaderTitle("Columns");
     setModal(true);
     setDraggable(true);
@@ -32,35 +29,31 @@ public final class ColumnVisibilityDialog<T> extends Dialog {
         new FormLayout.ResponsiveStep("900px", 3)
     );
 
-    // Defaults: alle true, mit Serverwerten überlagert
-    var knownKeys = grid.getColumns()
+    var knownKeys = grid
+        .getColumns()
         .stream()
         .map(Grid.Column::getKey)
         .filter(Objects::nonNull)
         .toList();
 
     Map<String, Boolean> state = service.mergeWithDefaults(knownKeys);
-
-    // Für Bulk-Apply (optional) sammeln wir Änderungen
     Map<String, Boolean> pending = new LinkedHashMap<>();
+    grid.getColumns()
+        .forEach(col -> {
+          final String key = col.getKey();
+          if (key == null) return;
 
-    grid.getColumns().forEach(col -> {
-      final String key = col.getKey();
-      if (key == null) return; // nur adressierbare Spalten
+          boolean visible = state.getOrDefault(key, true);
+          col.setVisible(visible);
 
-      boolean visible = state.getOrDefault(key, true);
-      col.setVisible(visible);
-
-      var cb = new Checkbox(col.getHeaderText() != null ? col.getHeaderText() : key, visible);
-      cb.addValueChangeListener(ev -> {
-        boolean v = Boolean.TRUE.equals(ev.getValue());
-        col.setVisible(v);
-        // Sofort speichern ODER sammeln:
-        service.setSingle(key, v);
-        // Falls du stattdessen bulk willst: pending.put(key, v);
-      });
-      form.add(cb);
-    });
+          var cb = new Checkbox(col.getHeaderText() != null ? col.getHeaderText() : key, visible);
+          cb.addValueChangeListener(ev -> {
+            boolean v = Boolean.TRUE.equals(ev.getValue());
+            col.setVisible(v);
+            service.setSingle(key, v);
+          });
+          form.add(cb);
+        });
 
     var btnClose = new Button("Close", _ -> close());
     btnClose.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
