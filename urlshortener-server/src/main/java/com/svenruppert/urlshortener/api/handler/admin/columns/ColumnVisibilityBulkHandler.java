@@ -8,6 +8,8 @@ import com.svenruppert.urlshortener.core.prefs.ColumnEditRequest;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.svenruppert.dependencies.core.net.HttpStatus.*;
 import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
@@ -57,7 +59,18 @@ public class ColumnVisibilityBulkHandler
       writeJson(ex, BAD_REQUEST, "userId, viewId and non-empty changes required");
       return;
     }
-    store.saveColumnVisibilities(req.userId(), req.viewId(), req.changes());
+
+    var oldPreferences = store.load(req.userId(), req.viewId());
+    Map<String, Boolean> merged = Stream
+        .of(oldPreferences, req.changes())
+        .flatMap(m -> m.entrySet().stream())
+        .collect(Collectors.toMap(
+            Map.Entry::getKey,
+            Map.Entry::getValue,
+            (v1, v2) -> v2
+        ));
+
+    store.saveColumnVisibilities(req.userId(), req.viewId(), merged);
     writeJson(ex, OK, toJson(Map.of("status", "ok")));
   }
 

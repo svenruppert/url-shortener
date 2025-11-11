@@ -11,9 +11,9 @@ import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
 import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
+import com.svenruppert.urlshortener.core.validation.UrlValidator;
 
 import java.io.IOException;
-import java.net.URI;
 
 import static com.svenruppert.dependencies.core.net.HttpStatus.*;
 import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
@@ -36,7 +36,6 @@ import static com.svenruppert.urlshortener.core.StringUtils.isNullOrBlank;
 public class ShortenHandler
     implements HttpHandler, HasLogger {
 
-
   protected static final String HTTP = "http";
   protected static final String HTTPS = "https";
 
@@ -46,25 +45,12 @@ public class ShortenHandler
     this.store = store;
   }
 
-
   @Override
   public void handle(HttpExchange ex)
       throws IOException {
     logger().info("handle ... {} ", ex.getRequestMethod());
     if (!RequestMethodUtils.requirePost(ex)) return;
     try {
-      // Optional: CORS Preflight
-      //      if (REQUEST_METHOD_OPTIONS.equalsIgnoreCase(ex.getRequestMethod())) {
-      //        ex.sendResponseHeaders(NO_CONTENT.code(), -1);
-      //        return;
-      //      }
-      //
-      //      if (!REQUEST_METHOD_POST.equalsIgnoreCase(ex.getRequestMethod())) {
-      //        ex.getResponseHeaders().add("Allow", "POST, OPTIONS");
-      //        writeJson(ex, METHOD_NOT_ALLOWED);
-      //        return;
-      //      }
-
       final String body = readBody(ex.getRequestBody());
       ShortenRequest req = fromJson(body, ShortenRequest.class);
       if (isNullOrBlank(req.getUrl())) {
@@ -72,26 +58,14 @@ public class ShortenHandler
         return;
       }
 
-      if (req.getUrl().contains("\r") || req.getUrl().contains("\n")) {
-        writeJson(ex, BAD_REQUEST, "Invalid characters in 'url'");
+      var result = UrlValidator.validate(req.getUrl());
+      if (!result.valid()) {
+        writeJson(ex, HttpStatus.BAD_REQUEST, "{\"error\":\"" + result.message() + "\"}");
         return;
+      } else {
+        logger().info("valid URL {}", req.getUrl());
       }
 
-      // URL validieren (nur http/https)
-      final URI target;
-      try {
-        target = URI.create(req.getUrl());
-      } catch (IllegalArgumentException iae) {
-        writeJson(ex, BAD_REQUEST, "Invalid 'url'");
-        return;
-      }
-      final String scheme = target.getScheme();
-      if (scheme == null
-          || !(scheme.equalsIgnoreCase(HTTP)
-          || scheme.equalsIgnoreCase(HTTPS))) {
-        writeJson(ex, BAD_REQUEST, "Only http/https allowed");
-        return;
-      }
 
       logger().info("ShortenHandler - createMapping start");
       final Result<ShortUrlMapping> urlMappingResult = store.createMapping(req.getShortURL(),

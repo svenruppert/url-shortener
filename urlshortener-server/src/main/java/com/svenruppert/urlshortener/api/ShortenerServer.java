@@ -8,10 +8,7 @@ import com.svenruppert.urlshortener.api.handler.admin.*;
 import com.svenruppert.urlshortener.api.handler.admin.columns.ColumnVisibilityBulkHandler;
 import com.svenruppert.urlshortener.api.handler.admin.columns.ColumnVisibilityHandler;
 import com.svenruppert.urlshortener.api.handler.admin.columns.ColumnVisibilitySingleHandler;
-import com.svenruppert.urlshortener.api.handler.urlmapping.DeleteMappingHandler;
-import com.svenruppert.urlshortener.api.handler.urlmapping.ListCountHandler;
-import com.svenruppert.urlshortener.api.handler.urlmapping.ListHandler;
-import com.svenruppert.urlshortener.api.handler.urlmapping.ShortenHandler;
+import com.svenruppert.urlshortener.api.handler.urlmapping.*;
 import com.svenruppert.urlshortener.api.store.preferences.PreferencesStore;
 import com.svenruppert.urlshortener.api.store.provider.inmemory.InMemoryPreferencesStore;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
@@ -111,6 +108,7 @@ public class ShortenerServer
     serverAdmin.createContext(PATH_ADMIN_SHORTEN, new ShortenHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_LIST_COUNT, new ListCountHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_EDIT, new EditMappingHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter()); // DELETE /mapping/{code}
     serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter()); // DELETE /mapping/{code}
     serverAdmin.createContext(PATH_ADMIN_STORE_INFO, new StoreInfoHandler(urlMappingStore, startedAt)).getFilters().add(new BlockBrowserPreflightFilter());
 

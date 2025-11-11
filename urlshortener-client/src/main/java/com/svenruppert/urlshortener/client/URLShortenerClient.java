@@ -1,10 +1,12 @@
 package com.svenruppert.urlshortener.client;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
-import com.svenruppert.urlshortener.core.*;
+import com.svenruppert.urlshortener.core.AliasPolicy;
+import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
+import com.svenruppert.urlshortener.core.validation.UrlValidator;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -155,6 +157,14 @@ public class URLShortenerClient
    */
   private String shortenURL(String originalUrl)
       throws IOException {
+
+    var result = UrlValidator.validate(originalUrl);
+    if (!result.valid()) {
+      throw new IllegalArgumentException("Invalid URL: " + result.message());
+    } else {
+      logger().info("shortenURL - valid URL {} ", originalUrl);
+    }
+
     URL shortenUrl = serverBaseAdmin.resolve(PATH_ADMIN_SHORTEN).toURL();
     logger().info("connecting to .. shortenUrl {}", shortenUrl);
     HttpURLConnection connection = (HttpURLConnection) shortenUrl.openConnection();
@@ -350,6 +360,11 @@ public class URLShortenerClient
       throws IOException {
     logger().info("Create custom mapping alias='{}' url='{}' expiredAt='{}'", alias, url, expiredAt);
 
+    var result = UrlValidator.validate(url);
+    if (!result.valid()) {
+      throw new IllegalArgumentException("Invalid URL: " + result.message());
+    }
+
     if (alias != null && !alias.isBlank()) {
       var validate = AliasPolicy.validate(alias);
       if (!validate.valid()) {
@@ -377,7 +392,6 @@ public class URLShortenerClient
       try (InputStream is = connection.getInputStream()) {
         String jsonResponse = new String(is.readAllBytes(), UTF_8);
         logger().info("createCustomMapping - jsonResponse - {}", jsonResponse);
-        //String extractedShortCode = JsonUtils.extractShortCode(jsonResponse);
         ShortUrlMapping shortUrlMapping = fromJson(jsonResponse, ShortUrlMapping.class);
         logger().info("shortUrlMapping .. {}", shortUrlMapping);
         return shortUrlMapping;
@@ -393,6 +407,59 @@ public class URLShortenerClient
     }
     throw new IOException("Server returned status " + status);
   }
+
+  public boolean edit(String shortCode, String newUrl, Optional<Instant> expiresAt)
+      throws IOException {
+    return edit(shortCode, newUrl, expiresAt.isPresent() ? expiresAt.orElse(null) : null);
+  }
+
+  public boolean edit(String shortCode, String newUrl, Instant expiresAtOrNull)
+      throws IOException {
+    if (shortCode == null || shortCode.isBlank()) {
+      throw new IllegalArgumentException("shortCode must not be null/blank");
+    }
+    if (newUrl == null || newUrl.isBlank()) {
+      throw new IllegalArgumentException("newUrl must not be null/blank");
+    }
+
+    // Endpoint: .../edit/{shortCode}
+    final URI uri = serverBaseAdmin.resolve(PATH_ADMIN_EDIT + "/" + shortCode);
+    final URL url = uri.toURL();
+    logger().info("edit - {}", url);
+
+    final HttpURLConnection con = (HttpURLConnection) url.openConnection();
+    con.setRequestMethod("PUT");
+    con.setDoOutput(true);
+    con.setRequestProperty(CONTENT_TYPE, JSON_CONTENT_TYPE);
+    con.setRequestProperty(ACCEPT, APPLICATION_JSON);
+    con.setConnectTimeout(10_000);
+    con.setReadTimeout(15_000);
+
+    final ShortenRequest req = new ShortenRequest(newUrl, shortCode, expiresAtOrNull);
+    final String body = req.toJson();
+    logger().info("edit - request body - '{}'", body);
+    try (OutputStream os = con.getOutputStream()) {
+      os.write(body.getBytes(UTF_8));
+    }
+
+    final int code = con.getResponseCode();
+    logger().info("edit - responseCode {}", code);
+
+    if (code == 200 || code == 204 || code == 201) {
+      drainQuietly(con.getInputStream());
+      return true;
+    }
+
+    if (code == 404) {
+      logger().info("shortCode not found.. {}", shortCode);
+      drainQuietly(con.getErrorStream());
+      return false;
+    }
+
+    final String err = readAllAsString(con.getErrorStream());
+    throw new IOException("Unexpected response: " + code + ", body=" + err);
+  }
+
 
   /**
    * Removes an existing mapping. Equivalent to DELETE /mapping/{shortCode}.

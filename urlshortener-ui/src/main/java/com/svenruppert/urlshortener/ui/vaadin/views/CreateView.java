@@ -4,6 +4,7 @@ import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.AliasPolicy;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
+import com.svenruppert.urlshortener.core.validation.UrlValidator;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.button.Button;
@@ -18,6 +19,8 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.timepicker.TimePicker;
 import com.vaadin.flow.data.binder.Binder;
+import com.vaadin.flow.data.binder.ValidationResult;
+import com.vaadin.flow.data.binder.ValueContext;
 import com.vaadin.flow.router.Route;
 
 import java.io.IOException;
@@ -73,8 +76,11 @@ public class CreateView
 
     binder.forField(urlField)
         .asRequired("URL must not be empty")
-        .withValidator(url -> url.startsWith("http://") || url.startsWith("https://"),
-                       "Only HTTP(S) URLs allowed")
+        .withValidator((String url, ValueContext ctx) -> {
+          var res = UrlValidator.validate(url);
+          if (res.valid()) return ValidationResult.ok();
+          else return ValidationResult.error(res.message());
+        })
         .bind(ShortenRequest::getUrl, ShortenRequest::setUrl);
 
     binder.forField(aliasField)

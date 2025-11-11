@@ -11,6 +11,8 @@ public interface UrlMappingUpdater {
   Result<ShortUrlMapping> createMapping(String alias, String url);
   Result<ShortUrlMapping> createMapping(String alias, String url, Instant expiredAt);
 
+  Result<ShortUrlMapping> editMapping(String alias, String url, Instant expiredAt);
+
   boolean delete(String shortCode);
 
 }

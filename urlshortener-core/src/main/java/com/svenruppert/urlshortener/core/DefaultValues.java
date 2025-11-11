@@ -23,6 +23,7 @@ public final class DefaultValues {
   public static final String PATH_REDIRECT = "/";
 
   public static final String PATH_ADMIN_SHORTEN = "/shorten";
+  public static final String PATH_ADMIN_EDIT = "/edit";
   public static final String PATH_ADMIN_DELETE = "/delete";
   public static final String PATH_ADMIN_LIST = "/list";
   public static final String PATH_ADMIN_LIST_ALL = "/list/all";
