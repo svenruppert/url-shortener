@@ -4,10 +4,10 @@ import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.validation.UrlValidator;
-import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.ComponentEvent;
-import com.vaadin.flow.component.ComponentEventListener;
-import com.vaadin.flow.component.UI;
+import com.svenruppert.urlshortener.ui.vaadin.components.MultiAliasEditorStrict;
+import com.svenruppert.urlshortener.ui.vaadin.events.MappingCreatedOrChanged;
+import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
+import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.datepicker.DatePicker;
@@ -26,6 +26,7 @@ import com.vaadin.flow.data.binder.ValidationResult;
 import com.vaadin.flow.data.binder.ValueContext;
 import com.vaadin.flow.shared.Registration;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -73,6 +74,7 @@ public class DetailsDialog
   private final URLShortenerClient client;
   private final ShortUrlMapping item;
   private final Binder<ShortUrlMapping> binder = new Binder<>(ShortUrlMapping.class);
+
 
   /**
    * @param mapping concrete ShortUrlMapping instance
@@ -142,8 +144,10 @@ public class DetailsDialog
     form.setColspan(tfUrl, 2);
     add(form);
 
+    Button addAliasesBtn = new Button("Add aliases…", _ -> openAddAliasesDialog(mapping));
     closeBtn.addClickListener(_ -> close());
-    getFooter().add(closeBtn);
+    getFooter().add(closeBtn, addAliasesBtn);
+
 
     wireActions();
   }
@@ -300,6 +304,76 @@ public class DetailsDialog
 
   public String getShortCode() {
     return shortCode;
+  }
+
+  private void openAddAliasesDialog(ShortUrlMapping currentMapping) {
+    var client = UrlShortenerClientFactory.newInstance();
+
+    Dialog dlg = new Dialog();
+    dlg.setHeaderTitle("new alias for: " + currentMapping.shortCode());
+    dlg.setModal(true);
+    dlg.setCloseOnEsc(true);
+    dlg.setCloseOnOutsideClick(false);
+
+    dlg.setWidth("70vw");
+    dlg.getElement().getStyle().set("max-width", "1100px");
+
+    var editor = new MultiAliasEditorStrict(
+        SHORTCODE_BASE_URL,
+        alias -> {
+          try {
+            return client.resolveShortcode(alias) == null;
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+    );
+    editor.setWidthFull();
+    Button saveBtn = new Button("Save", _ -> {
+      editor.validateAll();
+      var validAliases = editor.getValidAliases();
+      if (validAliases.isEmpty()) {
+        Notification.show("no valid alias.", 2500, Notification.Position.TOP_CENTER);
+        return;
+      }
+
+      int ok = 0;
+      for (String alias : validAliases) {
+        try {
+          var expires = currentMapping.expiresAt().orElse(null);
+          client.createCustomMapping(alias, currentMapping.originalUrl(), expires);
+          editor.markSaved(alias);
+          ok++;
+        } catch (Exception ex) {
+          editor.markError(alias, String.valueOf(ex.getMessage()));
+        }
+      }
+      Notification.show("Saved: " + ok + " | Open: " + editor.countOpen(),
+                        3500, Notification.Position.TOP_CENTER);
+      refreshAfterAliasAdd();
+    });
+
+    Button closeBtn = new Button("Close", _ -> dlg.close());
+
+    dlg.addOpenedChangeListener(e -> {
+      if (!e.isOpened()) {
+        var ui = UI.getCurrent();
+        if (ui != null) {
+          ComponentUtil.fireEvent(ui, new MappingCreatedOrChanged(this));
+        }
+      }
+    });
+
+    dlg.add(editor);
+    dlg.getFooter().add(saveBtn, closeBtn);
+    dlg.open();
+  }
+
+  private void refreshAfterAliasAdd() {
+    var ui = UI.getCurrent();
+    if (ui != null) {
+      ComponentUtil.fireEvent(ui, new MappingCreatedOrChanged(this));
+    }
   }
 
   // ---------- Public API

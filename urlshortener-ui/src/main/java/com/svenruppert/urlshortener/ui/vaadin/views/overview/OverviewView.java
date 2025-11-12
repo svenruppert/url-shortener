@@ -7,6 +7,7 @@ import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.svenruppert.urlshortener.ui.vaadin.components.ColumnVisibilityDialog;
+import com.svenruppert.urlshortener.ui.vaadin.events.MappingCreatedOrChanged;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
 import com.svenruppert.urlshortener.ui.vaadin.tools.ColumnVisibilityClientFactory;
 import com.svenruppert.urlshortener.ui.vaadin.tools.ColumnVisibilityService;
@@ -105,6 +106,13 @@ public class OverviewView
 
     add(buildSearchBar());
     configureGrid();
+    ComponentUtil.addListener(UI.getCurrent(),
+                              MappingCreatedOrChanged.class,
+                              _ -> {
+                                logger().info("Received MappingCreatedOrChanged -> refreshing overview");
+                                refreshPageInfo();
+                                refresh();
+                              });
     add(grid);
 
     pageSize.setValue(25);
