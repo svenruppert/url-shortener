@@ -24,14 +24,8 @@ public class RedirectHandler
   @Override
   public void handle(HttpExchange exchange)
       throws IOException {
-
     if (!RequestMethodUtils.requireGet(exchange)) return;
 
-    //    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-    //      exchange.getResponseHeaders().add("Allow", "GET");
-    //      exchange.sendResponseHeaders(405, -1);
-    //      return;
-    //    }
     final String path = exchange.getRequestURI().getPath(); // z.B. "/ABC123"
     if (path == null || !path.startsWith(PATH_REDIRECT)) {
       exchange.sendResponseHeaders(400, -1);

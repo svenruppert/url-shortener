@@ -34,13 +34,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public final class ColumnVisibilityClient
     implements HasLogger {
 
-
   private final String baseUrl;      // e.g. "http://localhost:8080"
   private final HttpClient http;
 
   public ColumnVisibilityClient() {
     this(ADMIN_SERVER_URL);
-
   }
 
   public ColumnVisibilityClient(String baseUrl) {
