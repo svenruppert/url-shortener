@@ -66,7 +66,7 @@ public class EclipseUrlMappingStore
       var urlMappings = dataRoot().shortUrlMappings();
       var shortUrlMappingOLD = urlMappings.get(shortCode);
       var originalOrNewUrl = url != null ? url : shortUrlMappingOLD.originalUrl();
-      var instant = expiredAt != null ? Optional.of(expiredAt) : shortUrlMappingOLD.expiresAt();
+      Optional<Instant> instant = Optional.ofNullable(expiredAt);
       var shortUrlMapping = new ShortUrlMapping(shortCode, originalOrNewUrl, shortUrlMappingOLD.createdAt(), instant);
       urlMappings.put(shortUrlMapping.shortCode(), shortUrlMapping);
       storage.store(dataRoot().shortUrlMappings());

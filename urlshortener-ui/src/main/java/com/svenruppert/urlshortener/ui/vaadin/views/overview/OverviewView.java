@@ -46,14 +46,13 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.PATTERN_DATE_TIME;
 import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL;
+import static com.vaadin.flow.component.button.ButtonVariant.LUMO_ERROR;
+import static com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY_INLINE;
 import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CENTER;
 import static com.vaadin.flow.data.value.ValueChangeMode.LAZY;
 
@@ -65,10 +64,12 @@ public class OverviewView
 
   public static final String PATH = "";
   protected static final int VALUE_CHANGE_TIMEOUT = 400;
+  private static final int BULK_OPEN_CONFIRM_THRESHOLD = 4;
   private static final DateTimeFormatter DATE_TIME_FMT =
       DateTimeFormatter.ofPattern(PATTERN_DATE_TIME)
           .withLocale(Locale.GERMANY)
           .withZone(ZoneId.systemDefault());
+
   private final URLShortenerClient urlShortenerClient = UrlShortenerClientFactory.newInstance();
   private final ColumnVisibilityClient columnVisibilityClient = ColumnVisibilityClientFactory.newInstance();
   //TODO  Initialize Column Visibility Client/Service (User ID later from security context)
@@ -92,10 +93,17 @@ public class OverviewView
 
   private final TextField globalSearch = new TextField();
   private final ComboBox<String> searchScope = new ComboBox<>("Search in");
-//  private final Button advancedBtn = new Button("Advanced filters", new Icon(VaadinIcon.SLIDERS));
 
   private final Text pageInfo = new Text("");
   private final Grid<ShortUrlMapping> grid = new Grid<>(ShortUrlMapping.class, false);
+
+
+  private final Button bulkDeleteBtn = new Button("Delete selected links…");
+  private final Button bulkSetExpiryBtn = new Button("Set expiry for selected…");
+  private final Button bulkClearExpiryBtn = new Button("Clear expiry for selected");
+  private final Span selectionInfo = new Span();
+  private final HorizontalLayout bulkBar = new HorizontalLayout();
+
 
   private Details advanced;
   private int currentPage = 1;
@@ -113,6 +121,7 @@ public class OverviewView
     add(new H2("URL Shortener – Overview"));
     initDataProvider();
     add(buildSearchBar());
+    add(buildBulkBar());
     configureGrid();
     addListeners();
     addShortCuts();
@@ -214,6 +223,29 @@ public class OverviewView
         setSimpleSearchEnabled(false);
       }
     });
+
+    grid.addSelectionListener(event -> {
+      var all = event.getAllSelectedItems();
+      boolean hasSelection = !all.isEmpty();
+
+      bulkBar.setVisible(hasSelection);
+
+      if (hasSelection) {
+        int count = all.size();
+        String label = count == 1 ? "link selected" : "links selected";
+        selectionInfo.setText(count + " " + label + " on page " + currentPage);
+      } else {
+        selectionInfo.setText("");
+      }
+
+      bulkDeleteBtn.setEnabled(hasSelection);
+      bulkSetExpiryBtn.setEnabled(hasSelection);
+      bulkClearExpiryBtn.setEnabled(hasSelection);
+    });
+
+    bulkDeleteBtn.addClickListener(_ -> confirmBulkDeleteSelected());
+    bulkSetExpiryBtn.addClickListener(_ -> openBulkSetExpiryDialog());
+    bulkClearExpiryBtn.addClickListener(_ -> confirmBulkClearExpirySelected());
   }
 
   private void addShortCuts() {
@@ -226,6 +258,14 @@ public class OverviewView
                                   if (globalSearch.isEnabled()) globalSearch.focus();
                                 },
                                 Key.KEY_K, KeyModifier.META);
+
+    // Bulk delete via Delete-Key
+    current.addShortcutListener(_ -> {
+                                  if (!grid.getSelectedItems().isEmpty()) {
+                                    confirmBulkDeleteSelected();
+                                  }
+                                },
+                                Key.DELETE);
   }
 
   @Override
@@ -262,6 +302,36 @@ public class OverviewView
       subscription = null;
     }
   }
+
+  private Component buildBulkBar() {
+    bulkDeleteBtn.addThemeVariants(LUMO_ERROR, LUMO_TERTIARY_INLINE);
+    bulkSetExpiryBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
+    bulkClearExpiryBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
+
+    bulkDeleteBtn.getElement().setProperty("title", "Delete all selected short links");
+    bulkSetExpiryBtn.getElement().setProperty("title", "Set the same expiry for all selected links");
+    bulkClearExpiryBtn.getElement().setProperty("title", "Remove expiry for all selected links");
+
+    bulkDeleteBtn.setEnabled(false);
+    bulkSetExpiryBtn.setEnabled(false);
+    bulkClearExpiryBtn.setEnabled(false);
+
+    bulkBar.removeAll();
+    selectionInfo.getStyle().set("opacity", "0.7");
+    selectionInfo.getStyle().set("font-size", "var(--lumo-font-size-s)");
+    selectionInfo.getStyle().set("margin-right", "var(--lumo-space-m)");
+
+    bulkBar.add(selectionInfo,
+                bulkDeleteBtn,
+                bulkSetExpiryBtn,
+                bulkClearExpiryBtn);
+
+    bulkBar.setWidthFull();
+    bulkBar.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+    bulkBar.setVisible(false);
+    return bulkBar;
+  }
+
 
   private Component buildSearchBar() {
     globalSearch.setPlaceholder("Search all…");
@@ -340,11 +410,8 @@ public class OverviewView
     advanced.setOpened(false);
     advanced.getElement().getThemeList().add("filled");
 
-//    advancedBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-//    advancedBtn.addClickListener(_ -> advanced.setOpened(!advanced.isOpened()));
     setSimpleSearchEnabled(!advanced.isOpened());
 
-//    HorizontalLayout topBar = new HorizontalLayout(globalSearch, searchScope, pageSize, resetBtn, advancedBtn);
     HorizontalLayout topBar = new HorizontalLayout(globalSearch, searchScope, pageSize, resetBtn);
 
     topBar.setWidthFull();
@@ -367,14 +434,14 @@ public class OverviewView
     logger().info("configureGrid..");
     grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES, GridVariant.LUMO_COMPACT);
     grid.setHeight("70vh");
-    grid.setSelectionMode(Grid.SelectionMode.SINGLE);
+    grid.setSelectionMode(Grid.SelectionMode.MULTI);
 
     grid.addComponentColumn(m -> {
           var code = new Span(m.shortCode());
           code.getStyle().set("font-family", "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace");
 
           var copy = new Button(new Icon(VaadinIcon.COPY));
-          copy.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+          copy.addThemeVariants(LUMO_TERTIARY_INLINE);
           copy.getElement().setProperty("title", "Copy ShortUrl");
           copy.addClickListener(_ -> {
             UI.getCurrent()
@@ -485,11 +552,11 @@ public class OverviewView
   private Component buildGridRowActions(ShortUrlMapping m) {
     logger().info("buildGridRowActions..");
     Button delete = new Button(new Icon(VaadinIcon.TRASH));
-    delete.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+    delete.addThemeVariants(LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
     delete.addClickListener(_ -> confirmDelete(m.shortCode()));
 
     var details = new Button(new Icon(VaadinIcon.SEARCH));
-    details.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+    details.addThemeVariants(LUMO_TERTIARY_INLINE);
     details.addClickListener(_ -> openDetailsDialog(m));
     var row = new HorizontalLayout(details, delete);
     row.setSpacing(true);
@@ -669,7 +736,7 @@ public class OverviewView
         Notification.show("Operation failed");
       }
     });
-    confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
+    confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, LUMO_ERROR);
 
     Button cancel = new Button("Cancel", _ -> dialog.close());
 
@@ -677,10 +744,186 @@ public class OverviewView
     dialog.open();
   }
 
+  private void confirmBulkDeleteSelected() {
+    var selected = grid.getSelectedItems();
+    if (selected.isEmpty()) {
+      Notification.show("No entries selected");
+      return;
+    }
+
+    Dialog dialog = new Dialog();
+    dialog.setHeaderTitle("Delete " + selected.size() + " short links?");
+
+    var exampleCodes = selected.stream()
+        .map(ShortUrlMapping::shortCode)
+        .sorted()
+        .limit(5)
+        .toList();
+
+    if (!exampleCodes.isEmpty()) {
+      String preview = String.join(", ", exampleCodes);
+      if (selected.size() > 5) {
+        preview += ", …";
+      }
+      dialog.add(new Text("Examples: " + preview));
+    } else {
+      dialog.add(new Text("Delete selected short links?"));
+    }
+
+    Button confirm = new Button("Delete", _ -> {
+      int success = 0;
+      int failed = 0;
+
+      for (var m : selected) {
+        try {
+          boolean ok = urlShortenerClient.delete(m.shortCode());
+          if (ok) {
+            success++;
+          } else {
+            failed++;
+          }
+        } catch (IOException ex) {
+          logger().error("Bulk delete failed for {}", m.shortCode(), ex);
+          failed++;
+        }
+      }
+
+      dialog.close();
+      grid.deselectAll();
+      safeRefresh();
+      Notification.show("Deleted: " + success + " • Failed: " + failed);
+    });
+    confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, LUMO_ERROR);
+
+    Button cancel = new Button("Cancel", _ -> dialog.close());
+
+    dialog.getFooter().add(new HorizontalLayout(confirm, cancel));
+    dialog.open();
+  }
+
+  private void openBulkSetExpiryDialog() {
+    var selected = grid.getSelectedItems();
+    if (selected.isEmpty()) {
+      Notification.show("No entries selected");
+      return;
+    }
+
+    Dialog dialog = new Dialog();
+    dialog.setHeaderTitle("Set expiry for " + selected.size() + " short links");
+
+    DatePicker date = new DatePicker("Date");
+    TimePicker time = new TimePicker("Time");
+    time.setStep(Duration.ofMinutes(15));
+
+    HorizontalLayout body = new HorizontalLayout(date, time);
+    body.setAlignItems(Alignment.END);
+    dialog.add(body);
+
+    Button cancel = new Button("Cancel", _ -> dialog.close());
+    Button apply = new Button("Apply", _ -> {
+      if (date.getValue() == null) {
+        Notification.show("Please select a date");
+        return;
+      }
+
+      var localTime = Optional.ofNullable(time.getValue()).orElse(java.time.LocalTime.of(0, 0));
+      var zdt = ZonedDateTime.of(date.getValue(), localTime, ZoneId.systemDefault());
+      Instant expiresAt = zdt.toInstant();
+
+      int success = 0;
+      int failed = 0;
+
+      for (ShortUrlMapping m : selected) {
+        try {
+          boolean ok = urlShortenerClient.edit(
+              m.shortCode(),
+              m.originalUrl(),
+              expiresAt
+          );
+          if (ok) success++;
+          else failed++;
+        } catch (IOException ex) {
+          logger().error("Bulk set expiry failed for {}", m.shortCode(), ex);
+          failed++;
+        }
+      }
+
+      dialog.close();
+      grid.deselectAll();
+      safeRefresh();
+      Notification.show("Updated expiry: " + success + " • Failed: " + failed);
+    });
+    apply.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+    dialog.getFooter().add(new HorizontalLayout(cancel, apply));
+    dialog.open();
+  }
+
+  private void confirmBulkClearExpirySelected() {
+    var selected = grid.getSelectedItems();
+    if (selected.isEmpty()) {
+      Notification.show("No entries selected");
+      return;
+    }
+
+    Dialog dialog = new Dialog();
+    dialog.setHeaderTitle("Remove expiry for " + selected.size() + " short links?");
+
+    dialog.add(new Text(
+        "This will remove the expiry date from all selected short links. "
+            + "They will no longer expire automatically."
+    ));
+
+    Button cancel = new Button("Cancel", _ -> dialog.close());
+    Button confirm = new Button("Remove expiry", _ -> {
+      dialog.close();
+      bulkClearExpiry(selected);
+    });
+    confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+    dialog.getFooter().add(new HorizontalLayout(cancel, confirm));
+    dialog.open();
+  }
+
+  private void bulkClearExpiry(Set<ShortUrlMapping> selected) {
+    if (selected.isEmpty()) {
+      Notification.show("No entries selected");
+      return;
+    }
+
+    int success = 0;
+    int failed = 0;
+
+    for (var m : selected) {
+      try {
+        boolean ok = urlShortenerClient.edit(
+            m.shortCode(),
+            m.originalUrl()
+        );
+        if (ok) {
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (IOException ex) {
+        logger().error("Bulk clear expiry failed for {}", m.shortCode(), ex);
+        failed++;
+      }
+    }
+
+    grid.deselectAll();
+    safeRefresh();
+    Notification.show("Cleared expiry: " + success + " • Failed: " + failed);
+  }
+
   private final class RefreshGuard
       implements AutoCloseable {
     private final boolean prev;
     private final boolean refreshAfter;
+
+    //    public RefreshGuard() {
+    //
+    //    }
 
     RefreshGuard(boolean refreshAfter) {
       this.prev = suppressRefresh;
