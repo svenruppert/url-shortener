@@ -101,7 +101,7 @@ public class InMemoryUrlMappingStore
     if (existsByCode) {
       var shortUrlMappingOLD = store.get(shortCode);
       var originalOrNewUrl = url != null ? url : shortUrlMappingOLD.originalUrl();
-      var instant = expiredAt != null ? Optional.of(expiredAt) : shortUrlMappingOLD.expiresAt();
+      var instant = Optional.ofNullable(expiredAt);
       var shortUrlMapping = new ShortUrlMapping(shortCode, originalOrNewUrl, shortUrlMappingOLD.createdAt(), instant);
       store.put(shortUrlMapping.shortCode(), shortUrlMapping);
       return Result.success(shortUrlMapping);

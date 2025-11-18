@@ -262,12 +262,12 @@ public final class JsonUtils
       return toJson(m);
     }
 
-    if (dto instanceof ColumnSingleEditRequest req) {
+    if (dto instanceof ColumnSingleEditRequest(String userId, String viewId, String columnKey, boolean visible)) {
       Map<String, Object> m = new LinkedHashMap<>();
-      m.put("userId", req.userId());
-      m.put("viewId", req.viewId());
-      m.put("columnKey", req.columnKey());
-      m.put("visible", req.visible());
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      m.put("columnKey", columnKey);
+      m.put("visible", visible);
       return toJson(m);
     }
 

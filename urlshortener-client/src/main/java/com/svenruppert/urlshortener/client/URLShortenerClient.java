@@ -408,9 +408,14 @@ public class URLShortenerClient
     throw new IOException("Server returned status " + status);
   }
 
-  public boolean edit(String shortCode, String newUrl, Optional<Instant> expiresAt)
+//  public boolean edit(String shortCode, String newUrl, Optional<Instant> expiresAt)
+//      throws IOException {
+//    return edit(shortCode, newUrl, expiresAt.isPresent() ? expiresAt.orElse(null) : null);
+//  }
+
+  public boolean edit(String shortCode, String newUrl)
       throws IOException {
-    return edit(shortCode, newUrl, expiresAt.isPresent() ? expiresAt.orElse(null) : null);
+    return edit(shortCode, newUrl, null);
   }
 
   public boolean edit(String shortCode, String newUrl, Instant expiresAtOrNull)
@@ -422,7 +427,6 @@ public class URLShortenerClient
       throw new IllegalArgumentException("newUrl must not be null/blank");
     }
 
-    // Endpoint: .../edit/{shortCode}
     final URI uri = serverBaseAdmin.resolve(PATH_ADMIN_EDIT + "/" + shortCode);
     final URL url = uri.toURL();
     logger().info("edit - {}", url);

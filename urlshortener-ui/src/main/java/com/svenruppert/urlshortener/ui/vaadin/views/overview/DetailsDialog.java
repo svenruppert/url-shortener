@@ -10,7 +10,7 @@ import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.datepicker.DatePicker.DatePickerI18n;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
@@ -108,7 +108,7 @@ public class DetailsDialog
 
     binder.forField(tfUrl)
         .asRequired("URL must not be blank")
-        .withValidator((String url, ValueContext ctx) -> {
+        .withValidator((String url, ValueContext _) -> {
           var res = UrlValidator.validate(url);
           if (res.valid()) return ValidationResult.ok();
           else return ValidationResult.error(res.message());
@@ -192,7 +192,7 @@ public class DetailsDialog
     expiresField.setVisible(false);
     expiresField.setWeekNumbersVisible(true);
     expiresField.setDatePickerI18n(
-        new DatePicker.DatePickerI18n().setFirstDayOfWeek(1));
+        new DatePickerI18n().setFirstDayOfWeek(1));
     expiresField.setStep(Duration.ofMinutes(1));
     expiresField.setWidthFull();
     Button clearBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL), _ -> expiresField.clear());
@@ -302,10 +302,6 @@ public class DetailsDialog
     }
   }
 
-  public String getShortCode() {
-    return shortCode;
-  }
-
   private void openAddAliasesDialog(ShortUrlMapping currentMapping) {
     var client = UrlShortenerClientFactory.newInstance();
 
@@ -377,18 +373,6 @@ public class DetailsDialog
   }
 
   // ---------- Public API
-
-  public String getOriginalUrl() {
-    return originalUrl;
-  }
-
-  public Instant getCreatedAt() {
-    return createdAt;
-  }
-
-  public Optional<Instant> getExpiresAt() {
-    return expiresAt;
-  }
 
   public Registration addOpenListener(ComponentEventListener<OpenEvent> l) {
     return addListener(OpenEvent.class, l);
