@@ -72,7 +72,8 @@ public class EditMappingHandler
       }
 
       final Instant newExpires = req.getExpiresAt();
-      final Result<ShortUrlMapping> updated = urlMappingStore.editMapping(shortCode, req.getUrl(), newExpires);
+      final Boolean active = req.getActive();
+      final Result<ShortUrlMapping> updated = urlMappingStore.editMapping(shortCode, req.getUrl(), newExpires, active);
 
       if (updated.isAbsent()) {
         updated.ifFailed(msg -> {

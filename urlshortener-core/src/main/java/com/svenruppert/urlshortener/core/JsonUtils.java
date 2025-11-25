@@ -5,6 +5,7 @@ import com.svenruppert.urlshortener.core.prefs.*;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenResponse;
+import com.svenruppert.urlshortener.core.urlmapping.ToggleActive;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
@@ -71,7 +72,8 @@ public final class JsonUtils
         throw new IllegalArgumentException("Field 'url' missing or empty");
       }
       Instant expiresAt = parseInstantSafe(m.get("expiresAt"));
-      return (T) new ShortenRequest(url, alias, expiresAt);
+      Boolean active = parseBooleanSafe(m.get("active"));
+      return (T) new ShortenRequest(url, alias, expiresAt, active);
     }
 
     if (type == ShortenResponse.class) {
@@ -84,9 +86,11 @@ public final class JsonUtils
       String code = m.get("shortCode");
       String url = m.get("originalUrl");
       Instant createdAt = parseInstantSafe(m.get("createdAt"));
-      Instant expiresAtI = parseInstantSafe(m.get("expiresAt"));
+      Instant expiresAt = parseInstantSafe(m.get("expiresAt"));
+      Boolean active = parseBooleanSafe(m.get("active"));
       return (T) new ShortUrlMapping(code, url, createdAt,
-                                     Optional.ofNullable(expiresAtI));
+                                     expiresAt,
+                                     active);
     }
 
     if (type == ColumnInfoRequest.class) {
@@ -126,10 +130,21 @@ public final class JsonUtils
       var userId = m.get("userId");
       var viewId = m.get("viewId");
       var columnKey = m.get("columnKey");
-      var visible = Boolean.parseBoolean(String.valueOf(m.get("visible")));
+      var visible = Boolean.parseBoolean(m.get("visible"));
       return (T) new ColumnSingleEditRequest(userId, viewId, columnKey, visible);
     }
 
+    if (type == ToggleActive.ToggleActiveRequest.class) {
+      var shortCode = m.get("shortCode");
+      var active = Boolean.parseBoolean(m.get("active"));
+      return (T) new ToggleActive.ToggleActiveRequest(shortCode, active);
+    }
+
+    if (type == ToggleActive.ToggleActiveResponse.class) {
+      var shortCode = m.get("shortCode");
+      var active = Boolean.parseBoolean(m.get("active"));
+      return (T) new ToggleActive.ToggleActiveResponse(shortCode, active);
+    }
 
     throw new UnsupportedOperationException("Unsupported type for fromJson: " + type.getName());
   }
@@ -178,7 +193,7 @@ public final class JsonUtils
       if (v == null) {
         sb.append("null");
       } else if (v instanceof Number || v instanceof Boolean) {
-        sb.append(v);
+        sb.append('"').append(v).append('"');
       } else {
         sb.append('"').append(escape(v.toString())).append('"');
       }
@@ -196,6 +211,7 @@ public final class JsonUtils
       m.put("url", req.getUrl());
       m.put("alias", req.getShortURL());
       m.put("expiresAt", req.getExpiresAt());
+      m.put("active", req.getActive());
       return toJson(m);
     }
     if (dto instanceof ShortenResponse(String shortCode, String originalUrl)) {
@@ -217,6 +233,7 @@ public final class JsonUtils
       if (map.expiresAt().orElse(null) != null) {
         m.put("expiresAt", map.expiresAt().get().toString());
       }
+      m.put("active", map.active());
       return toJson(m);
     }
     if (dto instanceof StoreInfo(String mode, int mappings, long startedAtEpochMs)) {
@@ -268,6 +285,20 @@ public final class JsonUtils
       m.put("viewId", viewId);
       m.put("columnKey", columnKey);
       m.put("visible", visible);
+      return toJson(m);
+    }
+
+    if (dto instanceof ToggleActive.ToggleActiveRequest(String shortCode, boolean active)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("shortCode", shortCode);
+      m.put("active", active);
+      return toJson(m);
+    }
+
+    if (dto instanceof ToggleActive.ToggleActiveResponse(String shortCode, boolean active)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("shortCode", shortCode);
+      m.put("active", active);
       return toJson(m);
     }
 
@@ -356,6 +387,14 @@ public final class JsonUtils
   private static Instant parseInstantSafe(String s) {
     try {
       return (s == null || s.isBlank()) ? null : Instant.parse(s);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private static Boolean parseBooleanSafe(String s) {
+    try {
+      return (s == null || s.isBlank()) ? null : Boolean.parseBoolean(s);
     } catch (Exception e) {
       return null;
     }

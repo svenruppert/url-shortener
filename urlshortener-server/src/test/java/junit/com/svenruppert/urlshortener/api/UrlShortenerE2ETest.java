@@ -91,7 +91,7 @@ public class UrlShortenerE2ETest
   @Order(1)
   void shorten_returns201_andJson()
       throws Exception {
-    String body = JsonUtils.toJson(new ShortenRequest("https://example.com/x", "e2e-alias"));
+    String body = JsonUtils.toJson(new ShortenRequest("https://example.com/x", "e2e-alias", null, null));
     var res = POST("/shorten", body);
     assertEquals(201, res.statusCode());
     assertTrue(res.headers().firstValue("Content-Type").orElse("").toLowerCase().contains("application/json"));
@@ -123,7 +123,7 @@ public class UrlShortenerE2ETest
   @Order(4)
   void duplicate_alias_conflict_409()
       throws Exception {
-    String body = JsonUtils.toJson(new ShortenRequest("https://example.com/other", "e2e-alias"));
+    String body = JsonUtils.toJson(new ShortenRequest("https://example.com/other", "e2e-alias",null, null));
     var res = POST(PATH_ADMIN_SHORTEN, body);
     logger().info("expected response code - {} ", CONFLICT);
     assertEquals(CONFLICT.code(), res.statusCode(), "Doppelter Alias sollte Konflikt liefern");
@@ -148,7 +148,7 @@ public class UrlShortenerE2ETest
   @Order(6)
   void crlf_in_url_returns400()
       throws Exception {
-    String body = JsonUtils.toJson(new ShortenRequest("https://ex\r\nample.com", "bad"));
+    String body = JsonUtils.toJson(new ShortenRequest("https://ex\r\nample.com", "bad",null, null));
     var res = POST(PATH_ADMIN_SHORTEN, body);
     logger().info("response - {}", res.body());
 

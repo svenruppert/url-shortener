@@ -1,27 +1,19 @@
 package com.svenruppert.urlshortener.core.urlmapping;
 
-import com.svenruppert.urlshortener.core.JsonUtils;
-
 import java.time.Instant;
+import java.util.Objects;
 
 public final class ShortenRequest {
   private String url;
   private String shortURL;
   private Instant expiresAt;
+  private Boolean active;
 
-  public ShortenRequest() {
-  }
-
-  public ShortenRequest(String url, String shortURL) {
-    this.url = url;
-    this.shortURL = shortURL;
-    this.expiresAt = null;
-  }
-
-  public ShortenRequest(String url, String shortURL, Instant expiresAt) {
+  public ShortenRequest(String url, String shortURL, Instant expiresAt, Boolean active) {
     this.url = url;
     this.shortURL = shortURL;
     this.expiresAt = expiresAt;
+    this.active = active;
   }
 
   public Instant getExpiresAt() {
@@ -52,30 +44,33 @@ public final class ShortenRequest {
     return shortURL != null && !shortURL.isBlank();
   }
 
+  public Boolean getActive() {
+    return active;
+  }
+
+  public void setActive(Boolean active) {
+    this.active = active;
+  }
+
   @Override
   public String toString() {
     return "ShortenRequest{" +
         "url='" + url + '\'' +
         ", shortURL='" + shortURL + '\'' +
         ", expiresAt='" + expiresAt + '\'' +
+        ", active='" + active + '\'' +
         '}';
   }
 
-  /**
-   * Returns the JSON representation of this object.
-   * No external libraries required, with correct escaping for simple cases.
-   */
-  //TODO Design error due to dependency on Utils class
-  public String toJson() {
-    var a = shortURL == null ? "\"null\"" : "\"" + JsonUtils.escape(shortURL) + "\"";
-    var b = expiresAt == null ? "\"null\"" : "\"" + JsonUtils.escape(expiresAt.toString()) + "\"";
-    return """
-        {
-          "url": "%s",
-          "alias": %s,
-          "expiresAt": %s
-        }
-        """.formatted(JsonUtils.escape(url), a, b
-    );
+  @Override
+  public boolean equals(Object o) {
+    if (o == null || getClass() != o.getClass()) return false;
+    ShortenRequest that = (ShortenRequest) o;
+    return Objects.equals(url, that.url) && Objects.equals(shortURL, that.shortURL) && Objects.equals(expiresAt, that.expiresAt) && Objects.equals(active, that.active);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(url, shortURL, expiresAt, active);
   }
 }

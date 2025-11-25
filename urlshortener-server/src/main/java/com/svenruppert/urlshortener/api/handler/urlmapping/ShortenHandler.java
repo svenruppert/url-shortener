@@ -36,9 +36,6 @@ import static com.svenruppert.urlshortener.core.StringUtils.isNullOrBlank;
 public class ShortenHandler
     implements HttpHandler, HasLogger {
 
-  protected static final String HTTP = "http";
-  protected static final String HTTPS = "https";
-
   private final UrlMappingStore store;
 
   public ShortenHandler(UrlMappingStore store) {
@@ -70,7 +67,8 @@ public class ShortenHandler
       logger().info("ShortenHandler - createMapping start");
       final Result<ShortUrlMapping> urlMappingResult = store.createMapping(req.getShortURL(),
                                                                            req.getUrl(),
-                                                                           req.getExpiresAt());
+                                                                           req.getExpiresAt(),
+                                                                           req.getActive());
       logger().info("ShortenHandler - createMapping stop");
       urlMappingResult
           .ifPresentOrElse(success -> logger().info("mapping created success {}", success.toString()),

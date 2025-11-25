@@ -3,13 +3,13 @@ package junit.com.svenruppert.urlshortener.client;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
-import com.svenruppert.urlshortener.core.validation.UrlValidator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
 import static java.time.Instant.now;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -233,6 +233,30 @@ public class URLShortenerClientTest
 
     // Assert
     assertTrue(client.listActive().isEmpty(), "No active entry may remain after deletion");
+  }
+
+  @Test
+  void checkTheActiveAttribute()
+      throws IOException {
+    // Arrange
+    var m = client.createCustomMapping("sru01", HTTP_SVENRUPPERT_COM, null, false);
+    logger().info("Mapping As Json {}", toJson(m));
+    assertNotNull(m);
+
+    assertEquals(1, client.listAll().size(), "One entry is expected");
+    assertEquals(0, client.listActive().size(), "NO active entry is expected");
+
+    var m2 = client.createCustomMapping("sru02", HTTP_SVENRUPPERT_COM, null, true);
+    logger().info("Mapping m2 As Json {}", toJson(m2));
+    assertNotNull(m2);
+    assertEquals(2, client.listAll().size(), "Two entries are expected");
+    assertEquals(1, client.listActive().size(), "One active entry is expected");
+    assertEquals(1, client.listInActive().size(), "One INactive entry is expected");
+
+    // Act
+    assertTrue(client.delete(m.shortCode()));
+    assertEquals(1, client.listAll().size(), "One entry is expected");
+    assertEquals(1, client.listActive().size(), "One active entry is expected");
   }
 
 

@@ -1,4 +1,3 @@
-// com.svenruppert.urlshortener.api.handler.urlmapping.ListCountHandler
 package com.svenruppert.urlshortener.api.handler.urlmapping;
 
 import com.sun.net.httpserver.HttpExchange;
@@ -64,27 +63,29 @@ public final class ListCountHandler
     }
   }
 
+  private static Optional<Boolean> parseBoolean(String raw) {
+    try {
+      return (raw == null || raw.isBlank()) ? Optional.empty() : Optional.of(Boolean.valueOf(raw));
+    } catch (Exception e) {
+      return Optional.empty();
+    }
+  }
+
   @Override
   public void handle(HttpExchange ex)
       throws IOException {
     if (!RequestMethodUtils.requireGet(ex)) return;
-    //    if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) {
-    //      ex.sendResponseHeaders(405, -1);
-    //      return;
-    //    }
-
     var rawQuery = ex.getRequestURI().getRawQuery();
     var queryString = Optional.ofNullable(rawQuery).orElse("");
     Map<String, List<String>> q = parseQuery(queryString);
 
+    // sort/page/size not relevant
     UrlMappingFilter filter = UrlMappingFilter.builder()
         .codePart(first(q, "code"))
-        .codeCaseSensitive(bool(q, "codeCase"))
         .urlPart(first(q, "url"))
-        .urlCaseSensitive(bool(q, "urlCase"))
         .createdFrom(parseInstant(first(q, "from")).orElse(null))
         .createdTo(parseInstant(first(q, "to")).orElse(null))
-        // sort/page/size not relevant
+        .active(parseBoolean(first(q, "active")).orElse(null))
         .build();
 
     int total = store.count(filter);

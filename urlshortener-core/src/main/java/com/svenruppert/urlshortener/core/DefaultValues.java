@@ -25,10 +25,12 @@ public final class DefaultValues {
   public static final String PATH_ADMIN_SHORTEN = "/shorten";
   public static final String PATH_ADMIN_EDIT = "/edit";
   public static final String PATH_ADMIN_DELETE = "/delete";
+  public static final String PATH_ADMIN_TOGGLE_ACTIVE = "/toggleActive";
   public static final String PATH_ADMIN_LIST = "/list";
   public static final String PATH_ADMIN_LIST_ALL = "/list/all";
   public static final String PATH_ADMIN_LIST_EXPIRED = "/list/expired";
   public static final String PATH_ADMIN_LIST_ACTIVE = "/list/active";
+  public static final String PATH_ADMIN_LIST_INACTIVE = "/list/inactive";
   public static final String PATH_ADMIN_LIST_COUNT = "/list/count";
 
   public static final String PATH_ADMIN_STORE_INFO = "/store/info";

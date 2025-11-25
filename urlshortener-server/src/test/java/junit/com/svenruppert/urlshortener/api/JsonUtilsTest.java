@@ -64,7 +64,8 @@ class JsonUtilsTest {
         "abc123",
         "https://example.com/page",
         Instant.parse("2025-10-13T10:15:30Z"),
-        Optional.empty()
+        null,
+        true
     );
 
     String json = JsonUtils.toJson(m);

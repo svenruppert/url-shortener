@@ -7,6 +7,7 @@ import com.svenruppert.urlshortener.api.store.urlmapping.MappingCreator;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingFilter;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.ToggleActive.ToggleActiveResponse;
 
 import java.time.Instant;
 import java.util.*;
@@ -35,16 +36,10 @@ public class InMemoryUrlMappingStore
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(String originalUrl) {
-    logger().info("originalUrl: {} ->", originalUrl);
-    return createMapping(null, originalUrl);
-  }
-
-  @Override
   public Optional<ShortUrlMapping> findByShortCode(String shortCode) {
     logger().info("findByShortCode '{}'", shortCode);
     String normalized = normalize(shortCode);
-    logger().info("findByShortCode normalized for search '{}'", shortCode);
+    logger().info("findByShortCode normalized for search '{}'", normalized);
     return Optional.ofNullable(store.get(normalized));
   }
 
@@ -83,26 +78,40 @@ public class InMemoryUrlMappingStore
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl) {
-    logger().info("createMapping - shortCode: {} - originalUrl: {} ", shortCode, originalUrl);
-    return creator.create(shortCode, originalUrl, null);
+  public Result<ToggleActiveResponse> toggleActive(String shortCode, boolean newActiveValue) {
+    if (shortCode == null || shortCode.isBlank())
+      return Result.failure("shortCode '" + shortCode + "' is  valid");
+    if (store.containsKey(shortCode)) {
+      var urlMapping = store.get(shortCode);
+      var updatedUrlMapping = urlMapping.withActive(newActiveValue);
+      store.put(shortCode, updatedUrlMapping);
+      return Result.success(new ToggleActiveResponse(shortCode, updatedUrlMapping.active()));
+    } else {
+      return Result.failure("shortCode " + shortCode + "not found");
+    }
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt) {
-    logger().info("createMapping - shortCode: {} - originalUrl: {} - expiredAt: {} ", shortCode, originalUrl, expiredAt);
-    return creator.create(shortCode, originalUrl, expiredAt);
+  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt, Boolean active) {
+    logger().info("createMapping - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", shortCode, originalUrl, expiredAt, active);
+    var originalOrDefaultActive = active != null ? active : true;
+    return creator.create(shortCode, originalUrl, expiredAt, originalOrDefaultActive);
   }
 
   @Override
-  public Result<ShortUrlMapping> editMapping(String shortCode, String url, Instant expiredAt) {
-    logger().info("editMapping - shortCode: {} - originalUrl: {} - expiredAt: {} ", shortCode, url, expiredAt);
+  public Result<ShortUrlMapping> editMapping(String shortCode, String url, Instant expiredAt, Boolean active) {
+    logger().info("editMapping - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", shortCode, url, expiredAt, active);
     var existsByCode = existsByCode(shortCode);
     if (existsByCode) {
       var shortUrlMappingOLD = store.get(shortCode);
       var originalOrNewUrl = url != null ? url : shortUrlMappingOLD.originalUrl();
-      var instant = Optional.ofNullable(expiredAt);
-      var shortUrlMapping = new ShortUrlMapping(shortCode, originalOrNewUrl, shortUrlMappingOLD.createdAt(), instant);
+      var originalOrNewActive = active != null ? active : shortUrlMappingOLD.active();
+      var shortUrlMapping = new ShortUrlMapping(
+          shortCode,
+          originalOrNewUrl,
+          shortUrlMappingOLD.createdAt(),
+          expiredAt,
+          originalOrNewActive);
       store.put(shortUrlMapping.shortCode(), shortUrlMapping);
       return Result.success(shortUrlMapping);
     } else {

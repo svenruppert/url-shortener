@@ -22,7 +22,18 @@ public class UrlMappingFilterHelper {
   }
 
   public static boolean matches(UrlMappingFilter f, ShortUrlMapping m) {
-    return matchCode(f, m) && matchUrl(f, m) && matchCreated(f, m);
+    return matchActive(f, m) && matchCode(f, m) && matchUrl(f, m) && matchCreated(f, m);
+  }
+
+  private static boolean matchActive(UrlMappingFilter f, ShortUrlMapping m) {
+    var active = f.active();
+    if (active.isEmpty()) return true;
+    var aBoolean = active.get();
+    if (aBoolean) {
+      return m.active();
+    } else {
+      return !m.active();
+    }
   }
 
   @NotNull
@@ -45,11 +56,7 @@ public class UrlMappingFilterHelper {
     return f.codePart()
         .map(part -> {
           String code = normalize(m.shortCode());
-          if (f.codeCaseSensitive()) {
-            return code.contains(part);
-          } else {
-            return code.toLowerCase(Locale.ROOT).contains(part.toLowerCase(Locale.ROOT));
-          }
+          return code.toLowerCase(Locale.ROOT).contains(part.toLowerCase(Locale.ROOT));
         })
         .orElse(true);
   }
@@ -59,9 +66,7 @@ public class UrlMappingFilterHelper {
         .map(part -> {
           String url = m.originalUrl();
           if (url == null) return false;
-          return f.urlCaseSensitive()
-              ? url.contains(part)
-              : url.toLowerCase(Locale.ROOT).contains(part.toLowerCase(Locale.ROOT));
+          return url.toLowerCase(Locale.ROOT).contains(part.toLowerCase(Locale.ROOT));
         })
         .orElse(true);
   }

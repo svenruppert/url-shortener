@@ -76,7 +76,7 @@ class JsonUtilsAdvancedTest {
   class DTOJson {
     @Test
     void toJson_ShortenRequest_and_fromJson_roundtrip() {
-      ShortenRequest req = new ShortenRequest("https://example.com?q=1", "alias-01");
+      ShortenRequest req = new ShortenRequest("https://example.com?q=1", "alias-01", null, true);
       String json = JsonUtils.toJson(req);
       assertTrue(json.contains("\"url\":\"https://example.com?q=1\""));
       assertTrue(json.contains("\"alias\":\"alias-01\""));
@@ -100,7 +100,11 @@ class JsonUtilsAdvancedTest {
       String resJson = JsonUtils.toJson(res);
       assertEquals("{\"shortCode\":\"sc\",\"originalUrl\":\"https://e\"}", resJson);
 
-      ShortUrlMapping map = new ShortUrlMapping("sc", "https://e", Instant.parse("2020-01-01T00:00:00Z"), java.util.Optional.empty());
+      ShortUrlMapping map = new ShortUrlMapping("sc",
+                                                "https://e",
+                                                Instant.parse("2020-01-01T00:00:00Z"),
+                                                null,
+                                                true);
       String mapJson = JsonUtils.toJson(map);
       assertTrue(mapJson.contains("\"shortCode\":\"sc\""));
       assertTrue(mapJson.contains("\"originalUrl\":\"https://e\""));

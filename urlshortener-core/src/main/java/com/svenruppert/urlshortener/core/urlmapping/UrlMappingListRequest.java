@@ -11,15 +11,16 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class UrlMappingListRequest {
   private String codePart;
-  private boolean codeCaseSensitive;
+  //  private boolean codeCaseSensitive;
   private String urlPart;
-  private boolean urlCaseSensitive;
+  //  private boolean urlCaseSensitive;
   private Instant from;
   private Instant to;
   private Integer page;
   private Integer size;
   private String sort; // createdAt|shortCode|originalUrl|expiresAt
   private String dir; // asc|desc
+  private Boolean active;
 
   private UrlMappingListRequest() {
   }
@@ -53,11 +54,12 @@ public class UrlMappingListRequest {
   private Map<String, String> baseParams() {
     var q = new LinkedHashMap<String, String>();
     add(q, "code", codePart);
-    addTrue(q, "codeCase", codeCaseSensitive);
+    //    addTrue(q, "codeCase", codeCaseSensitive);
     add(q, "url", urlPart);
-    addTrue(q, "urlCase", urlCaseSensitive);
+    //    addTrue(q, "urlCase", urlCaseSensitive);
     add(q, "from", from);
     add(q, "to", to);
+    if (active != null) add(q, "active", active);
     return q;
   }
 
@@ -78,17 +80,17 @@ public class UrlMappingListRequest {
     return codePart;
   }
 
-  public boolean isCodeCaseSensitive() {
-    return codeCaseSensitive;
-  }
+  //  public boolean isCodeCaseSensitive() {
+  //    return codeCaseSensitive;
+  //  }
 
   public String getUrlPart() {
     return urlPart;
   }
 
-  public boolean isUrlCaseSensitive() {
-    return urlCaseSensitive;
-  }
+  //  public boolean isUrlCaseSensitive() {
+  //    return urlCaseSensitive;
+  //  }
 
   public Instant getFrom() {
     return from;
@@ -118,15 +120,16 @@ public class UrlMappingListRequest {
   public String toString() {
     return "UrlMappingListRequest{"
         + "codePart='" + codePart + '\''
-        + ", codeCaseSensitive=" + codeCaseSensitive
+        //        + ", codeCaseSensitive=" + codeCaseSensitive
         + ", urlPart='" + urlPart + '\''
-        + ", urlCaseSensitive=" + urlCaseSensitive
+        //        + ", urlCaseSensitive=" + urlCaseSensitive
         + ", from=" + from
         + ", to=" + to
         + ", page=" + page
         + ", size=" + size
         + ", sort='" + sort + '\''
         + ", dir='" + dir + '\''
+        + ", active='" + active + '\''
         + '}';
   }
 
@@ -138,20 +141,20 @@ public class UrlMappingListRequest {
       return this;
     }
 
-    public Builder codeCaseSensitive(boolean b) {
-      r.codeCaseSensitive = b;
-      return this;
-    }
+    //    public Builder codeCaseSensitive(boolean b) {
+    //      r.codeCaseSensitive = b;
+    //      return this;
+    //    }
 
     public Builder urlPart(String v) {
       r.urlPart = v;
       return this;
     }
 
-    public Builder urlCaseSensitive(boolean b) {
-      r.urlCaseSensitive = b;
-      return this;
-    }
+    //    public Builder urlCaseSensitive(boolean b) {
+    //      r.urlCaseSensitive = b;
+    //      return this;
+    //    }
 
     public Builder from(Instant v) {
       r.from = v;
@@ -182,6 +185,11 @@ public class UrlMappingListRequest {
       r.dir = v;
       return this;
     } // asc|desc
+
+    public Builder active(boolean a) {
+      r.active = a;
+      return this;
+    }
 
     public UrlMappingListRequest build() {
       return r;

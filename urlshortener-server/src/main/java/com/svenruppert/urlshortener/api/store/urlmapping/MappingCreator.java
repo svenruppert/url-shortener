@@ -9,7 +9,6 @@ import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Function;
 
 import static com.svenruppert.urlshortener.core.AliasPolicy.normalize;
@@ -26,6 +25,7 @@ public final class MappingCreator
   private final PutMapping store;
   private final Clock clock;
   private final Function<ErrorInfo, String> errorMapper; // maps ErrorInfo → e.g. your toJson(...)
+
   public MappingCreator(ShortCodeGenerator generator,
                         ExistsByCode exists,
                         PutMapping store,
@@ -41,7 +41,7 @@ public final class MappingCreator
   /**
    * Main method: creates mapping with optional alias.
    */
-  public Result<ShortUrlMapping> create(String alias, String url, Instant expiredAt) {
+  public Result<ShortUrlMapping> create(String alias, String url, Instant expiredAt, Boolean active) {
     logger().info("createMapping - alias='{}' / url='{}' / expiredAt='{}'", alias, url, expiredAt);
 
     final String shortCode;
@@ -70,19 +70,20 @@ public final class MappingCreator
     } else {
       logger().info("alias is null or blank");
       String gen = normalize(generator.nextCode());
-      logger().info("next normalized alias .. {} " , gen);
+      logger().info("next normalized alias .. {} ", gen);
       while (exists.test(gen)) {
         gen = normalize(generator.nextCode());
-        logger().info("next normalized alias .. {} " , gen);
+        logger().info("next normalized alias .. {} ", gen);
       }
       shortCode = gen;
     }
-    var mapping = new ShortUrlMapping(shortCode, url, Instant.now(clock), Optional.ofNullable(expiredAt));
+    var mapping = new ShortUrlMapping(shortCode, url, Instant.now(clock), expiredAt, active);
     logger().info("mapping to store .. {}", mapping);
     store.accept(mapping);
     logger().info("mapping stored .. {}", mapping);
     return Result.success(mapping);
   }
+
   @FunctionalInterface
   public interface ExistsByCode {
     boolean test(String code);
