@@ -108,8 +108,9 @@ public class ShortenerServer
     serverAdmin.createContext(PATH_ADMIN_SHORTEN, new ShortenHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_LIST_COUNT, new ListCountHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_EDIT, new EditMappingHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter()); // DELETE /mapping/{code}
-    serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter()); // DELETE /mapping/{code}
+    serverAdmin.createContext(PATH_ADMIN_EDIT, new EditMappingHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_TOGGLE_ACTIVE, new ToggleActiveHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_STORE_INFO, new StoreInfoHandler(urlMappingStore, startedAt)).getFilters().add(new BlockBrowserPreflightFilter());
 
     serverAdmin.createContext(PATH_ADMIN_PREFERENCES_COLUMNS,        new ColumnVisibilityHandler(preferencesStore)).getFilters().add(new BlockBrowserPreflightFilter());

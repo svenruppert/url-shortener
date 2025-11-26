@@ -34,12 +34,6 @@ public final class DeleteMappingHandler
     final String path = exchange.getRequestURI().getPath();
     logger().info("DeleteMappingHandler invoked: {} {}", method, path);
     if (!RequestMethodUtils.requireDelete(exchange)) return;
-//    if (!"DELETE".equalsIgnoreCase(method)) {
-//      logger().warn("no DELETE Req - {}", method);
-//      exchange.getResponseHeaders().add("Allow", "DELETE");
-//      exchange.sendResponseHeaders(405, -1);
-//      return;
-//    }
 
     //TODO check with AliasPolicy.isValid(alias)
     if (!path.startsWith(PATH_ADMIN_DELETE)) {

@@ -15,7 +15,6 @@ import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.details.Details;
@@ -33,6 +32,7 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.timepicker.TimePicker;
@@ -64,7 +64,6 @@ public class OverviewView
 
   public static final String PATH = "";
   protected static final int VALUE_CHANGE_TIMEOUT = 400;
-  private static final int BULK_OPEN_CONFIRM_THRESHOLD = 4;
   private static final DateTimeFormatter DATE_TIME_FMT =
       DateTimeFormatter.ofPattern(PATTERN_DATE_TIME)
           .withLocale(Locale.GERMANY)
@@ -76,13 +75,12 @@ public class OverviewView
   private final ColumnVisibilityService columnVisibilityService = new ColumnVisibilityService(columnVisibilityClient, "admin", "overview");
 
   private final TextField codePart = new TextField("Shortcode contains");
-  private final Checkbox codeCase = new Checkbox("Case-sensitive");
   private final TextField urlPart = new TextField("Original URL contains");
-  private final Checkbox urlCase = new Checkbox("Case-sensitive");
   private final DatePicker fromDate = new DatePicker("From (local)");
   private final TimePicker fromTime = new TimePicker("Time");
   private final DatePicker toDate = new DatePicker("To (local)");
   private final TimePicker toTime = new TimePicker("Time");
+  private final Select<ActiveState> activeState = new Select<>();
   private final ComboBox<String> sortBy = new ComboBox<>("Sort by");
   private final ComboBox<String> dir = new ComboBox<>("Direction");
   private final IntegerField pageSize = new IntegerField("Page size");
@@ -97,10 +95,12 @@ public class OverviewView
   private final Text pageInfo = new Text("");
   private final Grid<ShortUrlMapping> grid = new Grid<>(ShortUrlMapping.class, false);
 
-
   private final Button bulkDeleteBtn = new Button("Delete selected links…");
   private final Button bulkSetExpiryBtn = new Button("Set expiry for selected…");
   private final Button bulkClearExpiryBtn = new Button("Clear expiry for selected");
+  private final Button bulkActivateBtn = new Button("Activate all selected");
+  private final Button bulkDiActivateBtn = new Button("Deactivate all selected");
+
   private final Span selectionInfo = new Span();
   private final HorizontalLayout bulkBar = new HorizontalLayout();
 
@@ -142,6 +142,12 @@ public class OverviewView
                                 refreshPageInfo();
                                 safeRefresh();
                               });
+
+
+    activeState.addValueChangeListener(_ -> {
+      currentPage = 1;
+      safeRefresh();
+    });
 
     globalSearch.addValueChangeListener(e -> {
       var v = Optional.ofNullable(e.getValue()).orElse("");
@@ -195,9 +201,7 @@ public class OverviewView
       try (var _ = new RefreshGuard(true)) {
         globalSearch.clear();
         codePart.clear();
-        codeCase.clear();
         urlPart.clear();
-        urlCase.clear();
         fromDate.clear();
         fromTime.clear();
         toDate.clear();
@@ -212,6 +216,7 @@ public class OverviewView
         advanced.setOpened(false);
         setSimpleSearchEnabled(true);
         globalSearch.focus();
+        activeState.setValue(ActiveState.NOT_SET);
       }
     });
 
@@ -241,11 +246,16 @@ public class OverviewView
       bulkDeleteBtn.setEnabled(hasSelection);
       bulkSetExpiryBtn.setEnabled(hasSelection);
       bulkClearExpiryBtn.setEnabled(hasSelection);
+      bulkActivateBtn.setEnabled(hasSelection);
+      bulkDiActivateBtn.setEnabled(hasSelection);
     });
 
     bulkDeleteBtn.addClickListener(_ -> confirmBulkDeleteSelected());
     bulkSetExpiryBtn.addClickListener(_ -> openBulkSetExpiryDialog());
     bulkClearExpiryBtn.addClickListener(_ -> confirmBulkClearExpirySelected());
+    bulkActivateBtn.addClickListener(_ -> confirmBulkActivateSelected());
+    bulkDiActivateBtn.addClickListener(_ -> confirmBulkDeactivateSelected());
+
   }
 
   private void addShortCuts() {
@@ -307,14 +317,20 @@ public class OverviewView
     bulkDeleteBtn.addThemeVariants(LUMO_ERROR, LUMO_TERTIARY_INLINE);
     bulkSetExpiryBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
     bulkClearExpiryBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
+    bulkActivateBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
+    bulkDiActivateBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
 
     bulkDeleteBtn.getElement().setProperty("title", "Delete all selected short links");
     bulkSetExpiryBtn.getElement().setProperty("title", "Set the same expiry for all selected links");
     bulkClearExpiryBtn.getElement().setProperty("title", "Remove expiry for all selected links");
+    bulkActivateBtn.getElement().setProperty("title", "Activate all selected links");
+    bulkDiActivateBtn.getElement().setProperty("title", "Deactivate all selected links");
 
     bulkDeleteBtn.setEnabled(false);
     bulkSetExpiryBtn.setEnabled(false);
     bulkClearExpiryBtn.setEnabled(false);
+    bulkActivateBtn.setEnabled(false);
+    bulkDiActivateBtn.setEnabled(false);
 
     bulkBar.removeAll();
     selectionInfo.getStyle().set("opacity", "0.7");
@@ -324,7 +340,9 @@ public class OverviewView
     bulkBar.add(selectionInfo,
                 bulkDeleteBtn,
                 bulkSetExpiryBtn,
-                bulkClearExpiryBtn);
+                bulkClearExpiryBtn,
+                bulkActivateBtn,
+                bulkDiActivateBtn);
 
     bulkBar.setWidthFull();
     bulkBar.setDefaultVerticalComponentAlignment(Alignment.CENTER);
@@ -379,7 +397,8 @@ public class OverviewView
 
     FormLayout searchBlock = new FormLayout();
     searchBlock.setWidthFull();
-    searchBlock.add(codePart, urlPart, new HorizontalLayout(codeCase, urlCase));
+    //    searchBlock.add(codePart, urlPart, new HorizontalLayout(codeCase, urlCase));
+    searchBlock.add(codePart, urlPart, new HorizontalLayout()); //TODO not nice!!
     searchBlock.add(fromGroup, toGroup);
     searchBlock.setResponsiveSteps(
         new FormLayout.ResponsiveStep("0", 1),
@@ -412,7 +431,16 @@ public class OverviewView
 
     setSimpleSearchEnabled(!advanced.isOpened());
 
-    HorizontalLayout topBar = new HorizontalLayout(globalSearch, searchScope, pageSize, resetBtn);
+    activeState.setLabel("Active state");
+    activeState.setItems(ActiveState.values());
+    activeState.setItemLabelGenerator(state -> switch (state) {
+      case ACTIVE -> "Active";
+      case INACTIVE -> "Inactive";
+      case NOT_SET -> "Not set";
+    });
+    activeState.setEmptySelectionAllowed(false);
+    activeState.setValue(ActiveState.NOT_SET);
+    HorizontalLayout topBar = new HorizontalLayout(globalSearch, searchScope, pageSize, activeState, resetBtn);
 
     topBar.setWidthFull();
     topBar.setSpacing(true);
@@ -487,6 +515,39 @@ public class OverviewView
         .setFlexGrow(0);
 
     grid.addComponentColumn(m -> {
+          Icon icon = m.active()
+              ? VaadinIcon.CHECK_CIRCLE.create()
+              : VaadinIcon.CLOSE_CIRCLE.create();
+
+          icon.setColor(m.active()
+                            ? "var(--lumo-success-color)"
+                            : "var(--lumo-error-color)");
+          icon.getStyle().set("cursor", "pointer");
+          icon.getElement().setProperty("title",
+                                        m.active() ? "Deactivate" : "Activate");
+
+          icon.addClickListener(_ -> {
+            boolean newValue = !m.active();
+
+            try {
+              urlShortenerClient.toggleActive(m.shortCode(), newValue);
+              Notification.show("Status updated", 2000, Notification.Position.TOP_CENTER);
+              safeRefresh();
+            } catch (Exception ex) {
+              Notification.show("Error updating active status: " + ex.getMessage(),
+                                3000, Notification.Position.TOP_CENTER);
+            }
+          });
+          return icon;
+        })
+        .setHeader("Active")
+        .setKey("active")
+        .setAutoWidth(true)
+        .setResizable(true)
+        .setSortable(true)
+        .setFlexGrow(0);
+
+    grid.addComponentColumn(m -> {
           var pill = new Span(m.expiresAt()
                                   .map(ts -> {
                                     var days = Duration.between(Instant.now(), ts).toDays();
@@ -497,12 +558,13 @@ public class OverviewView
                                   .orElse("No expiry"));
           pill.getElement().getThemeList().add("badge pill small");
 
-          m.expiresAt().ifPresent(ts -> {
-            long d = Duration.between(Instant.now(), ts).toDays();
-            if (d < 0) pill.getElement().getThemeList().add("error");
-            else if (d <= 3) pill.getElement().getThemeList().add("warning");
-            else pill.getElement().getThemeList().add("success");
-          });
+          m.expiresAt()
+              .ifPresent(ts -> {
+                long d = Duration.between(Instant.now(), ts).toDays();
+                if (d < 0) pill.getElement().getThemeList().add("error");
+                else if (d <= 3) pill.getElement().getThemeList().add("warning");
+                else pill.getElement().getThemeList().add("success");
+              });
           return pill;
         })
         .setHeader("Expires")
@@ -567,7 +629,6 @@ public class OverviewView
     globalSearch.setEnabled(enabled);
     searchScope.setEnabled(enabled);
     resetBtn.setEnabled(true);
-    globalSearch.setHelperText(enabled ? null : "Disabled while Advanced filters are open");
   }
 
   private void applyAdvancedToSimpleAndReset() {
@@ -581,9 +642,7 @@ public class OverviewView
 
     try (var _ = new RefreshGuard(true)) {
       codePart.clear();
-      codeCase.clear();
       urlPart.clear();
-      urlCase.clear();
       fromDate.clear();
       fromTime.clear();
       toDate.clear();
@@ -679,15 +738,18 @@ public class OverviewView
   private UrlMappingListRequest buildFilter(Integer page, Integer size) {
     UrlMappingListRequest.Builder b = UrlMappingListRequest.builder();
 
+    ActiveState activeStateValue = activeState.getValue();
+    logger().info("buildFilter - activeState == {}", activeStateValue);
+    if (activeStateValue != null && activeStateValue.isSet()) {
+      b.active(activeStateValue.toBoolean());
+    }
     if (codePart.getValue() != null && !codePart.getValue().isBlank()) {
       b.codePart(codePart.getValue());
     }
-    b.codeCaseSensitive(Boolean.TRUE.equals(codeCase.getValue()));
 
     if (urlPart.getValue() != null && !urlPart.getValue().isBlank()) {
       b.urlPart(urlPart.getValue());
     }
-    b.urlCaseSensitive(Boolean.TRUE.equals(urlCase.getValue()));
 
     if (fromDate.getValue() != null && fromTime.getValue() != null) {
       var zdt = ZonedDateTime.of(fromDate.getValue(), fromTime.getValue(), ZoneId.systemDefault());
@@ -838,7 +900,8 @@ public class OverviewView
           boolean ok = urlShortenerClient.edit(
               m.shortCode(),
               m.originalUrl(),
-              expiresAt
+              expiresAt,
+              m.active()
           );
           if (ok) success++;
           else failed++;
@@ -886,11 +949,6 @@ public class OverviewView
   }
 
   private void bulkClearExpiry(Set<ShortUrlMapping> selected) {
-    if (selected.isEmpty()) {
-      Notification.show("No entries selected");
-      return;
-    }
-
     int success = 0;
     int failed = 0;
 
@@ -898,7 +956,9 @@ public class OverviewView
       try {
         boolean ok = urlShortenerClient.edit(
             m.shortCode(),
-            m.originalUrl()
+            m.originalUrl(),
+            null,
+            m.active()
         );
         if (ok) {
           success++;
@@ -916,14 +976,74 @@ public class OverviewView
     Notification.show("Cleared expiry: " + success + " • Failed: " + failed);
   }
 
+  private void bulkSetActive(Set<ShortUrlMapping> selected, boolean activate) {
+    int success = 0;
+    int failed = 0;
+
+    for (var m : selected) {
+      try {
+        var ok = urlShortenerClient.toggleActive(m.shortCode(), activate);
+        if (ok) {
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (IOException ex) {
+        logger().error("Toggle active state failed for {}", m.shortCode(), ex);
+        failed++;
+      }
+    }
+
+    grid.deselectAll();
+    safeRefresh();
+
+    var actionLabel = activate ? "Activate" : "Deactivate";
+    Notification.show(
+        actionLabel + " – Success: " + success + " • Failed: " + failed
+    );
+  }
+
+  private void confirmBulkSetActiveSelected(boolean activate) {
+    var selected = grid.getSelectedItems();
+    if (selected.isEmpty()) {
+      Notification.show("No entries selected");
+      return;
+    }
+
+    var verb = activate ? "activate" : "deactivate";
+    var verbCap = activate ? "Activate" : "Deactivate";
+
+    Dialog dialog = new Dialog();
+    dialog.setHeaderTitle(verbCap + " all " + selected.size() + " short links?");
+
+    dialog.add(new Text(
+        "This will " + verb + " all selected short links. "
+            + "They will be " + (activate ? "active" : "inactive") + " afterwards."
+    ));
+
+    Button cancel = new Button("Cancel", _ -> dialog.close());
+    Button confirm = new Button(verbCap + " All", _ -> {
+      dialog.close();
+      bulkSetActive(Set.copyOf(selected), activate);
+    });
+    confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    dialog.getFooter().add(new HorizontalLayout(cancel, confirm));
+    dialog.open();
+  }
+
+  private void confirmBulkActivateSelected() {
+    confirmBulkSetActiveSelected(true);
+  }
+
+  private void confirmBulkDeactivateSelected() {
+    confirmBulkSetActiveSelected(false);
+  }
+
+
   private final class RefreshGuard
       implements AutoCloseable {
     private final boolean prev;
     private final boolean refreshAfter;
-
-    //    public RefreshGuard() {
-    //
-    //    }
 
     RefreshGuard(boolean refreshAfter) {
       this.prev = suppressRefresh;

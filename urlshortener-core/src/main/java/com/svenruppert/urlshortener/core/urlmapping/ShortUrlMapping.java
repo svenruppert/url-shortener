@@ -8,18 +8,21 @@ public final class ShortUrlMapping {
   private final String shortCode;
   private final String originalUrl;
   private final Instant createdAt;
-  private final Optional<Instant> expiresAt;
+  private final Instant expiresAt;
+  private final boolean active;
 
   public ShortUrlMapping(
       String shortCode,
       String originalUrl,
       Instant createdAt,
-      Optional<Instant> expiresAt
+      Instant expiresAt,
+      boolean active
   ) {
     this.shortCode = shortCode;
     this.originalUrl = originalUrl;
     this.createdAt = createdAt;
     this.expiresAt = expiresAt;
+    this.active = active;
   }
 
   public String shortCode() {
@@ -35,8 +38,34 @@ public final class ShortUrlMapping {
   }
 
   public Optional<Instant> expiresAt() {
-    return expiresAt;
+    return Optional.ofNullable(expiresAt);
   }
+
+  public boolean active() {
+    return active;
+  }
+
+  // --- COPY-WITH Methoden ---
+  public ShortUrlMapping withShortCode(String shortCode) {
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+  }
+
+  public ShortUrlMapping withOriginalUrl(String originalUrl) {
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+  }
+
+  public ShortUrlMapping withCreatedAt(Instant createdAt) {
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+  }
+
+  public ShortUrlMapping withExpiresAt(Instant expiresAt) {
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+  }
+
+  public ShortUrlMapping withActive(boolean active) {
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+  }
+
 
   @Override
   public boolean equals(Object obj) {
@@ -46,12 +75,13 @@ public final class ShortUrlMapping {
     return Objects.equals(this.shortCode, that.shortCode) &&
         Objects.equals(this.originalUrl, that.originalUrl) &&
         Objects.equals(this.createdAt, that.createdAt) &&
-        Objects.equals(this.expiresAt, that.expiresAt);
+        Objects.equals(this.expiresAt, that.expiresAt) &&
+        this.active == that.active;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(shortCode, originalUrl, createdAt, expiresAt);
+    return Objects.hash(shortCode, originalUrl, createdAt, expiresAt, active);
   }
 
   @Override
@@ -60,6 +90,10 @@ public final class ShortUrlMapping {
         "shortCode=" + shortCode + ", " +
         "originalUrl=" + originalUrl + ", " +
         "createdAt=" + createdAt + ", " +
-        "expiresAt=" + expiresAt + ']';
+        "expiresAt=" + expiresAt + ", " +
+        "active=" + active +
+        ']';
   }
+
+
 }

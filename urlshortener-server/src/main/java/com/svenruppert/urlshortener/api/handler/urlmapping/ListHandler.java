@@ -39,6 +39,14 @@ public class ListHandler
     return (v == null || v.isEmpty()) ? null : v.getFirst();
   }
 
+  private static Optional<Boolean> parseBoolean(String raw) {
+    try {
+      return (raw == null || raw.isBlank()) ? Optional.empty() : Optional.of(Boolean.valueOf(raw));
+    } catch (Exception e) {
+      return Optional.empty();
+    }
+  }
+
   private static Optional<Instant> parseInstant(String raw, boolean startOfDayIfDate) {
     if (raw == null || raw.isBlank()) return Optional.empty();
 
@@ -80,10 +88,6 @@ public class ListHandler
   public void handle(HttpExchange ex)
       throws IOException {
     if (!RequestMethodUtils.requireGet(ex)) return;
-//    if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) {
-//      ex.sendResponseHeaders(405, -1);
-//      return;
-//    }
     final String path = ex.getRequestURI().getPath();
     logger().info("List request: {}", path);
 
@@ -94,6 +98,8 @@ public class ListHandler
       responseJson = listExpired();
     } else if (path.endsWith(PATH_ADMIN_LIST_ACTIVE)) {
       responseJson = listActive();
+    } else if (path.endsWith(PATH_ADMIN_LIST_INACTIVE)) {
+      responseJson = listInActive();
     } else if (path.endsWith(PATH_ADMIN_LIST)) {
       responseJson = listFiltered(ex);
     } else {
@@ -110,12 +116,33 @@ public class ListHandler
 
   private String listExpired() {
     final Instant now = Instant.now();
-    return filterAndBuild("expired", m -> m.expiresAt().isPresent() && m.expiresAt().get().isBefore(now));
+    return filterAndBuild("expired",
+                          m -> m.expiresAt()
+                              .isPresent() && m.expiresAt()
+                              .get()
+                              .isBefore(now));
   }
 
   private String listActive() {
     final Instant now = Instant.now();
-    return filterAndBuild("active", m -> m.expiresAt().map(exp -> !exp.isBefore(now)).orElse(true));
+    return filterAndBuild("active",
+                          m -> {
+                            if (!m.active()) return false;
+                            return m.expiresAt()
+                                .map(exp -> !exp.isBefore(now))
+                                .orElse(true);
+                          });
+  }
+
+  private String listInActive() {
+    final Instant now = Instant.now();
+    return filterAndBuild("inactive",
+                          m -> {
+                            if (!m.active()) return true;
+                            return m.expiresAt()
+                                .map(exp -> exp.isBefore(now))
+                                .orElse(false);
+                          });
   }
 
   private String listFiltered(HttpExchange exchange) {
@@ -128,16 +155,12 @@ public class ListHandler
     var sortBy = parseSort(first(query, "sort"));      // mapping String -> UrlMappingFilter.SortBy
     var dir = parseDir(first(query, "dir"));        // mapping String -> UrlMappingFilter.Direction
 
-    boolean codeCase = Boolean.parseBoolean(Optional.ofNullable(first(query, "codeCase")).orElse("false"));
-    boolean urlCase = Boolean.parseBoolean(Optional.ofNullable(first(query, "urlCase")).orElse("false"));
-
     var filter = UrlMappingFilter.builder()
         .codePart(first(query, "code"))
-        .codeCaseSensitive(codeCase)
         .urlPart(first(query, "url"))
-        .urlCaseSensitive(urlCase)
         .createdFrom(parseInstant(first(query, "from"), true).orElse(null))
         .createdTo(parseInstant(first(query, "to"), false).orElse(null))
+        .active(parseBoolean(first(query, "active")).orElse(null))
         .offset(offset)
         .limit(size)
         .sortBy(sortBy.orElse(null))
@@ -166,17 +189,26 @@ public class ListHandler
 
   private String filterAndBuild(String mode, Predicate<ShortUrlMapping> predicate) {
     final Instant now = Instant.now();
-    final var data = store.findAll().stream().filter(predicate).map(m -> toDto(m, now)).toList();
+    final var data = store
+        .findAll()
+        .stream()
+        .filter(predicate)
+        .map(m -> toDto(m, now))
+        .toList();
     return JsonUtils.toJsonListing(mode, data.size(), data);
   }
 
   private Map<String, String> toDto(ShortUrlMapping m, Instant now) {
-    boolean expired = m.expiresAt().map(t -> t.isBefore(now)).orElse(false);
+    boolean expired = m.
+        expiresAt()
+        .map(t -> t.isBefore(now))
+        .orElse(false);
     return Map.of(
         "shortCode", m.shortCode(),
         "originalUrl", m.originalUrl(),
         "createdAt", m.createdAt().toString(),
         "expiresAt", m.expiresAt().map(Instant::toString).orElse(""),
+        "active", m.active() + "",
         "status", expired ? "expired" : "active"
     );
   }

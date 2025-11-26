@@ -9,6 +9,7 @@ import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 import com.svenruppert.urlshortener.api.store.provider.eclipsestore.DataRoot;
 import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.ToggleActive;
 import org.eclipse.store.storage.types.StorageManager;
 
 import java.time.Clock;
@@ -42,32 +43,22 @@ public class EclipseUrlMappingStore
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(String originalUrl) {
-    return createMapping(null, originalUrl, null);
+  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt, Boolean active) {
+    logger().info("createMapping - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", shortCode, originalUrl, expiredAt, active);
+    var originalOrDefaultActive = active != null ? active : true;
+    return creator.create(shortCode, originalUrl, expiredAt, originalOrDefaultActive);
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(String alias, String originalUrl) {
-    logger().info("alias: {} - originalUrl: {} ", alias, originalUrl);
-    return creator.create(alias, originalUrl, null);
-  }
-
-  @Override
-  public Result<ShortUrlMapping> createMapping(String alias, String originalUrl, Instant expiredArt) {
-    logger().info("alias: {} - originalUrl: {} - expiredAt: {}", alias, originalUrl, expiredArt);
-    return creator.create(alias, originalUrl, expiredArt);
-  }
-
-  @Override
-  public Result<ShortUrlMapping> editMapping(String shortCode, String url, Instant expiredAt) {
-    logger().info("editMapping - shortCode: {} - originalUrl: {} - expiredAt: {} ", shortCode, url, expiredAt);
+  public Result<ShortUrlMapping> editMapping(String shortCode, String url, Instant expiredAt, Boolean active) {
+    logger().info("editMapping - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", shortCode, url, expiredAt, active);
     var existsByCode = existsByCode(shortCode);
     if (existsByCode) {
       var urlMappings = dataRoot().shortUrlMappings();
       var shortUrlMappingOLD = urlMappings.get(shortCode);
       var originalOrNewUrl = url != null ? url : shortUrlMappingOLD.originalUrl();
-      Optional<Instant> instant = Optional.ofNullable(expiredAt);
-      var shortUrlMapping = new ShortUrlMapping(shortCode, originalOrNewUrl, shortUrlMappingOLD.createdAt(), instant);
+      var originalOrNewActive = active != null ? active : shortUrlMappingOLD.active();
+      var shortUrlMapping = new ShortUrlMapping(shortCode, originalOrNewUrl, shortUrlMappingOLD.createdAt(), expiredAt, originalOrNewActive);
       urlMappings.put(shortUrlMapping.shortCode(), shortUrlMapping);
       storage.store(dataRoot().shortUrlMappings());
       return Result.success(shortUrlMapping);
@@ -83,12 +74,29 @@ public class EclipseUrlMappingStore
     var normalized = normalize(shortCode);
     logger().info("delete - normalized for deletion '{}'", normalized);
     var removed = dataRoot().shortUrlMappings().remove(normalized) != null;
-    logger().info("mapping removed from store {} ", removed);
+    logger().info("delete - mapping removed from store {} ", removed);
     if (removed) {
       storage.store(dataRoot().shortUrlMappings());
-      logger().info("changes persisted in store");
+      logger().info("delete - changes persisted in store");
     }
     return removed;
+  }
+
+  @Override
+  public Result<ToggleActive.ToggleActiveResponse> toggleActive(String shortCode, boolean newActiveValue) {
+    if (shortCode == null || shortCode.isBlank())
+      return Result.failure("shortCode '" + shortCode + "' is  valid");
+    var urlMappings = dataRoot().shortUrlMappings();
+    if (urlMappings.containsKey(shortCode)) {
+      var urlMapping = urlMappings.get(shortCode);
+      var updatedUrlMapping = urlMapping.withActive(newActiveValue);
+      urlMappings.put(shortCode, updatedUrlMapping);
+      storage.store(dataRoot().shortUrlMappings());
+      logger().info("toggleActive - changes persisted in store");
+      return Result.success(new ToggleActive.ToggleActiveResponse(shortCode, updatedUrlMapping.active()));
+    } else {
+      return Result.failure("shortCode " + shortCode + "not found");
+    }
   }
 
   private DataRoot dataRoot() {
@@ -109,7 +117,7 @@ public class EclipseUrlMappingStore
   public Optional<ShortUrlMapping> findByShortCode(String shortCode) {
     logger().info("findByShortCode '{}'", shortCode);
     String normalized = normalize(shortCode);
-    logger().info("findByShortCode normalized for search '{}'", shortCode);
+    logger().info("findByShortCode normalized for search '{}'", normalized);
     return Optional.ofNullable(dataRoot().shortUrlMappings().get(normalized));
   }
 

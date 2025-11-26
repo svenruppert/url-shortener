@@ -48,8 +48,7 @@ public class CreateView
   private final DatePicker expiresDate = new DatePicker("Expires (date)");
   private final TimePicker expiresTime = new TimePicker("Expires (time)");
   private final Checkbox noExpiry = new Checkbox("No expiry");
-
-  private final FormLayout form = new FormLayout();
+  private final Checkbox cbActive = new Checkbox("Active");
 
   public CreateView() {
     setSpacing(true);
@@ -62,7 +61,8 @@ public class CreateView
 
     configureExpiryFields();
 
-    form.add(urlField, noExpiry, expiresDate, expiresTime);
+    FormLayout form = new FormLayout();
+    form.add(urlField, noExpiry, cbActive, expiresDate, expiresTime);
     form.setResponsiveSteps(
         new FormLayout.ResponsiveStep("0", 1),
         new FormLayout.ResponsiveStep("900px", 2)
@@ -77,7 +77,7 @@ public class CreateView
 
     binder.forField(urlField)
         .asRequired("URL must not be empty")
-        .withValidator((String url, ValueContext ctx) -> {
+        .withValidator((String url, ValueContext _) -> {
           var res = UrlValidator.validate(url);
           return res.valid() ? ValidationResult.ok() : ValidationResult.error(res.message());
         })
@@ -119,7 +119,12 @@ public class CreateView
       for (String alias : validAliases) {
         try {
           logger().info("try to save mapping {} / {} ", urlField.getValue(), alias);
-          var customMapping = urlShortenerClient.createCustomMapping(alias, urlField.getValue(), expiresAt.orElse(null));
+          var activeState = cbActive.getValue();
+
+          var customMapping = urlShortenerClient.createCustomMapping(alias,
+                                                                     urlField.getValue(),
+                                                                     expiresAt.orElse(null),
+                                                                     activeState);
           logger().info("created customMapping is {}", customMapping);
           if (customMapping != null)
             logger().info("saved - {}", customMapping);
@@ -202,7 +207,7 @@ public class CreateView
     noExpiry.clear();
     expiresDate.clear();
     expiresTime.clear();
-    binder.setBean(new ShortenRequest());
+    binder.setBean(new ShortenRequest(null, null, null, null));
     urlField.setInvalid(false);
   }
 }

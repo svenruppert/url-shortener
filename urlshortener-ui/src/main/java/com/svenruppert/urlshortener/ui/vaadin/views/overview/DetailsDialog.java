@@ -10,6 +10,7 @@ import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.datepicker.DatePicker.DatePickerI18n;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -53,12 +54,14 @@ public class DetailsDialog
   private final String originalUrl;
   private final Instant createdAt;
   private final Optional<Instant> expiresAt;
+  private final Boolean active;
 
   // UI components
   private final TextField tfShort = new TextField("Shortcode");
   private final TextField tfUrl = new TextField("Original URL");
   private final TextField tfCreated = new TextField("Created on");
   private final TextField tfExpires = new TextField("Expires");
+  private final Checkbox cbActive = new Checkbox("Active");
   private final Span statusPill = new Span();
 
   private final Button openBtn = new Button("Open", new Icon(VaadinIcon.EXTERNAL_LINK));
@@ -90,6 +93,7 @@ public class DetailsDialog
     this.originalUrl = mapping.originalUrl();
     this.createdAt = mapping.createdAt();
     this.expiresAt = mapping.expiresAt();
+    this.active = mapping.active();
 
     setHeaderTitle("Details: " + shortCode);
     setModal(true);
@@ -140,7 +144,7 @@ public class DetailsDialog
         new FormLayout.ResponsiveStep("0", 1),
         new FormLayout.ResponsiveStep("600px", 2)
     );
-    form.add(tfShort, tfUrl, tfCreated, tfExpires, buildExpiresRow(), statusPill);
+    form.add(tfShort, tfCreated, tfUrl, cbActive,  tfExpires, buildExpiresRow(), statusPill);
     form.setColspan(tfUrl, 2);
     add(form);
 
@@ -166,6 +170,8 @@ public class DetailsDialog
         .set("overflow", "hidden")
         .set("text-overflow", "ellipsis");
 
+    cbActive.setValue(active);
+    cbActive.setReadOnly(true);
     tfCreated.setValue(DATE_TIME_FMT.format(createdAt));
     tfCreated.setReadOnly(true);
 
@@ -195,11 +201,12 @@ public class DetailsDialog
         new DatePickerI18n().setFirstDayOfWeek(1));
     expiresField.setStep(Duration.ofMinutes(1));
     expiresField.setWidthFull();
-    Button clearBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL), _ -> expiresField.clear());
-    clearBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
-    clearBtn.getElement().setAttribute("title", "Clear expiry");
+//    Button clearBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL), _ -> expiresField.clear());
+//    clearBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+//    clearBtn.getElement().setAttribute("title", "Clear expiry");
 
-    HorizontalLayout row = new HorizontalLayout(expiresField, clearBtn);
+//    HorizontalLayout row = new HorizontalLayout(expiresField, clearBtn);
+    HorizontalLayout row = new HorizontalLayout(expiresField);
     row.setSpacing(true);
     row.setPadding(false);
     row.setWidthFull();
@@ -224,6 +231,7 @@ public class DetailsDialog
    * Sets up button actions and event propagation.
    */
   private void wireActions() {
+    //TODO use Shortcode to open and check if it works
     openBtn.addClickListener(_ -> {
       fireEvent(new OpenEvent(this, shortCode, originalUrl));
       getUI().ifPresent(ui -> ui.getPage().open(originalUrl, "_blank"));
@@ -263,9 +271,11 @@ public class DetailsDialog
   private void switchToEdit(boolean enable) {
     tfUrl.setReadOnly(!enable);
     tfExpires.setVisible(!enable);
+    cbActive.setReadOnly(!enable);
 
     expiresField.setVisible(enable);
     expiresField.setReadOnly(!enable);
+
 
     editBtn.setVisible(!enable);
     saveBtn.setVisible(enable);
@@ -286,7 +296,8 @@ public class DetailsDialog
       LocalDateTime ldt = expiresField.getValue();
       Instant expires = (ldt == null) ? null : ldt.atZone(ZoneId.systemDefault()).toInstant();
 
-      boolean ok = client.edit(item.shortCode(), newUrl, expires);
+      var cbActiveValue = cbActive.getValue();
+      boolean ok = client.edit(item.shortCode(), newUrl, expires, cbActiveValue);
       if (ok) {
         Notification.show("Saved.");
         fireEvent(new SavedEvent(this, item.shortCode()));
@@ -337,7 +348,7 @@ public class DetailsDialog
       for (String alias : validAliases) {
         try {
           var expires = currentMapping.expiresAt().orElse(null);
-          client.createCustomMapping(alias, currentMapping.originalUrl(), expires);
+          client.createCustomMapping(alias, currentMapping.originalUrl(), expires, currentMapping.active());
           editor.markSaved(alias);
           ok++;
         } catch (Exception ex) {

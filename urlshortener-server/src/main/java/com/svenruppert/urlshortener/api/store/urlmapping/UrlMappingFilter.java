@@ -17,8 +17,6 @@ public final class UrlMappingFilter {
 
   public static final String CODE_PART = "codePart";
   public static final String URL_PART = "urlPart";
-  public static final String CODE_CASE_SENSITIVE = "codeCaseSensitive";
-  public static final String URL_CASE_SENSITIVE = "urlCaseSensitive";
   public static final String CREATED_FROM = "createdFrom";
   public static final String CREATED_TO = "createdTo";
   public static final String PAGING = "paging";
@@ -26,38 +24,36 @@ public final class UrlMappingFilter {
   public static final String LIMIT = "limit";
   public static final String SORT_BY = "sortBy";
   public static final String DIRECTION = "direction";
+  public static final String ACTIVE = "active";
 
   private final String codePart;            // already normalized (AliasPolicy) or null
-  private final boolean codeCaseSensitive;
   private final String urlPart;             // lowercase if necessary depending on the flag
-  private final boolean urlCaseSensitive;
   private final Instant createdFrom;        // inclusive
   private final Instant createdTo;          // inclusive
   private final Integer offset;             // nullable -> no paging
   private final Integer limit;              // nullable -> no paging
   private final SortBy sortBy;              // nullable -> unsorted
   private final Direction direction;        // nullable -> ASC default if sortBy != null
+  private final Boolean active;
 
   private UrlMappingFilter(String codePart,
-                           boolean codeCaseSensitive,
                            String urlPart,
-                           boolean urlCaseSensitive,
                            Instant createdFrom,
                            Instant createdTo,
                            Integer offset,
                            Integer limit,
                            SortBy sortBy,
-                           Direction direction) {
+                           Direction direction,
+                           Boolean active) {
     this.codePart = codePart;
-    this.codeCaseSensitive = codeCaseSensitive;
     this.urlPart = urlPart;
-    this.urlCaseSensitive = urlCaseSensitive;
     this.createdFrom = createdFrom;
     this.createdTo = createdTo;
     this.offset = offset;
     this.limit = limit;
     this.sortBy = sortBy;
     this.direction = direction;
+    this.active = active;
   }
 
   public static Builder builder() {
@@ -68,16 +64,8 @@ public final class UrlMappingFilter {
     return Optional.ofNullable(codePart);
   }
 
-  public boolean codeCaseSensitive() {
-    return codeCaseSensitive;
-  }
-
   public Optional<String> urlPart() {
     return Optional.ofNullable(urlPart);
-  }
-
-  public boolean urlCaseSensitive() {
-    return urlCaseSensitive;
   }
 
   public Optional<Instant> createdFrom() {
@@ -104,26 +92,30 @@ public final class UrlMappingFilter {
     return Optional.ofNullable(direction);
   }
 
+  public Optional<Boolean> active() {
+    return Optional.ofNullable(active);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (!(o instanceof UrlMappingFilter f)) return false;
-    return codeCaseSensitive == f.codeCaseSensitive &&
-        urlCaseSensitive == f.urlCaseSensitive &&
+    return
         Objects.equals(codePart, f.codePart) &&
         Objects.equals(urlPart, f.urlPart) &&
         Objects.equals(createdFrom, f.createdFrom) &&
         Objects.equals(createdTo, f.createdTo) &&
         Objects.equals(offset, f.offset) &&
         Objects.equals(limit, f.limit) &&
+        Objects.equals(active, f.active) &&
         sortBy == f.sortBy &&
         direction == f.direction;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(codePart, codeCaseSensitive, urlPart, urlCaseSensitive,
-                        createdFrom, createdTo, offset, limit, sortBy, direction);
+    return Objects.hash(codePart, urlPart,
+                        createdFrom, createdTo, offset, limit, sortBy, direction, active);
   }
 
   @Override
@@ -132,13 +124,11 @@ public final class UrlMappingFilter {
 
     if (codePart != null) {
       sb.append(CODE_PART + "='").append(codePart).append('\'');
-      if (codeCaseSensitive) sb.append(", " + CODE_CASE_SENSITIVE + "=true");
     }
 
     if (urlPart != null) {
       if (sb.length() > 19) sb.append(", ");
       sb.append(URL_PART + "='").append(urlPart).append('\'');
-      if (urlCaseSensitive) sb.append(", " + URL_CASE_SENSITIVE + "=true");
     }
 
     if (createdFrom != null) {
@@ -169,6 +159,11 @@ public final class UrlMappingFilter {
       sb.append(DIRECTION + "=").append(direction);
     }
 
+    if (active != null) {
+      if (sb.length() > 19) sb.append(", ");
+      sb.append(ACTIVE + "=").append(active);
+    }
+
     sb.append('}');
     return sb.toString();
   }
@@ -180,10 +175,7 @@ public final class UrlMappingFilter {
 
   public static final class Builder {
     private String codePart;
-    private boolean codeCaseSensitive = false;
-
     private String urlPart;
-    private boolean urlCaseSensitive = false;
 
     private Instant createdFrom;
     private Instant createdTo;
@@ -193,6 +185,8 @@ public final class UrlMappingFilter {
 
     private SortBy sortBy;
     private Direction direction;
+
+    private Boolean active;
 
     /**
      * Substring for shortcode; preprocessed with AliasPolicy.normalize.
@@ -205,10 +199,6 @@ public final class UrlMappingFilter {
       return this;
     }
 
-    public Builder codeCaseSensitive(boolean b) {
-      this.codeCaseSensitive = b;
-      return this;
-    }
 
     /**
      * Substring for original URL.
@@ -218,10 +208,6 @@ public final class UrlMappingFilter {
       return this;
     }
 
-    public Builder urlCaseSensitive(boolean b) {
-      this.urlCaseSensitive = b;
-      return this;
-    }
 
     public Builder createdFrom(Instant from) {
       this.createdFrom = from;
@@ -256,10 +242,14 @@ public final class UrlMappingFilter {
       return this;
     }
 
+    public Builder active(Boolean a) {
+      this.active = a;
+      return this;
+    }
+
     public UrlMappingFilter build() {
-      // Normalization for case-insensitive comparisons later in store implementation
-      return new UrlMappingFilter(codePart, codeCaseSensitive, urlPart, urlCaseSensitive,
-                                  createdFrom, createdTo, offset, limit, sortBy, direction);
+      return new UrlMappingFilter(codePart, urlPart,
+                                  createdFrom, createdTo, offset, limit, sortBy, direction, active);
     }
   }
 }
