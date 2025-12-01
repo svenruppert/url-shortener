@@ -44,6 +44,10 @@
                     <groupId>com.vaadin</groupId>
                     <artifactId>hilla-dev</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>com.vaadin</groupId>
+                    <artifactId>hilla</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 

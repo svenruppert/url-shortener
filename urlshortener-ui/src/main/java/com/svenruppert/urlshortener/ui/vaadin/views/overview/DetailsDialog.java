@@ -7,6 +7,7 @@ import com.svenruppert.urlshortener.core.validation.UrlValidator;
 import com.svenruppert.urlshortener.ui.vaadin.components.MultiAliasEditorStrict;
 import com.svenruppert.urlshortener.ui.vaadin.events.MappingCreatedOrChanged;
 import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
+import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -18,7 +19,6 @@ import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.textfield.TextField;
@@ -144,7 +144,7 @@ public class DetailsDialog
         new FormLayout.ResponsiveStep("0", 1),
         new FormLayout.ResponsiveStep("600px", 2)
     );
-    form.add(tfShort, tfCreated, tfUrl, cbActive,  tfExpires, buildExpiresRow(), statusPill);
+    form.add(tfShort, tfCreated, tfUrl, cbActive, tfExpires, buildExpiresRow(), statusPill);
     form.setColspan(tfUrl, 2);
     add(form);
 
@@ -201,11 +201,11 @@ public class DetailsDialog
         new DatePickerI18n().setFirstDayOfWeek(1));
     expiresField.setStep(Duration.ofMinutes(1));
     expiresField.setWidthFull();
-//    Button clearBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL), _ -> expiresField.clear());
-//    clearBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
-//    clearBtn.getElement().setAttribute("title", "Clear expiry");
+    //    Button clearBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL), _ -> expiresField.clear());
+    //    clearBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+    //    clearBtn.getElement().setAttribute("title", "Clear expiry");
 
-//    HorizontalLayout row = new HorizontalLayout(expiresField, clearBtn);
+    //    HorizontalLayout row = new HorizontalLayout(expiresField, clearBtn);
     HorizontalLayout row = new HorizontalLayout(expiresField);
     row.setSpacing(true);
     row.setPadding(false);
@@ -241,13 +241,13 @@ public class DetailsDialog
       var shortURL = SHORTCODE_BASE_URL + shortCode;
       copyToClipboard(shortURL);
       fireEvent(new CopyShortcodeEvent(this, shortURL));
-      Notification.show("Shortcode copied");
+      Notifications.shortCodeCopied();
     });
 
     copyUrlBtn.addClickListener(_ -> {
       copyToClipboard(originalUrl);
       fireEvent(new CopyUrlEvent(this, originalUrl));
-      Notification.show("URL copied");
+      Notifications.urlCopied();
     });
 
     deleteBtn.addClickListener(_ -> fireEvent(new DeleteEvent(this, shortCode)));
@@ -299,17 +299,17 @@ public class DetailsDialog
       var cbActiveValue = cbActive.getValue();
       boolean ok = client.edit(item.shortCode(), newUrl, expires, cbActiveValue);
       if (ok) {
-        Notification.show("Saved.");
+        Notifications.saved();
         fireEvent(new SavedEvent(this, item.shortCode()));
         switchToEdit(false);
         fireEvent(new SavedEvent(this, item.shortCode()));
         close();
       } else {
-        Notification.show("No changes.");
+        Notifications.noChanges();
       }
     } catch (Exception ex) {
       logger().error("Save failed", ex);
-      Notification.show("Save failed: " + ex.getMessage(), 5000, Notification.Position.MIDDLE);
+      Notifications.operationFailed(ex);
     }
   }
 
@@ -340,7 +340,7 @@ public class DetailsDialog
       editor.validateAll();
       var validAliases = editor.getValidAliases();
       if (validAliases.isEmpty()) {
-        Notification.show("no valid alias.", 2500, Notification.Position.TOP_CENTER);
+        Notifications.noValidShortCode();
         return;
       }
 
@@ -355,8 +355,7 @@ public class DetailsDialog
           editor.markError(alias, String.valueOf(ex.getMessage()));
         }
       }
-      Notification.show("Saved: " + ok + " | Open: " + editor.countOpen(),
-                        3500, Notification.Position.TOP_CENTER);
+      Notifications.savedAndNotSaved(ok, editor.countOpen());
       refreshAfterAliasAdd();
     });
 

@@ -57,8 +57,11 @@ public class MultiAliasEditorStrict
   }
 
   public long countOpen() {
-    return grid.getListDataView().getItems()
-        .filter(r -> r.getStatus() != Status.SAVED).count();
+    return grid
+        .getListDataView()
+        .getItems()
+        .filter(r -> r.getStatus() != Status.SAVED)
+        .count();
   }
 
   public void clearAllRows() {

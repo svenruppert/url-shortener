@@ -11,15 +11,13 @@ import com.svenruppert.urlshortener.ui.vaadin.events.MappingCreatedOrChanged;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
 import com.svenruppert.urlshortener.ui.vaadin.tools.ColumnVisibilityClientFactory;
 import com.svenruppert.urlshortener.ui.vaadin.tools.ColumnVisibilityService;
+import com.svenruppert.urlshortener.ui.vaadin.tools.HasRefreshGuard;
 import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
+import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.datepicker.DatePicker;
-import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.dialog.Dialog;
-import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
@@ -28,14 +26,8 @@ import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
-import com.vaadin.flow.component.notification.Notification;
-import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.select.Select;
-import com.vaadin.flow.component.textfield.IntegerField;
-import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.component.timepicker.TimePicker;
 import com.vaadin.flow.data.provider.CallbackDataProvider;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -44,9 +36,11 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.PATTERN_DATE_TIME;
@@ -54,13 +48,12 @@ import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL
 import static com.vaadin.flow.component.button.ButtonVariant.LUMO_ERROR;
 import static com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY_INLINE;
 import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CENTER;
-import static com.vaadin.flow.data.value.ValueChangeMode.LAZY;
 
 @PageTitle("Overview")
 @Route(value = OverviewView.PATH, layout = MainLayout.class)
 public class OverviewView
     extends VerticalLayout
-    implements HasLogger {
+    implements HasLogger, HasRefreshGuard {
 
   public static final String PATH = "";
   protected static final int VALUE_CHANGE_TIMEOUT = 400;
@@ -68,50 +61,21 @@ public class OverviewView
       DateTimeFormatter.ofPattern(PATTERN_DATE_TIME)
           .withLocale(Locale.GERMANY)
           .withZone(ZoneId.systemDefault());
-
   private final URLShortenerClient urlShortenerClient = UrlShortenerClientFactory.newInstance();
   private final ColumnVisibilityClient columnVisibilityClient = ColumnVisibilityClientFactory.newInstance();
   //TODO  Initialize Column Visibility Client/Service (User ID later from security context)
   private final ColumnVisibilityService columnVisibilityService = new ColumnVisibilityService(columnVisibilityClient, "admin", "overview");
-
-  private final TextField codePart = new TextField("Shortcode contains");
-  private final TextField urlPart = new TextField("Original URL contains");
-  private final DatePicker fromDate = new DatePicker("From (local)");
-  private final TimePicker fromTime = new TimePicker("Time");
-  private final DatePicker toDate = new DatePicker("To (local)");
-  private final TimePicker toTime = new TimePicker("Time");
-  private final Select<ActiveState> activeState = new Select<>();
-  private final ComboBox<String> sortBy = new ComboBox<>("Sort by");
-  private final ComboBox<String> dir = new ComboBox<>("Direction");
-  private final IntegerField pageSize = new IntegerField("Page size");
-  private final Button resetBtn = new Button("Reset", new Icon(VaadinIcon.ROTATE_LEFT));
+  private final Grid<ShortUrlMapping> grid = new Grid<>(ShortUrlMapping.class, false);
+  private final BulkActionsBar bulkBar = new BulkActionsBar(urlShortenerClient, grid, this);
+  private final Button btnSettings = new Button(new Icon(VaadinIcon.COG));
+  private final SearchBar searchBar = new SearchBar(this);
   private final Button prevBtn = new Button("‹ Prev");
   private final Button nextBtn = new Button("Next ›");
-  private final Button btnSettings = new Button(new Icon(VaadinIcon.COG));
-
-  private final TextField globalSearch = new TextField();
-  private final ComboBox<String> searchScope = new ComboBox<>("Search in");
-
   private final Text pageInfo = new Text("");
-  private final Grid<ShortUrlMapping> grid = new Grid<>(ShortUrlMapping.class, false);
-
-  private final Button bulkDeleteBtn = new Button("Delete selected links…");
-  private final Button bulkSetExpiryBtn = new Button("Set expiry for selected…");
-  private final Button bulkClearExpiryBtn = new Button("Clear expiry for selected");
-  private final Button bulkActivateBtn = new Button("Activate all selected");
-  private final Button bulkDiActivateBtn = new Button("Deactivate all selected");
-
-  private final Span selectionInfo = new Span();
-  private final HorizontalLayout bulkBar = new HorizontalLayout();
-
-
-  private Details advanced;
-  private int currentPage = 1;
-  private int totalCount = 0;
-
+  private Integer currentPage = 1;
+  private Integer totalCount = 0;
   private CallbackDataProvider<ShortUrlMapping, Void> dataProvider;
   private AutoCloseable subscription;
-
   private boolean suppressRefresh = false;
 
   public OverviewView() {
@@ -120,17 +84,31 @@ public class OverviewView
     setSpacing(true);
     add(new H2("URL Shortener – Overview"));
     initDataProvider();
-    add(buildSearchBar());
-    add(buildBulkBar());
+
+    var pagingBar = new HorizontalLayout(prevBtn, nextBtn, pageInfo, btnSettings);
+    pagingBar.setDefaultVerticalComponentAlignment(CENTER);
+    HorizontalLayout bottomBar = new HorizontalLayout(new Span(), pagingBar);
+    bottomBar.setWidthFull();
+    bottomBar.expand(bottomBar.getComponentAt(0));
+    bottomBar.setAlignItems(CENTER);
+    VerticalLayout container = new VerticalLayout(searchBar, bottomBar);
+    container.setPadding(false);
+    container.setSpacing(true);
+    container.setWidthFull();
+    add(container);
+
+    add(bulkBar);
+    add(grid);
     configureGrid();
     addListeners();
     addShortCuts();
-    add(grid);
 
-    try (var _ = new RefreshGuard(false)) {
-      pageSize.setValue(25);
-      sortBy.setValue("createdAt");
-      dir.setValue("desc");
+    try (var _ = withRefreshGuard(false)) {
+      searchBar.setPageSize(25);
+      searchBar.setSortBy("createdAt");
+      searchBar.setDirValue("desc");
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -143,92 +121,6 @@ public class OverviewView
                                 safeRefresh();
                               });
 
-
-    activeState.addValueChangeListener(_ -> {
-      currentPage = 1;
-      safeRefresh();
-    });
-
-    globalSearch.addValueChangeListener(e -> {
-      var v = Optional.ofNullable(e.getValue()).orElse("");
-      if (searchScope.getValue().equals("Shortcode")) {
-        codePart.setValue(v);
-        urlPart.clear();
-      } else {
-        urlPart.setValue(v);
-        codePart.clear();
-      }
-    });
-
-    searchScope.addValueChangeListener(_ -> {
-      var v = Optional.ofNullable(globalSearch.getValue()).orElse("");
-      if ("Shortcode".equals(searchScope.getValue())) {
-        codePart.setValue(v);
-        urlPart.clear();
-      } else {
-        urlPart.setValue(v);
-        codePart.clear();
-      }
-    });
-
-    btnSettings.addClickListener(_ -> new ColumnVisibilityDialog<>(grid, columnVisibilityService).open());
-
-    prevBtn.addClickListener(_ -> {
-      if (currentPage > 1) {
-        currentPage--;
-        refreshPageInfo();
-        safeRefresh();
-      }
-    });
-
-    nextBtn.addClickListener(_ -> {
-      int size = Optional.ofNullable(pageSize.getValue()).orElse(25);
-      int maxPage = Math.max(1, (int) Math.ceil((double) totalCount / size));
-      if (currentPage < maxPage) {
-        currentPage++;
-        refreshPageInfo();
-        safeRefresh();
-      }
-    });
-
-    pageSize.addValueChangeListener(e -> {
-      currentPage = 1;
-      grid.setPageSize(Optional.ofNullable(e.getValue()).orElse(25)); // optional
-      safeRefresh();
-    });
-
-    resetBtn.addClickListener(_ -> {
-      try (var _ = new RefreshGuard(true)) {
-        globalSearch.clear();
-        codePart.clear();
-        urlPart.clear();
-        fromDate.clear();
-        fromTime.clear();
-        toDate.clear();
-        toTime.clear();
-        sortBy.clear();
-        dir.clear();
-        pageSize.setValue(25);
-        sortBy.setValue("createdAt");
-        dir.setValue("desc");
-        currentPage = 1;
-        searchScope.setValue("URL");
-        advanced.setOpened(false);
-        setSimpleSearchEnabled(true);
-        globalSearch.focus();
-        activeState.setValue(ActiveState.NOT_SET);
-      }
-    });
-
-    advanced.addOpenedChangeListener(ev -> {
-      boolean nowClosed = !ev.isOpened();
-      if (nowClosed) {
-        applyAdvancedToSimpleAndReset();
-      } else {
-        setSimpleSearchEnabled(false);
-      }
-    });
-
     grid.addSelectionListener(event -> {
       var all = event.getAllSelectedItems();
       boolean hasSelection = !all.isEmpty();
@@ -238,41 +130,40 @@ public class OverviewView
       if (hasSelection) {
         int count = all.size();
         String label = count == 1 ? "link selected" : "links selected";
-        selectionInfo.setText(count + " " + label + " on page " + currentPage);
+        bulkBar.selectionInfoText(count + " " + label + " on page " + currentPage);
       } else {
-        selectionInfo.setText("");
+        bulkBar.selectionInfoText("");
       }
 
-      bulkDeleteBtn.setEnabled(hasSelection);
-      bulkSetExpiryBtn.setEnabled(hasSelection);
-      bulkClearExpiryBtn.setEnabled(hasSelection);
-      bulkActivateBtn.setEnabled(hasSelection);
-      bulkDiActivateBtn.setEnabled(hasSelection);
+      bulkBar.setButtonsEnabled(hasSelection);
     });
 
-    bulkDeleteBtn.addClickListener(_ -> confirmBulkDeleteSelected());
-    bulkSetExpiryBtn.addClickListener(_ -> openBulkSetExpiryDialog());
-    bulkClearExpiryBtn.addClickListener(_ -> confirmBulkClearExpirySelected());
-    bulkActivateBtn.addClickListener(_ -> confirmBulkActivateSelected());
-    bulkDiActivateBtn.addClickListener(_ -> confirmBulkDeactivateSelected());
+    btnSettings.addClickListener(_ -> new ColumnVisibilityDialog<>(grid, columnVisibilityService).open());
+    prevBtn.addClickListener(_ -> {
+      if (currentPage > 1) {
+        currentPage--;
+        refreshPageInfo();
+        safeRefresh();
+      }
+    });
 
+    nextBtn.addClickListener(_ -> {
+      int size = Optional.ofNullable(searchBar.getPageSize()).orElse(25);
+      int maxPage = Math.max(1, (int) Math.ceil((double) totalCount / size));
+      if (currentPage < maxPage) {
+        currentPage++;
+        refreshPageInfo();
+        safeRefresh();
+      }
+    });
   }
 
   private void addShortCuts() {
     var current = UI.getCurrent();
-    current.addShortcutListener(_ -> {
-                                  if (globalSearch.isEnabled()) globalSearch.focus();
-                                },
-                                Key.KEY_K, KeyModifier.CONTROL);
-    current.addShortcutListener(_ -> {
-                                  if (globalSearch.isEnabled()) globalSearch.focus();
-                                },
-                                Key.KEY_K, KeyModifier.META);
 
-    // Bulk delete via Delete-Key
     current.addShortcutListener(_ -> {
                                   if (!grid.getSelectedItems().isEmpty()) {
-                                    confirmBulkDeleteSelected();
+                                    bulkBar.confirmBulkDeleteSelected();
                                   }
                                 },
                                 Key.DELETE);
@@ -281,7 +172,7 @@ public class OverviewView
   @Override
   protected void onAttach(AttachEvent attachEvent) {
     super.onAttach(attachEvent);
-    try (var _ = new RefreshGuard(true)) {
+    try (var _ = withRefreshGuard(false)) {
       var keys = grid
           .getColumns()
           .stream()
@@ -295,6 +186,8 @@ public class OverviewView
             var k = c.getKey();
             if (k != null) c.setVisible(vis.getOrDefault(k, true));
           });
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
 
     subscription = StoreEvents.subscribe(_ -> getUI()
@@ -313,150 +206,6 @@ public class OverviewView
     }
   }
 
-  private Component buildBulkBar() {
-    bulkDeleteBtn.addThemeVariants(LUMO_ERROR, LUMO_TERTIARY_INLINE);
-    bulkSetExpiryBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
-    bulkClearExpiryBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
-    bulkActivateBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
-    bulkDiActivateBtn.addThemeVariants(LUMO_TERTIARY_INLINE);
-
-    bulkDeleteBtn.getElement().setProperty("title", "Delete all selected short links");
-    bulkSetExpiryBtn.getElement().setProperty("title", "Set the same expiry for all selected links");
-    bulkClearExpiryBtn.getElement().setProperty("title", "Remove expiry for all selected links");
-    bulkActivateBtn.getElement().setProperty("title", "Activate all selected links");
-    bulkDiActivateBtn.getElement().setProperty("title", "Deactivate all selected links");
-
-    bulkDeleteBtn.setEnabled(false);
-    bulkSetExpiryBtn.setEnabled(false);
-    bulkClearExpiryBtn.setEnabled(false);
-    bulkActivateBtn.setEnabled(false);
-    bulkDiActivateBtn.setEnabled(false);
-
-    bulkBar.removeAll();
-    selectionInfo.getStyle().set("opacity", "0.7");
-    selectionInfo.getStyle().set("font-size", "var(--lumo-font-size-s)");
-    selectionInfo.getStyle().set("margin-right", "var(--lumo-space-m)");
-
-    bulkBar.add(selectionInfo,
-                bulkDeleteBtn,
-                bulkSetExpiryBtn,
-                bulkClearExpiryBtn,
-                bulkActivateBtn,
-                bulkDiActivateBtn);
-
-    bulkBar.setWidthFull();
-    bulkBar.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-    bulkBar.setVisible(false);
-    return bulkBar;
-  }
-
-
-  private Component buildSearchBar() {
-    globalSearch.setPlaceholder("Search all…");
-    globalSearch.setClearButtonVisible(true);
-    globalSearch.setWidth("28rem");
-    globalSearch.setValueChangeMode(LAZY);
-    globalSearch.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
-
-    searchScope.setItems("URL", "Shortcode");
-    searchScope.setValue("URL");
-    searchScope.setWidth("11rem");
-
-    pageSize.setMin(1);
-    pageSize.setMax(500);
-    pageSize.setStepButtonsVisible(true);
-    pageSize.setWidth("140px");
-
-    var pagingBar = new HorizontalLayout(prevBtn, nextBtn, pageInfo, btnSettings);
-    pagingBar.setDefaultVerticalComponentAlignment(CENTER);
-
-    codePart.setPlaceholder("e.g. ex-");
-    codePart.setValueChangeMode(LAZY);
-    codePart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
-    codePart.addValueChangeListener(_ -> safeRefresh());
-
-    urlPart.setPlaceholder("e.g. docs");
-    urlPart.setValueChangeMode(LAZY);
-    urlPart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
-    urlPart.addValueChangeListener(_ -> safeRefresh());
-
-    sortBy.setItems("createdAt", "shortCode", "originalUrl", "expiresAt");
-    dir.setItems("asc", "desc");
-
-    fromDate.setClearButtonVisible(true);
-    toDate.setClearButtonVisible(true);
-    fromTime.setStep(Duration.ofMinutes(15));
-    toTime.setStep(Duration.ofMinutes(15));
-    fromTime.setPlaceholder("hh:mm");
-    toTime.setPlaceholder("hh:mm");
-
-    var fromGroup = new HorizontalLayout(fromDate, fromTime);
-    fromGroup.setDefaultVerticalComponentAlignment(Alignment.END);
-    var toGroup = new HorizontalLayout(toDate, toTime);
-    toGroup.setDefaultVerticalComponentAlignment(Alignment.END);
-
-    FormLayout searchBlock = new FormLayout();
-    searchBlock.setWidthFull();
-    //    searchBlock.add(codePart, urlPart, new HorizontalLayout(codeCase, urlCase));
-    searchBlock.add(codePart, urlPart, new HorizontalLayout()); //TODO not nice!!
-    searchBlock.add(fromGroup, toGroup);
-    searchBlock.setResponsiveSteps(
-        new FormLayout.ResponsiveStep("0", 1),
-        new FormLayout.ResponsiveStep("32rem", 2),
-        new FormLayout.ResponsiveStep("56rem", 3)
-    );
-
-    sortBy.setLabel(null);
-    sortBy.setPlaceholder("Sort by");
-    sortBy.setWidth("12rem");
-
-    dir.setLabel(null);
-    dir.setPlaceholder("Direction");
-    dir.setWidth("8rem");
-
-    HorizontalLayout sortToolbar = new HorizontalLayout(sortBy, dir);
-    sortToolbar.setAlignItems(FlexComponent.Alignment.END);
-
-    HorizontalLayout advHeader = new HorizontalLayout(searchBlock, sortToolbar);
-    advHeader.setWidthFull();
-    advHeader.setSpacing(true);
-    advHeader.setAlignItems(FlexComponent.Alignment.START);
-    advHeader.expand(searchBlock);
-    advHeader.getStyle().set("flex-wrap", "wrap");
-    advHeader.setVerticalComponentAlignment(FlexComponent.Alignment.END, sortToolbar);
-
-    advanced = new Details("Advanced filters", advHeader);
-    advanced.setOpened(false);
-    advanced.getElement().getThemeList().add("filled");
-
-    setSimpleSearchEnabled(!advanced.isOpened());
-
-    activeState.setLabel("Active state");
-    activeState.setItems(ActiveState.values());
-    activeState.setItemLabelGenerator(state -> switch (state) {
-      case ACTIVE -> "Active";
-      case INACTIVE -> "Inactive";
-      case NOT_SET -> "Not set";
-    });
-    activeState.setEmptySelectionAllowed(false);
-    activeState.setValue(ActiveState.NOT_SET);
-    HorizontalLayout topBar = new HorizontalLayout(globalSearch, searchScope, pageSize, activeState, resetBtn);
-
-    topBar.setWidthFull();
-    topBar.setSpacing(true);
-    topBar.setAlignItems(Alignment.END);
-
-    HorizontalLayout bottomBar = new HorizontalLayout(new Span(), pagingBar);
-    bottomBar.setWidthFull();
-    bottomBar.expand(bottomBar.getComponentAt(0));
-    bottomBar.setAlignItems(CENTER);
-
-    VerticalLayout container = new VerticalLayout(topBar, advanced, bottomBar);
-    container.setPadding(false);
-    container.setSpacing(true);
-    container.setWidthFull();
-    return container;
-  }
 
   private void configureGrid() {
     logger().info("configureGrid..");
@@ -464,89 +213,44 @@ public class OverviewView
     grid.setHeight("70vh");
     grid.setSelectionMode(Grid.SelectionMode.MULTI);
 
-    grid.addComponentColumn(m -> {
-          var code = new Span(m.shortCode());
-          code.getStyle().set("font-family", "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace");
+    configureColumShortCode();
+    configureColumUrl();
+    configureColumCreated();
+    configureColumActive();
+    configureColumExpires();
+    configureColumActions();
 
-          var copy = new Button(new Icon(VaadinIcon.COPY));
-          copy.addThemeVariants(LUMO_TERTIARY_INLINE);
-          copy.getElement().setProperty("title", "Copy ShortUrl");
-          copy.addClickListener(_ -> {
-            UI.getCurrent()
-                .getPage()
-                .executeJs("navigator.clipboard.writeText($0)", SHORTCODE_BASE_URL + m.shortCode());
-            Notification.show("Shortcode copied");
-          });
-          var wrap = new HorizontalLayout(code, copy);
-          wrap.setSpacing(true);
-          wrap.setPadding(false);
-          return wrap;
-        })
-        .setHeader("Shortcode")
-        .setKey("shortcode")
+    grid.addItemDoubleClickListener(ev -> openDetailsDialog(ev.getItem()));
+    grid.addItemClickListener(ev -> {
+      if (ev.getClickCount() == 2) openDetailsDialog(ev.getItem());
+    });
+    grid.getElement().addEventListener("keydown", _ -> {
+      grid.getSelectedItems().stream().findFirst().ifPresent(this::openDetailsDialog);
+    }).setFilter("event.key === 'Enter'");
+
+    GridContextMenu<ShortUrlMapping> menu = new GridContextMenu<>(grid);
+    menu.addItem("Show details", e -> e.getItem()
+        .ifPresent(this::openDetailsDialog));
+    menu.addItem("Open URL", e -> e.getItem()
+        .ifPresent(m ->
+                       UI.getCurrent().getPage().open(m.originalUrl(), "_blank")));
+    menu.addItem("Copy shortcode", e -> e.getItem()
+        .ifPresent(m ->
+                       UI.getCurrent().getPage().executeJs("navigator.clipboard.writeText($0)", m.shortCode())));
+    menu.addItem("Delete…", e -> e.getItem()
+        .ifPresent(m -> confirmDelete(m.shortCode())));
+  }
+
+  private void configureColumActions() {
+    grid.addComponentColumn(this::buildGridRowActions)
+        .setHeader("Actions")
+        .setKey("actions")
         .setAutoWidth(true)
-        .setFrozen(true)
-        .setResizable(true)
-        .setFlexGrow(0);
-
-    grid.addComponentColumn(m -> {
-          var a = new Anchor(m.originalUrl(), m.originalUrl());
-          a.setTarget("_blank");
-          a.getStyle()
-              .set("white-space", "nowrap")
-              .set("overflow", "hidden")
-              .set("text-overflow", "ellipsis")
-              .set("display", "inline-block")
-              .set("max-width", "100%");
-          a.getElement().setProperty("title", m.originalUrl());
-          return a;
-        })
-        .setHeader("URL")
-        .setKey("url")
-        .setFlexGrow(1)
+        .setFlexGrow(0)
         .setResizable(true);
+  }
 
-    grid.addColumn(m -> DATE_TIME_FMT.format(m.createdAt()))
-        .setHeader("Created")
-        .setKey("created")
-        .setAutoWidth(true)
-        .setResizable(true)
-        .setSortable(true)
-        .setFlexGrow(0);
-
-    grid.addComponentColumn(m -> {
-          Icon icon = m.active()
-              ? VaadinIcon.CHECK_CIRCLE.create()
-              : VaadinIcon.CLOSE_CIRCLE.create();
-
-          icon.setColor(m.active()
-                            ? "var(--lumo-success-color)"
-                            : "var(--lumo-error-color)");
-          icon.getStyle().set("cursor", "pointer");
-          icon.getElement().setProperty("title",
-                                        m.active() ? "Deactivate" : "Activate");
-
-          icon.addClickListener(_ -> {
-            boolean newValue = !m.active();
-
-            try {
-              urlShortenerClient.toggleActive(m.shortCode(), newValue);
-              Notification.show("Status updated", 2000, Notification.Position.TOP_CENTER);
-              safeRefresh();
-            } catch (Exception ex) {
-              Notification.show("Error updating active status: " + ex.getMessage(),
-                                3000, Notification.Position.TOP_CENTER);
-            }
-          });
-          return icon;
-        })
-        .setHeader("Active")
-        .setKey("active")
-        .setAutoWidth(true)
-        .setResizable(true)
-        .setSortable(true)
-        .setFlexGrow(0);
-
+  private void configureColumExpires() {
     grid.addComponentColumn(m -> {
           var pill = new Span(m.expiresAt()
                                   .map(ts -> {
@@ -572,33 +276,96 @@ public class OverviewView
         .setAutoWidth(true)
         .setResizable(true)
         .setFlexGrow(0);
+  }
 
-    grid.addComponentColumn(this::buildGridRowActions)
-        .setHeader("Actions")
-        .setKey("actions")
+  private void configureColumActive() {
+    grid.addComponentColumn(m -> {
+          Icon icon = m.active()
+              ? VaadinIcon.CHECK_CIRCLE.create()
+              : VaadinIcon.CLOSE_CIRCLE.create();
+
+          icon.setColor(m.active()
+                            ? "var(--lumo-success-color)"
+                            : "var(--lumo-error-color)");
+          icon.getStyle().set("cursor", "pointer");
+          icon.getElement().setProperty("title",
+                                        m.active() ? "Deactivate" : "Activate");
+
+          icon.addClickListener(_ -> {
+            boolean newValue = !m.active();
+
+            try {
+              urlShortenerClient.toggleActive(m.shortCode(), newValue);
+              Notifications.statusUpdatedOK();
+              safeRefresh();
+            } catch (Exception ex) {
+              Notifications.statusUpdatedFailed(ex);
+            }
+          });
+          return icon;
+        })
+        .setHeader("Active")
+        .setKey("active")
         .setAutoWidth(true)
-        .setFlexGrow(0)
+        .setResizable(true)
+        .setSortable(true)
+        .setFlexGrow(0);
+  }
+
+  private void configureColumCreated() {
+    grid.addColumn(m -> DATE_TIME_FMT.format(m.createdAt()))
+        .setHeader("Created")
+        .setKey("created")
+        .setAutoWidth(true)
+        .setResizable(true)
+        .setSortable(true)
+        .setFlexGrow(0);
+  }
+
+  private void configureColumUrl() {
+    grid.addComponentColumn(m -> {
+          var a = new Anchor(m.originalUrl(), m.originalUrl());
+          a.setTarget("_blank");
+          a.getStyle()
+              .set("white-space", "nowrap")
+              .set("overflow", "hidden")
+              .set("text-overflow", "ellipsis")
+              .set("display", "inline-block")
+              .set("max-width", "100%");
+          a.getElement().setProperty("title", m.originalUrl());
+          return a;
+        })
+        .setHeader("URL")
+        .setKey("url")
+        .setFlexGrow(1)
         .setResizable(true);
+  }
 
-    grid.addItemDoubleClickListener(ev -> openDetailsDialog(ev.getItem()));
-    grid.addItemClickListener(ev -> {
-      if (ev.getClickCount() == 2) openDetailsDialog(ev.getItem());
-    });
-    grid.getElement().addEventListener("keydown", _ -> {
-      grid.getSelectedItems().stream().findFirst().ifPresent(this::openDetailsDialog);
-    }).setFilter("event.key === 'Enter'");
+  private void configureColumShortCode() {
+    grid.addComponentColumn(m -> {
+          var code = new Span(m.shortCode());
+          code.getStyle().set("font-family", "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace");
 
-    GridContextMenu<ShortUrlMapping> menu = new GridContextMenu<>(grid);
-    menu.addItem("Show details", e -> e.getItem()
-        .ifPresent(this::openDetailsDialog));
-    menu.addItem("Open URL", e -> e.getItem()
-        .ifPresent(m ->
-                       UI.getCurrent().getPage().open(m.originalUrl(), "_blank")));
-    menu.addItem("Copy shortcode", e -> e.getItem()
-        .ifPresent(m ->
-                       UI.getCurrent().getPage().executeJs("navigator.clipboard.writeText($0)", m.shortCode())));
-    menu.addItem("Delete…", e -> e.getItem()
-        .ifPresent(m -> confirmDelete(m.shortCode())));
+          var copy = new Button(new Icon(VaadinIcon.COPY));
+          copy.addThemeVariants(LUMO_TERTIARY_INLINE);
+          copy.getElement().setProperty("title", "Copy ShortUrl");
+          copy.addClickListener(_ -> {
+            UI.getCurrent()
+                .getPage()
+                .executeJs("navigator.clipboard.writeText($0)", SHORTCODE_BASE_URL + m.shortCode());
+            Notifications.shortCodeCopied();
+          });
+          var wrap = new HorizontalLayout(code, copy);
+          wrap.setSpacing(true);
+          wrap.setPadding(false);
+          return wrap;
+        })
+        .setHeader("Shortcode")
+        .setKey("shortcode")
+        .setAutoWidth(true)
+        .setFrozen(true)
+        .setResizable(true)
+        .setFlexGrow(0);
   }
 
   private void openDetailsDialog(ShortUrlMapping item) {
@@ -625,50 +392,11 @@ public class OverviewView
     return row;
   }
 
-  private void setSimpleSearchEnabled(boolean enabled) {
-    globalSearch.setEnabled(enabled);
-    searchScope.setEnabled(enabled);
-    resetBtn.setEnabled(true);
-  }
-
-  private void applyAdvancedToSimpleAndReset() {
-    String code = Optional.ofNullable(codePart.getValue()).orElse("").trim();
-    String url = Optional.ofNullable(urlPart.getValue()).orElse("").trim();
-
-    final boolean hasCode = !code.isBlank();
-    final boolean hasUrl = !url.isBlank();
-    final String winnerValue = hasCode ? code : (hasUrl ? url : "");
-    final String winnerScope = hasCode ? "Shortcode" : "URL";
-
-    try (var _ = new RefreshGuard(true)) {
-      codePart.clear();
-      urlPart.clear();
-      fromDate.clear();
-      fromTime.clear();
-      toDate.clear();
-      toTime.clear();
-
-      sortBy.clear();
-      dir.clear();
-      sortBy.setValue("createdAt");
-      dir.setValue("desc");
-
-      searchScope.setValue(winnerScope);
-      if (!winnerValue.isBlank()) {
-        globalSearch.setValue(winnerValue);
-      } else {
-        globalSearch.clear();
-      }
-
-      setSimpleSearchEnabled(true);
-      globalSearch.focus();
-    }
-  }
 
   private void initDataProvider() {
     dataProvider = new CallbackDataProvider<>(
         q -> {
-          final int uiSize = Optional.ofNullable(pageSize.getValue()).orElse(25);
+          final int uiSize = Optional.ofNullable(searchBar.getPageSize()).orElse(25);
           final int pageStart = (currentPage - 1) * uiSize;
 
           final int vLimit = q.getLimit();
@@ -680,23 +408,23 @@ public class OverviewView
           final int page = (effectiveLimit > 0) ? (effectiveOffset / effectiveLimit) + 1 : 1;
           final int size = (effectiveLimit > 0) ? effectiveLimit : uiSize;
 
-          final UrlMappingListRequest req = buildFilter(page, size);
+          final UrlMappingListRequest req = searchBar.buildFilter(page, size);
           try {
             final List<ShortUrlMapping> items = urlShortenerClient.list(req);
             return items.stream();
           } catch (IOException ex) {
             logger().error("Error fetching (page={}, size={})", page, size, ex);
-            Notification.show("Loading failed");
+            Notifications.loadingFailed();
             return Stream.empty();
           }
         },
 
         _ -> {
           try {
-            final UrlMappingListRequest base = buildFilter(null, null);
+            final UrlMappingListRequest base = searchBar.buildFilter(null, null);
             totalCount = urlShortenerClient.listCount(base);
 
-            final int uiSize = Optional.ofNullable(pageSize.getValue()).orElse(25);
+            final int uiSize = Optional.ofNullable(searchBar.getPageSize()).orElse(25);
             final int pageStart = (currentPage - 1) * uiSize;
             final int remaining = Math.max(0, totalCount - pageStart);
             final int pageCount = Math.min(uiSize, remaining);
@@ -712,13 +440,13 @@ public class OverviewView
         }
     );
 
-    grid.setPageSize(Optional.ofNullable(pageSize.getValue()).orElse(25));
+    grid.setPageSize(Optional.ofNullable(searchBar.getPageSize()).orElse(25));
     grid.setDataProvider(dataProvider);
   }
 
   private void refreshPageInfo() {
     logger().info("refreshPageInfo");
-    int size = Optional.ofNullable(pageSize.getValue()).orElse(25);
+    int size = Optional.ofNullable(searchBar.getPageSize()).orElse(25);
     int maxPage = Math.max(1, (int) Math.ceil((double) totalCount / size));
     currentPage = Math.min(Math.max(1, currentPage), maxPage);
     pageInfo.setText("Page " + currentPage + " / " + maxPage + "   •   " + totalCount + " total");
@@ -727,56 +455,12 @@ public class OverviewView
     nextBtn.setEnabled(currentPage < maxPage);
   }
 
-  private void safeRefresh() {
+  public void safeRefresh() {
     logger().info("safeRefresh");
     if (!suppressRefresh) {
       logger().info("refresh");
       dataProvider.refreshAll();
     }
-  }
-
-  private UrlMappingListRequest buildFilter(Integer page, Integer size) {
-    UrlMappingListRequest.Builder b = UrlMappingListRequest.builder();
-
-    ActiveState activeStateValue = activeState.getValue();
-    logger().info("buildFilter - activeState == {}", activeStateValue);
-    if (activeStateValue != null && activeStateValue.isSet()) {
-      b.active(activeStateValue.toBoolean());
-    }
-    if (codePart.getValue() != null && !codePart.getValue().isBlank()) {
-      b.codePart(codePart.getValue());
-    }
-
-    if (urlPart.getValue() != null && !urlPart.getValue().isBlank()) {
-      b.urlPart(urlPart.getValue());
-    }
-
-    if (fromDate.getValue() != null && fromTime.getValue() != null) {
-      var zdt = ZonedDateTime.of(fromDate.getValue(), fromTime.getValue(), ZoneId.systemDefault());
-      b.from(zdt.toInstant());
-    } else if (fromDate.getValue() != null) {
-      var zdt = fromDate.getValue().atStartOfDay(ZoneId.systemDefault());
-      b.from(zdt.toInstant());
-    }
-
-    if (toDate.getValue() != null && toTime.getValue() != null) {
-      var zdt = ZonedDateTime.of(toDate.getValue(), toTime.getValue(), ZoneId.systemDefault());
-      b.to(zdt.toInstant());
-    } else if (toDate.getValue() != null) {
-      var zdt = toDate.getValue().atTime(23, 59).atZone(ZoneId.systemDefault());
-      b.to(zdt.toInstant());
-    }
-
-    if (sortBy.getValue() != null && !sortBy.getValue().isBlank()) b.sort(sortBy.getValue());
-    if (dir.getValue() != null && !dir.getValue().isBlank()) b.dir(dir.getValue());
-
-    if (page != null && size != null) {
-      b.page(page).size(size);
-    }
-
-    var filter = b.build();
-    logger().info("buildFilter - {}", filter);
-    return filter;
   }
 
   private void confirmDelete(String shortCode) {
@@ -789,13 +473,13 @@ public class OverviewView
         boolean ok = urlShortenerClient.delete(shortCode);
         dialog.close();
         if (ok) {
-          Notification.show("Short link deleted.");
+          Notifications.shortCodeDeleted();
           safeRefresh();
         } else {
-          Notification.show("Short link not found.");
+          Notifications.shortCodeDNotFound();
         }
       } catch (IOException ex) {
-        Notification.show("Operation failed");
+        Notifications.operationFailed(ex);
       }
     });
     confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, LUMO_ERROR);
@@ -806,255 +490,22 @@ public class OverviewView
     dialog.open();
   }
 
-  private void confirmBulkDeleteSelected() {
-    var selected = grid.getSelectedItems();
-    if (selected.isEmpty()) {
-      Notification.show("No entries selected");
-      return;
-    }
-
-    Dialog dialog = new Dialog();
-    dialog.setHeaderTitle("Delete " + selected.size() + " short links?");
-
-    var exampleCodes = selected.stream()
-        .map(ShortUrlMapping::shortCode)
-        .sorted()
-        .limit(5)
-        .toList();
-
-    if (!exampleCodes.isEmpty()) {
-      String preview = String.join(", ", exampleCodes);
-      if (selected.size() > 5) {
-        preview += ", …";
-      }
-      dialog.add(new Text("Examples: " + preview));
-    } else {
-      dialog.add(new Text("Delete selected short links?"));
-    }
-
-    Button confirm = new Button("Delete", _ -> {
-      int success = 0;
-      int failed = 0;
-
-      for (var m : selected) {
-        try {
-          boolean ok = urlShortenerClient.delete(m.shortCode());
-          if (ok) {
-            success++;
-          } else {
-            failed++;
-          }
-        } catch (IOException ex) {
-          logger().error("Bulk delete failed for {}", m.shortCode(), ex);
-          failed++;
-        }
-      }
-
-      dialog.close();
-      grid.deselectAll();
-      safeRefresh();
-      Notification.show("Deleted: " + success + " • Failed: " + failed);
-    });
-    confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, LUMO_ERROR);
-
-    Button cancel = new Button("Cancel", _ -> dialog.close());
-
-    dialog.getFooter().add(new HorizontalLayout(confirm, cancel));
-    dialog.open();
+  public void setGridPageSize(Integer gridPageSize) {
+    grid.setPageSize(Optional.ofNullable(gridPageSize).orElse(25)); // optional
   }
 
-  private void openBulkSetExpiryDialog() {
-    var selected = grid.getSelectedItems();
-    if (selected.isEmpty()) {
-      Notification.show("No entries selected");
-      return;
-    }
-
-    Dialog dialog = new Dialog();
-    dialog.setHeaderTitle("Set expiry for " + selected.size() + " short links");
-
-    DatePicker date = new DatePicker("Date");
-    TimePicker time = new TimePicker("Time");
-    time.setStep(Duration.ofMinutes(15));
-
-    HorizontalLayout body = new HorizontalLayout(date, time);
-    body.setAlignItems(Alignment.END);
-    dialog.add(body);
-
-    Button cancel = new Button("Cancel", _ -> dialog.close());
-    Button apply = new Button("Apply", _ -> {
-      if (date.getValue() == null) {
-        Notification.show("Please select a date");
-        return;
-      }
-
-      var localTime = Optional.ofNullable(time.getValue()).orElse(java.time.LocalTime.of(0, 0));
-      var zdt = ZonedDateTime.of(date.getValue(), localTime, ZoneId.systemDefault());
-      Instant expiresAt = zdt.toInstant();
-
-      int success = 0;
-      int failed = 0;
-
-      for (ShortUrlMapping m : selected) {
-        try {
-          boolean ok = urlShortenerClient.edit(
-              m.shortCode(),
-              m.originalUrl(),
-              expiresAt,
-              m.active()
-          );
-          if (ok) success++;
-          else failed++;
-        } catch (IOException ex) {
-          logger().error("Bulk set expiry failed for {}", m.shortCode(), ex);
-          failed++;
-        }
-      }
-
-      dialog.close();
-      grid.deselectAll();
-      safeRefresh();
-      Notification.show("Updated expiry: " + success + " • Failed: " + failed);
-    });
-    apply.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-    dialog.getFooter().add(new HorizontalLayout(cancel, apply));
-    dialog.open();
+  public void setCurrentPage(int currentPage) {
+    this.currentPage = currentPage;
   }
 
-  private void confirmBulkClearExpirySelected() {
-    var selected = grid.getSelectedItems();
-    if (selected.isEmpty()) {
-      Notification.show("No entries selected");
-      return;
-    }
-
-    Dialog dialog = new Dialog();
-    dialog.setHeaderTitle("Remove expiry for " + selected.size() + " short links?");
-
-    dialog.add(new Text(
-        "This will remove the expiry date from all selected short links. "
-            + "They will no longer expire automatically."
-    ));
-
-    Button cancel = new Button("Cancel", _ -> dialog.close());
-    Button confirm = new Button("Remove expiry", _ -> {
-      dialog.close();
-      bulkClearExpiry(selected);
-    });
-    confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-    dialog.getFooter().add(new HorizontalLayout(cancel, confirm));
-    dialog.open();
+  @Override
+  public boolean isRefreshSuppressed() {
+    return suppressRefresh;
   }
 
-  private void bulkClearExpiry(Set<ShortUrlMapping> selected) {
-    int success = 0;
-    int failed = 0;
-
-    for (var m : selected) {
-      try {
-        boolean ok = urlShortenerClient.edit(
-            m.shortCode(),
-            m.originalUrl(),
-            null,
-            m.active()
-        );
-        if (ok) {
-          success++;
-        } else {
-          failed++;
-        }
-      } catch (IOException ex) {
-        logger().error("Bulk clear expiry failed for {}", m.shortCode(), ex);
-        failed++;
-      }
-    }
-
-    grid.deselectAll();
-    safeRefresh();
-    Notification.show("Cleared expiry: " + success + " • Failed: " + failed);
+  @Override
+  public void setRefreshSuppressed(boolean suppressed) {
+    this.suppressRefresh = suppressed;
   }
 
-  private void bulkSetActive(Set<ShortUrlMapping> selected, boolean activate) {
-    int success = 0;
-    int failed = 0;
-
-    for (var m : selected) {
-      try {
-        var ok = urlShortenerClient.toggleActive(m.shortCode(), activate);
-        if (ok) {
-          success++;
-        } else {
-          failed++;
-        }
-      } catch (IOException ex) {
-        logger().error("Toggle active state failed for {}", m.shortCode(), ex);
-        failed++;
-      }
-    }
-
-    grid.deselectAll();
-    safeRefresh();
-
-    var actionLabel = activate ? "Activate" : "Deactivate";
-    Notification.show(
-        actionLabel + " – Success: " + success + " • Failed: " + failed
-    );
-  }
-
-  private void confirmBulkSetActiveSelected(boolean activate) {
-    var selected = grid.getSelectedItems();
-    if (selected.isEmpty()) {
-      Notification.show("No entries selected");
-      return;
-    }
-
-    var verb = activate ? "activate" : "deactivate";
-    var verbCap = activate ? "Activate" : "Deactivate";
-
-    Dialog dialog = new Dialog();
-    dialog.setHeaderTitle(verbCap + " all " + selected.size() + " short links?");
-
-    dialog.add(new Text(
-        "This will " + verb + " all selected short links. "
-            + "They will be " + (activate ? "active" : "inactive") + " afterwards."
-    ));
-
-    Button cancel = new Button("Cancel", _ -> dialog.close());
-    Button confirm = new Button(verbCap + " All", _ -> {
-      dialog.close();
-      bulkSetActive(Set.copyOf(selected), activate);
-    });
-    confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-    dialog.getFooter().add(new HorizontalLayout(cancel, confirm));
-    dialog.open();
-  }
-
-  private void confirmBulkActivateSelected() {
-    confirmBulkSetActiveSelected(true);
-  }
-
-  private void confirmBulkDeactivateSelected() {
-    confirmBulkSetActiveSelected(false);
-  }
-
-
-  private final class RefreshGuard
-      implements AutoCloseable {
-    private final boolean prev;
-    private final boolean refreshAfter;
-
-    RefreshGuard(boolean refreshAfter) {
-      this.prev = suppressRefresh;
-      this.refreshAfter = refreshAfter;
-      suppressRefresh = true;
-    }
-
-    @Override
-    public void close() {
-      suppressRefresh = prev;
-      if (refreshAfter) safeRefresh();
-    }
-  }
 }
