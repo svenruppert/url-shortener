@@ -1,5 +1,9 @@
 package com.svenruppert.urlshortener.ui.vaadin.security;
 
+
+import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.core.StringUtils;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
@@ -8,7 +12,8 @@ import java.util.Arrays;
  * Central configuration for the simple admin login.
  * Reads its values from auth.properties via LoginConfigInitializer.
  */
-public final class LoginConfig {
+public final class LoginConfig
+    implements HasLogger {
 
   private static volatile boolean loginEnabled;
   private static volatile byte[] expectedPasswordBytes;
@@ -56,12 +61,15 @@ public final class LoginConfig {
     if (!isLoginConfigured() || enteredPassword == null) {
       return false;
     }
+    try {
+      byte[] entered = StringUtils.charArrayToBytes(enteredPassword);
+      boolean result = MessageDigest.isEqual(expectedPasswordBytes, entered);
+      Arrays.fill(entered, (byte) 0);
+      return result;
+    } catch (Exception e) {
+      HasLogger.staticLogger().warn("matches - {}", e.getMessage());
+      return false;
+    }
 
-    byte[] entered = new String(enteredPassword).getBytes(StandardCharsets.UTF_8);
-    boolean result = MessageDigest.isEqual(expectedPasswordBytes, entered);
-
-    // Best-effort clean-up
-    Arrays.fill(entered, (byte) 0);
-    return result;
   }
 }

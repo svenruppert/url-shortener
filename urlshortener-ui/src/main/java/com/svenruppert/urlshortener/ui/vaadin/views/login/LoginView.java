@@ -2,13 +2,14 @@ package com.svenruppert.urlshortener.ui.vaadin.views.login;
 
 import com.svenruppert.urlshortener.ui.vaadin.security.LoginConfig;
 import com.svenruppert.urlshortener.ui.vaadin.security.SessionAuth;
+import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
-import com.vaadin.flow.component.notification.Notification;
+//import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.router.BeforeEnterEvent;
@@ -85,11 +86,7 @@ public class LoginView
    */
   private void attemptLogin() {
     if (!LoginConfig.isLoginEnabled()) {
-      Notification.show(
-          "Login is currently disabled. Please check the server configuration.",
-          3000,
-          Notification.Position.MIDDLE
-      );
+      Notifications.loginCurrentlyDisabled();
       UI.getCurrent().navigate(OverviewView.PATH);
       return;
     }
@@ -100,11 +97,7 @@ public class LoginView
         : new char[0];
 
     if (!LoginConfig.isLoginConfigured()) {
-      Notification.show(
-          "Login is not configured. Please verify that the configuration file has been loaded.",
-          3000,
-          Notification.Position.MIDDLE
-      );
+      Notifications.loginCurrentlyNotConfigured();
       return;
     }
 
