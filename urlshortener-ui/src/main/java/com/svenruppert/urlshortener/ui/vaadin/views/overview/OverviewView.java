@@ -76,7 +76,7 @@ public class OverviewView
   private Integer totalCount = 0;
   private CallbackDataProvider<ShortUrlMapping, Void> dataProvider;
   private AutoCloseable subscription;
-  private boolean suppressRefresh = false;
+  private volatile boolean suppressRefresh = false;
 
   public OverviewView() {
     setSizeFull();
@@ -455,6 +455,7 @@ public class OverviewView
     nextBtn.setEnabled(currentPage < maxPage);
   }
 
+  @Override
   public void safeRefresh() {
     logger().info("safeRefresh");
     if (!suppressRefresh) {
