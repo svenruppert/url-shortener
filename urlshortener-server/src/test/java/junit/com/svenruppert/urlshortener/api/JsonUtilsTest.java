@@ -1,7 +1,7 @@
 package junit.com.svenruppert.urlshortener.api;
 
 import com.svenruppert.urlshortener.core.JsonUtils;
-import com.svenruppert.urlshortener.core.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -64,7 +64,8 @@ class JsonUtilsTest {
         "abc123",
         "https://example.com/page",
         Instant.parse("2025-10-13T10:15:30Z"),
-        Optional.empty()
+        null,
+        true
     );
 
     String json = JsonUtils.toJson(m);

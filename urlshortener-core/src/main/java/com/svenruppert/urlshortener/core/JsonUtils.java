@@ -1,6 +1,11 @@
 package com.svenruppert.urlshortener.core;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.core.prefs.*;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
+import com.svenruppert.urlshortener.core.urlmapping.ShortenResponse;
+import com.svenruppert.urlshortener.core.urlmapping.ToggleActive;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
@@ -8,9 +13,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static com.svenruppert.dependencies.core.logger.HasLogger.staticLogger;
@@ -19,103 +23,163 @@ import static java.util.stream.Collectors.joining;
 public final class JsonUtils
     implements HasLogger {
 
-  private static final Pattern FIELD_PATTERN =
-      Pattern.compile("\"(url|alias)\"\\s*:\\s*(\"(?:\\\\.|[^\"\\\\])*\"|null)", Pattern.DOTALL);
-
-  private JsonUtils() { }
-
-  public static Map<String, String> parseJson(InputStream input)
-      throws IOException {
-    String json = readInputStream(input).trim();
-    return parseJson(json);
+  private JsonUtils() {
   }
 
-  private static ShortenRequest parseShortenRequest(String json) {
-    String trimmed = json.trim();
-    if (!(trimmed.startsWith("{") && trimmed.endsWith("}"))) {
-      throw new IllegalArgumentException("Invalid JSON object");
-    }
+  /* ======================
+           READ
+     ====================== */
 
-    String url = null;
-    String alias = null;
-
-    Matcher m = FIELD_PATTERN.matcher(trimmed);
-    while (m.find()) {
-      String key = m.group(1);
-      String raw = m.group(2);
-      String val = "null".equals(raw) ? null : unescape(unquote(raw));
-      if ("url".equals(key)) url = val;
-      else if ("alias".equals(key)) alias = val;
-    }
-
-    if (url == null || url.isEmpty()) {
-      throw new IllegalArgumentException("Field 'url' missing or empty");
-    }
-
-    return new ShortenRequest(url, alias);
+  public static Map<String, String> parseJson(InputStream in)
+      throws IOException {
+    return parseFlatObject(readInputStream(in));
   }
 
   @NotNull
   public static Map<String, String> parseJson(String json)
       throws IOException {
-    if (!json.startsWith("{") || !json.endsWith("}")) {
-      throw new IOException("Invalid JSON object");
-    }
-
-    Map<String, String> result = new HashMap<>();
-    // Entferne geschweifte Klammern
-    String body = json.substring(1, json.length() - 1).trim();
-
-    if (body.isEmpty()) {
-      return Collections.emptyMap();
-    }
-
-    if (!body.contains(":")) {
-      throw new IOException("Invalid JSON object");
-    }
-
-    // Trenne key-value-Paare anhand von Kommas
-    String[] entries = body.split(",");
-    Arrays.stream(entries)
-        .map(entry -> entry.split(":", 2))
-        .filter(parts -> parts.length == 2)
-        .forEachOrdered(parts -> {
-          String key = unquote(parts[0].trim());
-          String value = unquote(parts[1].trim());
-          result.put(key, value);
-        });
-
-    return result;
+    return parseFlatObject(json);
   }
 
   @NotNull
   public static Stream<Map.Entry<String, String>> parseJsonToStream(String json)
       throws IOException {
-    return parseJson(json).entrySet().stream();
+    return parseFlatObject(json).entrySet().stream();
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T fromJson(String json, Class<T> type) {
+    if (json == null || json.isBlank()) throw new IllegalArgumentException("JSON input is null or blank");
+    Map<String, String> m;
+    try {
+      m = parseFlatObject(json);
+      HasLogger.staticLogger().info("fromJson {}", m);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Invalid JSON: " + e.getMessage(), e);
+    }
+
+    if (type == StoreInfo.class) {
+      String mode = m.getOrDefault("mode", "InMemory");
+      int mappings = parseIntSafe(m.get("mappings"), 0);
+      long startedAt = parseLongSafe(m.get("startedAtEpochMs"), 0L);
+      return (T) new StoreInfo(mode, mappings, startedAt);
+    }
+
+    if (type == ShortenRequest.class) {
+      String url = emptyToNull(m.get("url"));
+      String alias = emptyToNull(m.get("alias"));
+      if (url == null || url.isEmpty()) {
+        throw new IllegalArgumentException("Field 'url' missing or empty");
+      }
+      Instant expiresAt = parseInstantSafe(m.get("expiresAt"));
+      Boolean active = parseBooleanSafe(m.get("active"));
+      return (T) new ShortenRequest(url, alias, expiresAt, active);
+    }
+
+    if (type == ShortenResponse.class) {
+      String shortCode = m.get("shortCode");
+      String originalUrl = m.get("originalUrl");
+      return (T) new ShortenResponse(shortCode, originalUrl);
+    }
+
+    if (type == ShortUrlMapping.class) {
+      String code = m.get("shortCode");
+      String url = m.get("originalUrl");
+      Instant createdAt = parseInstantSafe(m.get("createdAt"));
+      Instant expiresAt = parseInstantSafe(m.get("expiresAt"));
+      Boolean active = parseBooleanSafe(m.get("active"));
+      return (T) new ShortUrlMapping(code, url, createdAt,
+                                     expiresAt,
+                                     active);
+    }
+
+    if (type == ColumnInfoRequest.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      return (T) new ColumnInfoRequest(userId, viewId);
+    }
+
+    if (type == ColumnInfoResponse.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      Map<String, Boolean> infos = castMap(m.get("columnInfos"));
+      return (T) new ColumnInfoResponse(userId, viewId, infos);
+    }
+
+    if (type == ColumnDeleteRequest.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      var columnKey = m.get("columnKey");
+      return (T) new ColumnDeleteRequest(userId, viewId, columnKey);
+    }
+
+    if (type == ColumnEditRequest.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      var changesJSON = m.get("changes");
+      try {
+        var changesMapRAW = parseJson(changesJSON);
+        Map<String, Boolean> changes = castMap(changesMapRAW);
+        return (T) new ColumnEditRequest(userId, viewId, changes);
+      } catch (IOException e) {
+        throw new IllegalArgumentException("changes map is invalid - " + e.getMessage());
+      }
+    }
+
+    if (type == ColumnSingleEditRequest.class) {
+      var userId = m.get("userId");
+      var viewId = m.get("viewId");
+      var columnKey = m.get("columnKey");
+      var visible = Boolean.parseBoolean(m.get("visible"));
+      return (T) new ColumnSingleEditRequest(userId, viewId, columnKey, visible);
+    }
+
+    if (type == ToggleActive.ToggleActiveRequest.class) {
+      var shortCode = m.get("shortCode");
+      var active = Boolean.parseBoolean(m.get("active"));
+      return (T) new ToggleActive.ToggleActiveRequest(shortCode, active);
+    }
+
+    if (type == ToggleActive.ToggleActiveResponse.class) {
+      var shortCode = m.get("shortCode");
+      var active = Boolean.parseBoolean(m.get("active"));
+      return (T) new ToggleActive.ToggleActiveResponse(shortCode, active);
+    }
+
+    throw new UnsupportedOperationException("Unsupported type for fromJson: " + type.getName());
   }
 
 
-  /**
-   * Minimal JSON parser for ShortenRequest.
-   */
-  public static ShortenRequest fromJson(String json, Class<ShortenRequest> type) {
-    return parseShortenRequest(json);
+  private static Map<String, Boolean> castMap(Object obj) {
+    if (obj == null) return java.util.Collections.emptyMap();
+    if (obj instanceof Map<?, ?> raw) {
+      Map<String, Boolean> result = new java.util.LinkedHashMap<>();
+      raw.forEach((k, v) -> {
+        if (k != null) {
+          result.put(k.toString(),
+                     v instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(v)));
+        }
+      });
+      return result;
+    }
+    return java.util.Collections.emptyMap();
   }
+  /* ======================
+           WRITE
+     ====================== */
 
   public static String toJson(String key, String value) {
-    return "{" +
-        "\"" + escape(key) + "\":" +
-        "\"" + escape(value) + "\"" +
-        "}";
+    return "{\"" + escape(key) + "\":\"" + escape(value) + "\"}";
   }
 
-//TODO - in ein DTO verpacken?
+  //TODO in ein DTO verpacken?
   public static String toJson(String httpCode, String message, String appCode) {
-    return "{\"code\":\"" + httpCode + "\",\"appCode\":\"" + appCode + "\",\"message\":\"" + escape(message) + "\"}";
+    return "{\"code\":\"" + escape(httpCode) + "\",\"appCode\":\"" + escape(appCode)
+        + "\",\"message\":\"" + escape(message) + "\"}";
   }
 
   /**
-   * Serializes a Map<String, ?> to JSON.
+   * Serializes a Map<String, ?> to JSON (flach).
    */
   public static String toJson(Map<String, ?> map) {
     StringBuilder sb = new StringBuilder();
@@ -129,7 +193,7 @@ public final class JsonUtils
       if (v == null) {
         sb.append("null");
       } else if (v instanceof Number || v instanceof Boolean) {
-        sb.append(v);
+        sb.append('"').append(v).append('"');
       } else {
         sb.append('"').append(escape(v.toString())).append('"');
       }
@@ -146,12 +210,14 @@ public final class JsonUtils
       Map<String, Object> m = new LinkedHashMap<>();
       m.put("url", req.getUrl());
       m.put("alias", req.getShortURL());
+      m.put("expiresAt", req.getExpiresAt());
+      m.put("active", req.getActive());
       return toJson(m);
     }
-    if (dto instanceof ShortenResponse res) {
+    if (dto instanceof ShortenResponse(String shortCode, String originalUrl)) {
       Map<String, Object> m = new LinkedHashMap<>();
-      m.put("shortCode", res.shortCode());
-      m.put("originalUrl", res.originalUrl());
+      m.put("shortCode", shortCode);
+      m.put("originalUrl", originalUrl);
       return toJson(m);
     }
     if (dto instanceof ShortUrlMapping map) {
@@ -164,37 +230,178 @@ public final class JsonUtils
       if (map.createdAt() != null) {
         m.put("createdAt", map.createdAt().toString());
       }
+      if (map.expiresAt().orElse(null) != null) {
+        m.put("expiresAt", map.expiresAt().get().toString());
+      }
+      m.put("active", map.active());
+      return toJson(m);
+    }
+    if (dto instanceof StoreInfo(String mode, int mappings, long startedAtEpochMs)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("mode", mode);
+      m.put("mappings", mappings);
+      m.put("startedAtEpochMs", startedAtEpochMs);
+      return toJson(m);
+    }
+
+    if (dto instanceof ColumnInfoRequest(String userId, String viewId)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      return toJson(m);
+    }
+
+    if (dto instanceof ColumnInfoResponse(String userId, String viewId, Map<String, Boolean> columnInfos)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      if (columnInfos != null && !columnInfos.isEmpty()) {
+        m.put("columnInfos", columnInfos);
+      }
+      return toJson(m);
+    }
+
+    if (dto instanceof ColumnDeleteRequest(String userId, String viewId, String columnKey)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      m.put("columnKey", columnKey);
+      return toJson(m);
+    }
+
+    if (dto instanceof ColumnEditRequest(String userId, String viewId, Map<String, Boolean> changes)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      if (changes != null && !changes.isEmpty()) {
+        m.put("changes", toJson(changes));
+      }
+      return toJson(m);
+    }
+
+    if (dto instanceof ColumnSingleEditRequest(String userId, String viewId, String columnKey, boolean visible)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("userId", userId);
+      m.put("viewId", viewId);
+      m.put("columnKey", columnKey);
+      m.put("visible", visible);
+      return toJson(m);
+    }
+
+    if (dto instanceof ToggleActive.ToggleActiveRequest(String shortCode, boolean active)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("shortCode", shortCode);
+      m.put("active", active);
+      return toJson(m);
+    }
+
+    if (dto instanceof ToggleActive.ToggleActiveResponse(String shortCode, boolean active)) {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("shortCode", shortCode);
+      m.put("active", active);
       return toJson(m);
     }
 
     throw new UnsupportedOperationException("Unsupported DTO: " + dto.getClass());
   }
 
+  public static String toJsonArrayOfObjects(List<Map<String, String>> items) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("[");
+    boolean firstItem = true;
+    for (Map<String, String> item : items) {
+      if (!firstItem) sb.append(",");
+      sb.append(toJson(item));
+      firstItem = false;
+    }
+    sb.append("]");
+    return sb.toString();
+  }
+
+  public static String toJsonListing(String mode, int count, List<Map<String, String>> items) {
+    return "{" +
+        "\"mode\":\"" + escape(mode) + "\"," +
+        "\"count\":" + count + "," +
+        "\"items\":" + toJsonArrayOfObjects(items) +
+        "}";
+  }
+
+  public static String toJsonListingPaged(
+      String mode,
+      int countOnPage,
+      List<Map<String, String>> items,
+      int page, int size, int total,
+      Object sort, Object dir
+  ) {
+    StringBuilder sb = new StringBuilder(128 + items.size() * 64);
+    sb.append("{");
+    sb.append("\"mode\":\"").append(escape(mode)).append("\",");
+    sb.append("\"page\":").append(page).append(",");
+    sb.append("\"size\":").append(size).append(",");
+    sb.append("\"total\":").append(total).append(",");
+    if (sort != null) sb.append("\"sort\":\"").append(escape(String.valueOf(sort))).append("\",");
+    if (dir != null) sb.append("\"dir\":\"").append(escape(String.valueOf(dir))).append("\",");
+    sb.append("\"count\":").append(countOnPage).append(",");
+    sb.append("\"items\":").append(toJsonArrayOfObjects(items));
+    sb.append("}");
+    return sb.toString();
+  }
+
+  /* ======================
+        SMALL HELPERS
+     ====================== */
 
   public static String extractShortCode(String json)
       throws IOException {
     staticLogger().info("Extracting shortCode from JSON: {}", json);
-    var attributeMap = JsonUtils.parseJson(json);
-    if (attributeMap.containsKey("shortCode")) {
-      var shortCode = attributeMap.get("shortCode");
-      staticLogger().info("Extracted shortCode: ->|{}|<-", shortCode);
-      return shortCode;
-    } else throw new IOException("Invalid JSON response - no shortCode available : " + json);
+    var attributeMap = parseFlatObject(json);
+    var sc = attributeMap.get("shortCode");
+    if (sc == null) throw new IOException("Invalid JSON response - no shortCode available : " + json);
+    staticLogger().info("Extracted shortCode: ->|{}|<-", sc);
+    return sc;
   }
 
   private static String readInputStream(InputStream input)
       throws IOException {
-    try (BufferedReader reader = new BufferedReader(
-        new InputStreamReader(input, StandardCharsets.UTF_8))) {
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
       return reader.lines().collect(joining());
     }
   }
 
-  private static String unquote(String s) {
-    if (s.startsWith("\"") && s.endsWith("\"") && s.length() >= 2) {
-      return s.substring(1, s.length() - 1);
+  private static int parseIntSafe(String s, int def) {
+    try {
+      return Integer.parseInt(s);
+    } catch (Exception e) {
+      return def;
     }
-    return s;
+  }
+
+  private static long parseLongSafe(String s, long def) {
+    try {
+      return Long.parseLong(s);
+    } catch (Exception e) {
+      return def;
+    }
+  }
+
+  private static Instant parseInstantSafe(String s) {
+    try {
+      return (s == null || s.isBlank()) ? null : Instant.parse(s);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private static Boolean parseBooleanSafe(String s) {
+    try {
+      return (s == null || s.isBlank()) ? null : Boolean.parseBoolean(s);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private static String emptyToNull(String s) {
+    return (s == null || s.isBlank()) ? null : s;
   }
 
   @NotNull
@@ -228,31 +435,15 @@ public final class JsonUtils
       if (c == '\\' && i + 1 < s.length()) {
         char n = s.charAt(++i);
         switch (n) {
-          case '"':
-            out.append('"');
-            break;
-          case '\\':
-            out.append('\\');
-            break;
-          case '/':
-            out.append('/');
-            break;
-          case 'b':
-            out.append('\b');
-            break;
-          case 'f':
-            out.append('\f');
-            break;
-          case 'n':
-            out.append('\n');
-            break;
-          case 'r':
-            out.append('\r');
-            break;
-          case 't':
-            out.append('\t');
-            break;
-          case 'u':
+          case '"' -> out.append('"');
+          case '\\' -> out.append('\\');
+          case '/' -> out.append('/');
+          case 'b' -> out.append('\b');
+          case 'f' -> out.append('\f');
+          case 'n' -> out.append('\n');
+          case 'r' -> out.append('\r');
+          case 't' -> out.append('\t');
+          case 'u' -> {
             if (i + 4 < s.length()) {
               String hex = s.substring(i + 1, i + 5);
               try {
@@ -261,9 +452,8 @@ public final class JsonUtils
               }
               i += 4;
             }
-            break;
-          default:
-            out.append(n);
+          }
+          default -> out.append(n);
         }
       } else {
         out.append(c);
@@ -273,44 +463,103 @@ public final class JsonUtils
   }
 
   /**
-   * Serializes a list of flat objects (String->String) as a JSON array.
+   * Minimal parser for flat JSON objects:
+   * - Strings, numbers, true/false, null
+   * - No arrays/nesting
+   * - Respects quotes and escapes → correctly splits at top-level commas.
    */
-  public static String toJsonArrayOfObjects(List<Map<String, String>> items) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("[");
-    boolean firstItem = true;
-    for (Map<String, String> item : items) {
-      if (!firstItem) sb.append(",");
-      sb.append("{");
-      boolean firstField = true;
-      for (Map.Entry<String, String> e : item.entrySet()) {
-        if (!firstField) sb.append(",");
-        sb.append("\"").append(escape(e.getKey())).append("\":");
-        String v = e.getValue();
-        if (v == null) {
-          sb.append("null");
-        } else {
-          sb.append("\"").append(escape(v)).append("\"");
-        }
-        firstField = false;
-      }
-      sb.append("}");
-      firstItem = false;
+  private static Map<String, String> parseFlatObject(String json)
+      throws IOException {
+    if (json == null) throw new IOException("JSON is null");
+    String s = json.trim();
+    if (!(s.startsWith("{") && s.endsWith("}")))
+      throw new IOException("Invalid JSON object");
+    s = s.substring(1, s.length() - 1); // Inhalt ohne { }
+
+    s = s.replaceAll("\\n", "");
+
+    Map<String, String> map = new LinkedHashMap<>();
+    var entries = getEntries(s);
+    if (entries.isEmpty()) return Collections.emptyMap();
+
+    for (String e : entries) {
+      if (e.isEmpty()) continue;
+      int colon = findTopLevelColon(e);
+      if (colon < 0) throw new IOException("Invalid entry: " + e);
+      String rawKey = e.substring(0, colon).trim();
+      String rawVal = e.substring(colon + 1).trim();
+      String key = stripQuotes(rawKey);
+      String val = parseValueToString(rawVal);
+      map.put(key, val);
     }
-    sb.append("]");
-    return sb.toString();
+    return map;
   }
 
-  /**
-   * Builds the response object for the list endpoints.
-   */
-  public static String toJsonListing(String mode, int count, List<Map<String, String>> items) {
-    StringBuilder sb = new StringBuilder(64 + items.size() * 64);
-    sb.append("{");
-    sb.append("\"mode\":\"").append(escape(mode)).append("\",");
-    sb.append("\"count\":").append(count).append(",");
-    sb.append("\"items\":").append(toJsonArrayOfObjects(items));
-    sb.append("}");
-    return sb.toString();
+  @NotNull
+  private static List<String> getEntries(String s) {
+    StringBuilder token = new StringBuilder();
+    boolean inString = false;
+    boolean escape = false;
+    List<String> entries = new ArrayList<>();
+
+    for (int i = 0; i < s.length(); i++) {
+      char c = s.charAt(i);
+      if (inString) {
+        token.append(c);
+        if (escape) {
+          escape = false;
+        } else if (c == '\\') {
+          escape = true;
+        } else if (c == '"') {
+          inString = false;
+        }
+      } else {
+        if (c == '"') {
+          inString = true;
+          token.append(c);
+        } else if (c == ',') {
+          entries.add(token.toString().trim());
+          token.setLength(0);
+        } else {
+          token.append(c);
+        }
+      }
+    }
+    if (!token.isEmpty()) entries.add(token.toString().trim());
+    return entries;
+  }
+
+  private static int findTopLevelColon(String s) {
+    boolean inString = false, escape = false;
+    for (int i = 0; i < s.length(); i++) {
+      char c = s.charAt(i);
+      if (inString) {
+        if (escape) escape = false;
+        else if (c == '\\') escape = true;
+        else if (c == '"') inString = false;
+      } else {
+        if (c == '"') inString = true;
+        else if (c == ':') return i;
+      }
+    }
+    return -1;
+  }
+
+  private static String stripQuotes(String s) {
+    String t = s.trim();
+    if (t.startsWith("\"") && t.endsWith("\"") && t.length() >= 2) {
+      return unescape(t.substring(1, t.length() - 1));
+    }
+    return t;
+  }
+
+  private static String parseValueToString(String raw) {
+    String t = raw.trim();
+    if (t.equals("null")) return null;
+    if (t.startsWith("\"") && t.endsWith("\"") && t.length() >= 2) {
+      return unescape(t.substring(1, t.length() - 1));
+    }
+    // number / boolean → unverändert als String
+    return t;
   }
 }

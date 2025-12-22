@@ -3,8 +3,11 @@ package com.svenruppert.urlshortener.client;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.core.AliasPolicy;
 import com.svenruppert.urlshortener.core.JsonUtils;
-import com.svenruppert.urlshortener.core.ShortUrlMapping;
-import com.svenruppert.urlshortener.core.ShortenRequest;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
+import com.svenruppert.urlshortener.core.urlmapping.ToggleActive.ToggleActiveRequest;
+import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
+import com.svenruppert.urlshortener.core.validation.UrlValidator;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,14 +18,18 @@ import java.net.URL;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
+import static com.svenruppert.dependencies.core.net.HttpStatus.OK;
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
+import static com.svenruppert.urlshortener.core.JsonUtils.fromJson;
+import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class URLShortenerClient
     implements HasLogger {
 
+  protected static final int CONNECT_TIMEOUT = 10_000;
+  protected static final int READ_TIMEOUT = 15_000;
   private final URI serverBaseAdmin;
   private final URI serverBaseRedirect;
 
@@ -131,75 +138,6 @@ public class URLShortenerClient
     return out;
   }
 
-  /**
-   * Parses a single mapping object. Expected fields are strings or null.
-   */
-  private static ShortUrlMapping parseOneMapping(String objJson) {
-    String shortCode = extractString(objJson, "shortCode");
-    String originalUrl = extractString(objJson, "originalUrl");
-    String createdAtIso = extractString(objJson, "createdAt");
-    String expiresAtIso = extractNullableString(objJson, "expiresAt");
-
-    Instant createdAt = createdAtIso != null ? Instant.parse(createdAtIso) : Instant.EPOCH;
-    Optional<Instant> expiresAt = expiresAtIso != null && !expiresAtIso.isEmpty()
-        ? Optional.of(Instant.parse(expiresAtIso))
-        : Optional.empty();
-
-    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt);
-  }
-
-  /**
-   * Reads a string field "key":"value" without keeping the quotes.
-   */
-  private static String extractString(String json, String key) {
-    String v = extractNullableString(json, key);
-    return v == null || "null".equals(v) ? null : v;
-  }
-
-  /**
-   * Reads a field and returns the raw string contents or null if the field is missing or null.
-   */
-  private static String extractNullableString(String json, String key) {
-    final String pattern = "\"" + key + "\"";
-    int p = json.indexOf(pattern);
-    if (p < 0) return null;
-    int colon = json.indexOf(':', p + pattern.length());
-    if (colon < 0) return null;
-
-    // jump over Whitespace
-    int i = colon + 1;
-    while (i < json.length() && Character.isWhitespace(json.charAt(i))) i++;
-    if (i >= json.length()) return null;
-
-    char c = json.charAt(i);
-    if (c == 'n') { // null
-      // expected "null"
-      return "null";
-    }
-    if (c != '"') return null;
-
-    // Read string, respect escapes
-    StringBuilder sb = new StringBuilder();
-    i++;
-    boolean escape = false;
-    for (; i < json.length(); i++) {
-      char ch = json.charAt(i);
-      if (escape) {
-        // For our fields, the standard escapes are sufficient, we take raw
-        sb.append(ch);
-        escape = false;
-      } else {
-        if (ch == '\\') {
-          escape = true;
-          continue;
-        }
-        if (ch == '"') break;
-        sb.append(ch);
-      }
-    }
-    return sb.toString();
-  }
-
   private static void drainQuietly(InputStream is) {
     if (is == null) return;
     try (is) {
@@ -210,7 +148,7 @@ public class URLShortenerClient
 
 
   // ————————————————————————————————————————————————————————————————————————————
-  // HTTP-Hilfen
+  // HTTP-Helper
   // ————————————————————————————————————————————————————————————————————————————
 
   /**
@@ -222,15 +160,23 @@ public class URLShortenerClient
    */
   private String shortenURL(String originalUrl)
       throws IOException {
+
+    var result = UrlValidator.validate(originalUrl);
+    if (!result.valid()) {
+      throw new IllegalArgumentException("Invalid URL: " + result.message());
+    } else {
+      logger().info("shortenURL - valid URL {} ", originalUrl);
+    }
+
     URL shortenUrl = serverBaseAdmin.resolve(PATH_ADMIN_SHORTEN).toURL();
     logger().info("connecting to .. shortenUrl {}", shortenUrl);
     HttpURLConnection connection = (HttpURLConnection) shortenUrl.openConnection();
     connection.setRequestMethod("POST");
     connection.setDoOutput(true);
-    connection.setRequestProperty("Content-Type", "application/json");
+    connection.setRequestProperty(CONTENT_TYPE, JSON_CONTENT_TYPE);
 
     String body = "{\"url\":\"" + originalUrl + "\"}";
-    logger().info("body - '{}'", body);
+    logger().info("shortenURL - body - '{}'", body);
     try (OutputStream os = connection.getOutputStream()) {
       os.write(body.getBytes());
     }
@@ -271,11 +217,36 @@ public class URLShortenerClient
     }
   }
 
-  // ————————————————————————————————————————————————————————————————————————————
-// Minimal parser for the known response structure
-// Expected format: {"mode":"...","count":N,"items":[{...},{...}]}
-// We only extract items[], the fields: shortCode, originalUrl, createdAt, expiresAt
-  // ————————————————————————————————————————————————————————————————————————————
+  public int listCount(UrlMappingListRequest req)
+      throws IOException {
+    String qs = (req == null) ? "" : req.toQueryStringForCount(); // siehe unten
+    var uri = qs.isEmpty()
+        ? serverBaseAdmin.resolve(PATH_ADMIN_LIST_COUNT)
+        : serverBaseAdmin.resolve(PATH_ADMIN_LIST_COUNT + "?" + qs);
+
+    var con = (java.net.HttpURLConnection) uri.toURL().openConnection();
+    con.setRequestMethod("GET");
+    con.setRequestProperty("Accept", "application/json");
+    con.setConnectTimeout(CONNECT_TIMEOUT);
+    con.setReadTimeout(READ_TIMEOUT);
+
+    int sc = con.getResponseCode();
+    if (sc != 200) {
+      String err = readAllAsString(con.getErrorStream() != null ? con.getErrorStream() : con.getInputStream());
+      throw new IOException("Unexpected HTTP " + sc + " for " + uri + " body=" + err);
+    }
+    try (var is = con.getInputStream()) {
+      String body = readAllAsString(is);
+      int i = body.indexOf("\"total\"");
+      if (i < 0) return 0;
+      int colon = body.indexOf(':', i);
+      int end = body.indexOf('}', colon + 1);
+      String num = body.substring(colon + 1, end).trim();
+      return Integer.parseInt(num);
+    } finally {
+      con.disconnect();
+    }
+  }
 
   /**
    * Returns all mappings.
@@ -305,21 +276,47 @@ public class URLShortenerClient
   }
 
   /**
+   * Returns active mappings.
+   */
+  public List<ShortUrlMapping> listInActive()
+      throws IOException {
+    final String json = fetchJson(PATH_ADMIN_LIST_INACTIVE);
+    return parseItemsAsMappings(json);
+  }
+
+  public List<ShortUrlMapping> list(UrlMappingListRequest request)
+      throws IOException {
+    logger().info("list - UrlMappingListRequest: {}", request);
+    final String json = listAsJson(request);
+    return parseItemsAsMappings(json);
+  }
+
+
+  /**
    * Optional: Raw JSON if a client needs metadata like count/mode.
    */
-  public String listAllJson()
+  public String listAllAsJson()
       throws IOException {
     return fetchJson(PATH_ADMIN_LIST_ALL);
   }
 
-  public String listExpiredJson()
+  public String listExpiredAsJson()
       throws IOException {
     return fetchJson(PATH_ADMIN_LIST_EXPIRED);
   }
 
-  public String listActiveJson()
+  public String listActiveAsJson()
       throws IOException {
     return fetchJson(PATH_ADMIN_LIST_ACTIVE);
+  }
+
+  public String listAsJson(UrlMappingListRequest request)
+      throws IOException {
+    final String qs = (request == null) ? "" : request.toQueryString();
+    String relativePath = qs.isEmpty()
+        ? PATH_ADMIN_LIST
+        : PATH_ADMIN_LIST + "?" + qs;
+    return fetchJson(relativePath);
   }
 
   private String fetchJson(String relativePath)
@@ -329,12 +326,12 @@ public class URLShortenerClient
     logger().info("fetchJson - url {}", url);
     final HttpURLConnection con = (HttpURLConnection) url.openConnection();
     con.setRequestMethod("GET");
-    con.setRequestProperty("Accept", "application/json");
-    con.setConnectTimeout(10_000);
-    con.setReadTimeout(15_000);
+    con.setRequestProperty(ACCEPT, APPLICATION_JSON);
+    con.setConnectTimeout(CONNECT_TIMEOUT);
+    con.setReadTimeout(READ_TIMEOUT);
 
     final int code = con.getResponseCode();
-    if (code != 200) {
+    if (code != OK.code()) {
       final String err = readAllAsString(
           con.getErrorStream() != null ? con.getErrorStream() : con.getInputStream());
       throw new IOException("Unexpected HTTP " + code + " for " + url + " body=" + err);
@@ -350,42 +347,53 @@ public class URLShortenerClient
     final String items = sliceItemsArray(json);
     final List<String> objects = splitTopLevelObjects(items);
     final List<ShortUrlMapping> result = new ArrayList<>(objects.size());
-    for (String obj : objects) {
-      result.add(parseOneMapping(obj));
+    for (String mapping : objects) {
+      var shortUrlMapping = fromJson(mapping, ShortUrlMapping.class);
+      result.add(shortUrlMapping);
     }
     return result;
   }
 
   public ShortUrlMapping createMapping(String url)
       throws IOException {
-    logger().info("Shorten the following url {}", url);
+    logger().info("Create mapping url='{}'", url);
     var shortenURL = shortenURL(url);
-    return new ShortUrlMapping(shortenURL, url, Instant.now(), Optional.empty());
+    return new ShortUrlMapping(shortenURL, url, Instant.now(), null, true);
   }
 
   public ShortUrlMapping createCustomMapping(String alias, String url)
       throws IOException {
     logger().info("Create custom mapping alias='{}' url='{}'", alias, url);
+    return createCustomMapping(alias, url, null, null);
+  }
 
-    if (alias == null || alias.isBlank()) {
-      return createMapping(url);
+
+  public ShortUrlMapping createCustomMapping(String alias, String url, Instant expiredAtOrNull, Boolean activeOrNull)
+      throws IOException {
+    logger().info("Create custom mapping alias='{}' url='{}' expiredAt='{}' active='{}'", alias, url, expiredAtOrNull, activeOrNull);
+    var result = UrlValidator.validate(url);
+    if (!result.valid()) {
+      throw new IllegalArgumentException("Invalid URL: " + result.message());
     }
 
-    var validate = AliasPolicy.validate(alias);
-    if (!validate.valid()) {
-      var reason = validate.reason();
-      throw new IllegalArgumentException(reason.defaultMessage);
+    if (alias != null && !alias.isBlank()) {
+      var validate = AliasPolicy.validate(alias);
+      if (!validate.valid()) {
+        var reason = validate.reason();
+        throw new IllegalArgumentException(reason.defaultMessage);
+      }
     }
+    var shortenRequest = new ShortenRequest(url, alias, expiredAtOrNull, activeOrNull);
+    String body = toJson(shortenRequest);
+    logger().info("createCustomMapping - body - '{}'", body);
 
     URL shortenUrl = serverBaseAdmin.resolve(PATH_ADMIN_SHORTEN).toURL();
     logger().info("connecting to .. shortenUrl {} (custom)", shortenUrl);
     HttpURLConnection connection = (HttpURLConnection) shortenUrl.openConnection();
     connection.setRequestMethod("POST");
     connection.setDoOutput(true);
-    connection.setRequestProperty("Content-Type", "application/json");
+    connection.setRequestProperty(CONTENT_TYPE, JSON_CONTENT_TYPE);
 
-    String body = new ShortenRequest(url, alias).toJson();
-    logger().info("body - '{}'", body);
     try (OutputStream os = connection.getOutputStream()) {
       os.write(body.getBytes(UTF_8));
     }
@@ -395,9 +403,10 @@ public class URLShortenerClient
     if (status == 200 || status == 201) {
       try (InputStream is = connection.getInputStream()) {
         String jsonResponse = new String(is.readAllBytes(), UTF_8);
-        String extractedShortCode = JsonUtils.extractShortCode(jsonResponse);
-        logger().info("extractedShortCode .. {}", extractedShortCode);
-        return new ShortUrlMapping(extractedShortCode, url, Instant.now(), Optional.empty());
+        logger().info("createCustomMapping - jsonResponse - {}", jsonResponse);
+        ShortUrlMapping shortUrlMapping = fromJson(jsonResponse, ShortUrlMapping.class);
+        logger().info("shortUrlMapping .. {}", shortUrlMapping);
+        return shortUrlMapping;
       }
     }
     if (status == 409) {
@@ -410,6 +419,54 @@ public class URLShortenerClient
     }
     throw new IOException("Server returned status " + status);
   }
+
+  public boolean edit(String shortCode, String newUrl, Instant expiresAtOrNull, Boolean activeOrNull)
+      throws IOException {
+    logger().info("Edit mapping alias='{}' url='{}' expiredAt='{}' active='{}'", shortCode, newUrl, expiresAtOrNull, activeOrNull);
+    if (shortCode == null || shortCode.isBlank()) {
+      throw new IllegalArgumentException("shortCode must not be null/blank");
+    }
+    if (newUrl == null || newUrl.isBlank()) {
+      throw new IllegalArgumentException("newUrl must not be null/blank");
+    }
+
+    final URI uri = serverBaseAdmin.resolve(PATH_ADMIN_EDIT + "/" + shortCode);
+    final URL url = uri.toURL();
+    logger().info("edit - {}", url);
+
+    final HttpURLConnection con = (HttpURLConnection) url.openConnection();
+    con.setRequestMethod("PUT");
+    con.setDoOutput(true);
+    con.setRequestProperty(CONTENT_TYPE, JSON_CONTENT_TYPE);
+    con.setRequestProperty(ACCEPT, APPLICATION_JSON);
+    con.setConnectTimeout(CONNECT_TIMEOUT);
+    con.setReadTimeout(READ_TIMEOUT);
+
+    final ShortenRequest req = new ShortenRequest(newUrl, shortCode, expiresAtOrNull, activeOrNull);
+    final String body = toJson(req);
+    logger().info("edit - request body - '{}'", body);
+    try (OutputStream os = con.getOutputStream()) {
+      os.write(body.getBytes(UTF_8));
+    }
+
+    final int code = con.getResponseCode();
+    logger().info("edit - responseCode {}", code);
+
+    if (code == 200 || code == 204 || code == 201) {
+      drainQuietly(con.getInputStream());
+      return true;
+    }
+
+    if (code == 404) {
+      logger().info("shortCode not found.. {}", shortCode);
+      drainQuietly(con.getErrorStream());
+      return false;
+    }
+
+    final String err = readAllAsString(con.getErrorStream());
+    throw new IOException("Unexpected response: " + code + ", body=" + err);
+  }
+
 
   /**
    * Removes an existing mapping. Equivalent to DELETE /mapping/{shortCode}.
@@ -429,8 +486,8 @@ public class URLShortenerClient
     final HttpURLConnection con = (HttpURLConnection) url.openConnection();
     con.setRequestMethod("DELETE");
     con.setRequestProperty("Accept", "application/json");
-    con.setConnectTimeout(10_000);
-    con.setReadTimeout(15_000);
+    con.setConnectTimeout(CONNECT_TIMEOUT);
+    con.setReadTimeout(READ_TIMEOUT);
 
     final int code = con.getResponseCode();
     try {
@@ -460,4 +517,47 @@ public class URLShortenerClient
       throw new IOException("shortCode not found: " + shortCode);
     }
   }
+
+  public boolean toggleActive(String shortCode, boolean active)
+      throws IOException {
+    logger().info("Toggle Active shortCode='{}' active='{}'", shortCode, active);
+    if (shortCode == null || shortCode.isBlank()) {
+      throw new IllegalArgumentException("shortCode must not be null/blank");
+    }
+    final URI uri = serverBaseAdmin.resolve(PATH_ADMIN_TOGGLE_ACTIVE + "/" + shortCode);
+    final URL url = uri.toURL();
+    logger().info("Toggle Active - {}", url);
+
+    final HttpURLConnection con = (HttpURLConnection) url.openConnection();
+    con.setRequestMethod("PUT");
+    con.setDoOutput(true);
+    con.setRequestProperty(CONTENT_TYPE, JSON_CONTENT_TYPE);
+    con.setRequestProperty(ACCEPT, APPLICATION_JSON);
+    con.setConnectTimeout(CONNECT_TIMEOUT);
+    con.setReadTimeout(READ_TIMEOUT);
+    var req = new ToggleActiveRequest(shortCode, active);
+
+    final String body = toJson(req);
+    logger().info("Toggle Active - request body - '{}'", body);
+    try (OutputStream os = con.getOutputStream()) {
+      os.write(body.getBytes(UTF_8));
+    }
+
+    final int code = con.getResponseCode();
+    logger().info("Toggle Active - responseCode {}", code);
+
+    if (code == 200 || code == 204 || code == 201) {
+      drainQuietly(con.getInputStream());
+      return true;
+    }
+
+    if (code == 404) {
+      logger().info("shortCode not found.. {}", shortCode);
+      drainQuietly(con.getErrorStream());
+      return false;
+    }
+    final String err = readAllAsString(con.getErrorStream());
+    throw new IOException("Unexpected response: " + code + ", body=" + err);
+  }
+
 }

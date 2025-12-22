@@ -1,21 +1,37 @@
 package com.svenruppert.urlshortener.ui.vaadin;
 
-import com.svenruppert.urlshortener.ui.vaadin.views.*;
+import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.ui.vaadin.components.StoreIndicator;
+import com.svenruppert.urlshortener.ui.vaadin.security.LoginConfig;
+import com.svenruppert.urlshortener.ui.vaadin.security.SessionAuth;
+import com.svenruppert.urlshortener.ui.vaadin.tools.AdminClientFactory;
+import com.svenruppert.urlshortener.ui.vaadin.views.AboutView;
+import com.svenruppert.urlshortener.ui.vaadin.views.CreateView;
+import com.svenruppert.urlshortener.ui.vaadin.views.YoutubeView;
+import com.svenruppert.urlshortener.ui.vaadin.views.login.LoginView;
+import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
 import static com.vaadin.flow.component.icon.VaadinIcon.*;
 
 public class MainLayout
-    extends AppLayout {
+    extends AppLayout
+    implements BeforeEnterObserver, HasLogger {
 
   public MainLayout() {
     createHeader();
@@ -23,24 +39,40 @@ public class MainLayout
 
   private void createHeader() {
     H1 appTitle = new H1("URL Shortener");
+    appTitle.getStyle()
+        .set("font-size", "1.1rem")
+        .set("margin", "0");
 
     SideNav views = getPrimaryNavigation();
     Scroller scroller = new Scroller(views);
     scroller.setClassName(LumoUtility.Padding.SMALL);
 
     DrawerToggle toggle = new DrawerToggle();
-//    H2 viewTitle = new H2("Orders");
 
-//    HorizontalLayout subViews = getSecondaryNavigation();
-//    Element element = subViews.getElement();
+    var adminClient = AdminClientFactory.newInstance();
+    var storeIndicator = new StoreIndicator(adminClient);
+    storeIndicator.getStyle().set("margin-left", "auto"); // nach rechts schieben
 
-//    HorizontalLayout wrapper = new HorizontalLayout(toggle, viewTitle);
-    HorizontalLayout wrapper = new HorizontalLayout(toggle);
-    wrapper.setAlignItems(FlexComponent.Alignment.CENTER);
-    wrapper.setSpacing(false);
+    HorizontalLayout headerRow;
+    if (LoginConfig.isLoginEnabled()) {
+      var logoutButton = new Button("Logout", _ -> {
+        SessionAuth.clearAuthentication();
+        UI.getCurrent().getPage().setLocation("/" + LoginView.PATH);
+      });
+      logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+      headerRow = new HorizontalLayout(toggle, appTitle, new Span(), storeIndicator, logoutButton);
+    } else {
+      headerRow = new HorizontalLayout(toggle, appTitle, new Span(), storeIndicator);
+    }
 
-//    VerticalLayout viewHeader = new VerticalLayout(wrapper, subViews);
-    VerticalLayout viewHeader = new VerticalLayout(wrapper);
+    headerRow.setWidthFull();
+    headerRow.setAlignItems(FlexComponent.Alignment.CENTER);
+    headerRow.setSpacing(true);
+    headerRow.setPadding(true);
+    headerRow.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+    headerRow.expand(headerRow.getComponentAt(2));
+
+    VerticalLayout viewHeader = new VerticalLayout(headerRow);
     viewHeader.setPadding(false);
     viewHeader.setSpacing(false);
 
@@ -61,31 +93,27 @@ public class MainLayout
     return sideNav;
   }
 
-//  private HorizontalLayout getSecondaryNavigation() {
-//    HorizontalLayout navigation = new HorizontalLayout();
-//    navigation.addClassNames(LumoUtility.JustifyContent.CENTER,
-//                             LumoUtility.Gap.SMALL, LumoUtility.Height.MEDIUM);
-//    RouterLink all = createLink("All");
-//    RouterLink open = createLink("Open");
-//    RouterLink completed = createLink("Completed");
-//    RouterLink cancelled = createLink("Cancelled");
-//    navigation.add(all, open, completed, cancelled);
-//    return navigation;
-//  }
+  @Override
+  public void beforeEnter(BeforeEnterEvent event) {
 
-//  private RouterLink createLink(String viewName) {
-//    RouterLink link = new RouterLink();
-//    link.add(viewName);
-//    // Demo has no routes
-//    // link.setRoute(viewClass.java);
-//
-//    link.addClassNames(LumoUtility.Display.FLEX,
-//                       LumoUtility.AlignItems.CENTER,
-//                       LumoUtility.Padding.Horizontal.MEDIUM,
-//                       LumoUtility.TextColor.SECONDARY,
-//                       LumoUtility.FontWeight.MEDIUM);
-//    link.getStyle().set("text-decoration", "none");
-//
-//    return link;
-//  }
+    // If login is globally disabled, do not protect any routes.
+    if (!LoginConfig.isLoginEnabled()) {
+      return;
+    }
+
+    logger().info("beforeEnter target={} authenticated={}",
+                  event.getNavigationTarget().getSimpleName(),
+                  SessionAuth.isAuthenticated());
+
+    // The login view itself must never be protected, otherwise we create a loop
+    if (event.getNavigationTarget().equals(LoginView.class)) {
+      return;
+    }
+
+    if (!SessionAuth.isAuthenticated()) {
+      logger().info("beforeEnter.. isAuthenticated()==false - reroute to LoginView");
+      event.rerouteTo(LoginView.class);
+    }
+  }
+
 }

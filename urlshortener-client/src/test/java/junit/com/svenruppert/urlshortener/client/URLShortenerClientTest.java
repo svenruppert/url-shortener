@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
 import static java.time.Instant.now;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -37,19 +38,20 @@ public class URLShortenerClientTest
   }
 
   @Test
-  void listEndpoints_useGET_and_returnJson() throws IOException {
-    var allRaw = client.listAllJson();
+  void listEndpoints_useGET_and_returnJson()
+      throws IOException {
+    var allRaw = client.listAllAsJson();
     assertNotNull(allRaw);
     assertTrue(allRaw.contains("\"mode\""));
     assertTrue(allRaw.contains("\"count\""));
     assertTrue(allRaw.contains("\"items\""));
 
-    var activeRaw = client.listActiveJson();
+    var activeRaw = client.listActiveAsJson();
     assertNotNull(activeRaw);
     assertTrue(activeRaw.contains("\"mode\""));
     assertTrue(activeRaw.contains("\"items\""));
 
-    var expiredRaw = client.listExpiredJson();
+    var expiredRaw = client.listExpiredAsJson();
     assertNotNull(expiredRaw);
     assertTrue(expiredRaw.contains("\"mode\""));
     assertTrue(expiredRaw.contains("\"items\""));
@@ -74,8 +76,8 @@ public class URLShortenerClientTest
 
     //TODO - impl. ShortCode with ExpiredAt
     //create second with expiredAt
-//    var shortCodeWithExpired = client.createMapping(HTTP_SVENRUPPERT_COM);
-//    assertEquals("1", shortCode.shortCode()); //TODO will break soo after int will be replaced with hash value
+    //    var shortCodeWithExpired = client.createMapping(HTTP_SVENRUPPERT_COM);
+    //    assertEquals("1", shortCode.shortCode()); //TODO will break soo after int will be replaced with hash value
 
   }
 
@@ -92,6 +94,17 @@ public class URLShortenerClientTest
     var listOneEntry = client.listAll();
     assertFalse(listOneEntry.isEmpty());
     assertEquals(1, listOneEntry.size());
+
+  }
+
+  @Test
+  void test003()
+      throws IOException {
+    assertThrows(IllegalArgumentException.class, () -> {
+      var mapping = client.createMapping("http://svende");
+    });
+    var listOneEntry = client.listAll();
+    assertTrue(listOneEntry.isEmpty());
 
   }
 
@@ -151,7 +164,8 @@ public class URLShortenerClientTest
 
 
   @Test
-  void delete_existingMapping_returnsTrue_andRemovesIt() throws IOException {
+  void delete_existingMapping_returnsTrue_andRemovesIt()
+      throws IOException {
     // Arrange: Create a mapping and verify its existence
     var created = client.createMapping(HTTP_SVENRUPPERT_COM);
     assertNotNull(created);
@@ -171,7 +185,8 @@ public class URLShortenerClientTest
   }
 
   @Test
-  void delete_nonExistingMapping_returnsFalse() throws IOException {
+  void delete_nonExistingMapping_returnsFalse()
+      throws IOException {
     boolean removed = client.delete("NoSuch123");
     assertFalse(removed, "Non-existent shortcode must return false (HTTP 404)");
   }
@@ -183,7 +198,8 @@ public class URLShortenerClientTest
   }
 
   @Test
-  void delete_isIdempotent_and_doesNotAffectOtherEntries() throws IOException {
+  void delete_isIdempotent_and_doesNotAffectOtherEntries()
+      throws IOException {
     // Arrange: Zwei Mappings anlegen
     var m1 = client.createMapping(HTTP_SVENRUPPERT_COM);
     var m2 = client.createMapping("https://example.org/path");
@@ -205,7 +221,8 @@ public class URLShortenerClientTest
   }
 
   @Test
-  void delete_then_listActive_reflectsRemoval() throws IOException {
+  void delete_then_listActive_reflectsRemoval()
+      throws IOException {
     // Arrange
     var m = client.createMapping(HTTP_SVENRUPPERT_COM);
     assertNotNull(m);
@@ -216,6 +233,30 @@ public class URLShortenerClientTest
 
     // Assert
     assertTrue(client.listActive().isEmpty(), "No active entry may remain after deletion");
+  }
+
+  @Test
+  void checkTheActiveAttribute()
+      throws IOException {
+    // Arrange
+    var m = client.createCustomMapping("sru01", HTTP_SVENRUPPERT_COM, null, false);
+    logger().info("Mapping As Json {}", toJson(m));
+    assertNotNull(m);
+
+    assertEquals(1, client.listAll().size(), "One entry is expected");
+    assertEquals(0, client.listActive().size(), "NO active entry is expected");
+
+    var m2 = client.createCustomMapping("sru02", HTTP_SVENRUPPERT_COM, null, true);
+    logger().info("Mapping m2 As Json {}", toJson(m2));
+    assertNotNull(m2);
+    assertEquals(2, client.listAll().size(), "Two entries are expected");
+    assertEquals(1, client.listActive().size(), "One active entry is expected");
+    assertEquals(1, client.listInActive().size(), "One INactive entry is expected");
+
+    // Act
+    assertTrue(client.delete(m.shortCode()));
+    assertEquals(1, client.listAll().size(), "One entry is expected");
+    assertEquals(1, client.listActive().size(), "One active entry is expected");
   }
 
 
