@@ -37,6 +37,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL;
+import static com.svenruppert.urlshortener.ui.vaadin.components.ExpiryBadgeFactory.computeStatusText;
+import static com.svenruppert.urlshortener.ui.vaadin.tools.UiActions.copyToClipboard;
 
 /**
  * Displays detailed information for a ShortUrlMapping.
@@ -152,9 +154,10 @@ public class DetailsDialog
     closeBtn.addClickListener(_ -> close());
     getFooter().add(closeBtn, addAliasesBtn);
 
-
     wireActions();
   }
+
+
 
   /**
    * Configures and populates all field components with the mapping values.
@@ -181,7 +184,7 @@ public class DetailsDialog
     statusPill.getElement().getThemeList().add("badge");
     statusPill.getElement().getThemeList().add("pill");
     statusPill.getElement().getThemeList().add("small");
-    var statusText = computeStatusText();
+    var statusText = computeStatusText(expiresAt);
     statusPill.setText(statusText.text());
     statusPill.getElement().getThemeList().add(statusText.theme());
 
@@ -189,7 +192,6 @@ public class DetailsDialog
     saveBtn.getElement().setAttribute("title", "Save");
     cancelBtn.getElement().setAttribute("title", "Cancel");
   }
-
 
   private Component buildExpiresRow() {
     expiresField.setLabel("Expires");
@@ -201,11 +203,6 @@ public class DetailsDialog
         new DatePickerI18n().setFirstDayOfWeek(1));
     expiresField.setStep(Duration.ofMinutes(1));
     expiresField.setWidthFull();
-    //    Button clearBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL), _ -> expiresField.clear());
-    //    clearBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
-    //    clearBtn.getElement().setAttribute("title", "Clear expiry");
-
-    //    HorizontalLayout row = new HorizontalLayout(expiresField, clearBtn);
     HorizontalLayout row = new HorizontalLayout(expiresField);
     row.setSpacing(true);
     row.setPadding(false);
@@ -214,18 +211,7 @@ public class DetailsDialog
     return row;
   }
 
-  /**
-   * Computes the expiry status label and its theme colour.
-   */
-  private Status computeStatusText() {
-    return expiresAt.map(ts -> {
-      long d = Duration.between(Instant.now(), ts).toDays();
-      if (d < 0) return new Status("Expired", "error");
-      if (d == 0) return new Status("Expires today", "warning");
-      if (d <= 3) return new Status("Expires in " + d + " days", "warning");
-      return new Status("Valid (" + d + " days left)", "success");
-    }).orElse(new Status("No expiry", "contrast"));
-  }
+
 
   /**
    * Sets up button actions and event propagation.
@@ -262,12 +248,6 @@ public class DetailsDialog
 
   }
 
-  private void copyToClipboard(String value) {
-    logger().info("copyToClipboard {}", value);
-    getUI().map(UI::getPage)
-        .ifPresent(page -> page.executeJs("navigator.clipboard.writeText($0)", value));
-  }
-
   private void switchToEdit(boolean enable) {
     tfUrl.setReadOnly(!enable);
     tfExpires.setVisible(!enable);
@@ -302,7 +282,6 @@ public class DetailsDialog
         Notifications.saved();
         fireEvent(new SavedEvent(this, item.shortCode()));
         switchToEdit(false);
-        fireEvent(new SavedEvent(this, item.shortCode()));
         close();
       } else {
         Notifications.noChanges();
@@ -312,6 +291,8 @@ public class DetailsDialog
       Notifications.operationFailed(ex);
     }
   }
+
+  // ---------- Public API
 
   private void openAddAliasesDialog(ShortUrlMapping currentMapping) {
     var client = UrlShortenerClientFactory.newInstance();
@@ -382,8 +363,6 @@ public class DetailsDialog
     }
   }
 
-  // ---------- Public API
-
   public Registration addOpenListener(ComponentEventListener<OpenEvent> l) {
     return addListener(OpenEvent.class, l);
   }
@@ -404,6 +383,8 @@ public class DetailsDialog
     return addListener(SavedEvent.class, listener);
   }
 
+  // ---------- Event classes
+
   // ---- Event API ----
   public static class SavedEvent
       extends ComponentEvent<DetailsDialog> {
@@ -419,9 +400,7 @@ public class DetailsDialog
     }
   }
 
-  private record Status(String text, String theme) { }
-
-  // ---------- Event classes
+//  private record Status(String text, String theme) { }
 
   public static class DetailsEvent
       extends ComponentEvent<DetailsDialog> {
@@ -471,4 +450,5 @@ public class DetailsDialog
       this.shortCode = sc;
     }
   }
+
 }

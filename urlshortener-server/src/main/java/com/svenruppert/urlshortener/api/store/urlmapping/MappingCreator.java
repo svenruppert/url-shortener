@@ -38,12 +38,8 @@ public final class MappingCreator
     this.errorMapper = Objects.requireNonNull(errorMapper);
   }
 
-  /**
-   * Main method: creates mapping with optional alias.
-   */
-  public Result<ShortUrlMapping> create(String alias, String url, Instant expiredAt, Boolean active) {
-    logger().info("createMapping - alias='{}' / url='{}' / expiredAt='{}'", alias, url, expiredAt);
-
+  public Result<ShortUrlMapping> create(Instant createdAt, String alias, String url, Instant expiredAt, Boolean active) {
+    logger().info("create - createdAt='{}' alias='{}' / url='{}' / expiredAt='{}'", createdAt, alias, url, expiredAt);
     final String shortCode;
     if (!isNullOrBlank(alias)) {
       var aliasCheck = AliasPolicy.validate(alias);
@@ -57,13 +53,13 @@ public final class MappingCreator
           case RESERVED -> "ALIAS_RESERVED";
         };
         var errorJson = errorMapper.apply(new ErrorInfo("400", reason.defaultMessage, reasonCode));
-        logger().warn("createMapping - {}", errorJson);
+        logger().warn("aliasCheck.failed() - createMapping - {}", errorJson);
         return Result.failure(errorJson);
       }
       var normalized = normalize(alias);
       if (exists.test(normalized)) {
         var errorJson = errorMapper.apply(new ErrorInfo("409", "normalizedAlias already in use", "ALIAS_CONFLICT"));
-        logger().warn("createMapping - {}", errorJson);
+        logger().warn("exists.test(normalized) - createMapping - {}", errorJson);
         return Result.failure(errorJson);
       }
       shortCode = normalized;
@@ -77,11 +73,21 @@ public final class MappingCreator
       }
       shortCode = gen;
     }
-    var mapping = new ShortUrlMapping(shortCode, url, Instant.now(clock), expiredAt, active);
+
+    var mapping = new ShortUrlMapping(shortCode, url, createdAt, expiredAt, active);
     logger().info("mapping to store .. {}", mapping);
     store.accept(mapping);
     logger().info("mapping stored .. {}", mapping);
     return Result.success(mapping);
+  }
+
+  /**
+   * Main method: creates mapping with optional alias.
+   */
+  public Result<ShortUrlMapping> create(String alias, String url, Instant expiredAt, Boolean active) {
+    logger().info("createMapping - alias='{}' / url='{}' / expiredAt='{}'", alias, url, expiredAt);
+    var createdAt = Instant.now(clock);
+    return create(createdAt, alias, url, expiredAt, active);
   }
 
   @FunctionalInterface

@@ -11,9 +11,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class UrlMappingListRequest {
   private String codePart;
-  //  private boolean codeCaseSensitive;
   private String urlPart;
-  //  private boolean urlCaseSensitive;
   private Instant from;
   private Instant to;
   private Integer page;
@@ -67,6 +65,14 @@ public class UrlMappingListRequest {
     return toQuery(baseParams());
   }
 
+  public String toQueryStringForExport() {
+    var q = baseParams();
+    if (size != null && size > 0) add(q, "size", size);
+    add(q, "sort", sort);
+    add(q, "dir", dir);
+    return toQuery(q);
+  }
+
   public String toQueryString() {
     var q = baseParams();
     if (page != null && page > 0) add(q, "page", page);
@@ -80,17 +86,9 @@ public class UrlMappingListRequest {
     return codePart;
   }
 
-  //  public boolean isCodeCaseSensitive() {
-  //    return codeCaseSensitive;
-  //  }
-
   public String getUrlPart() {
     return urlPart;
   }
-
-  //  public boolean isUrlCaseSensitive() {
-  //    return urlCaseSensitive;
-  //  }
 
   public Instant getFrom() {
     return from;
@@ -120,9 +118,7 @@ public class UrlMappingListRequest {
   public String toString() {
     return "UrlMappingListRequest{"
         + "codePart='" + codePart + '\''
-        //        + ", codeCaseSensitive=" + codeCaseSensitive
         + ", urlPart='" + urlPart + '\''
-        //        + ", urlCaseSensitive=" + urlCaseSensitive
         + ", from=" + from
         + ", to=" + to
         + ", page=" + page
@@ -141,20 +137,10 @@ public class UrlMappingListRequest {
       return this;
     }
 
-    //    public Builder codeCaseSensitive(boolean b) {
-    //      r.codeCaseSensitive = b;
-    //      return this;
-    //    }
-
     public Builder urlPart(String v) {
       r.urlPart = v;
       return this;
     }
-
-    //    public Builder urlCaseSensitive(boolean b) {
-    //      r.urlCaseSensitive = b;
-    //      return this;
-    //    }
 
     public Builder from(Instant v) {
       r.from = v;

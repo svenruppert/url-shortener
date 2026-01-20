@@ -5,11 +5,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 public final class ShortUrlMapping {
-  private final String shortCode;
-  private final String originalUrl;
-  private final Instant createdAt;
-  private final Instant expiresAt;
-  private final boolean active;
+  private  String shortCode;
+  private  String originalUrl;
+  private  Instant createdAt;
+  private  Instant expiresAt;
+  private  boolean active;
+
+  public ShortUrlMapping() {
+  }
 
   public ShortUrlMapping(
       String shortCode,
@@ -23,6 +26,26 @@ public final class ShortUrlMapping {
     this.createdAt = createdAt;
     this.expiresAt = expiresAt;
     this.active = active;
+  }
+
+  public String getShortCode() {
+    return shortCode;
+  }
+
+  public String getOriginalUrl() {
+    return originalUrl;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getExpiresAt() {
+    return expiresAt;
+  }
+
+  public boolean isActive() {
+    return active;
   }
 
   public String shortCode() {

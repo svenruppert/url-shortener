@@ -5,16 +5,21 @@ import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.StoreInfo;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 
-import static com.svenruppert.urlshortener.core.DefaultValues.PATH_ADMIN_STORE_INFO;
+import static com.svenruppert.urlshortener.core.DefaultValues.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class AdminClient
     implements HasLogger {
 
   private final URI serverBaseAdmin;
+
+  public AdminClient() {
+    this(ADMIN_SERVER_URL);
+  }
 
   public AdminClient(String serverBaseUrlAdmin) {
     var urlToServerAdmin = serverBaseUrlAdmin.endsWith("/")
@@ -28,7 +33,7 @@ public class AdminClient
   public StoreInfo getStoreInfo()
       throws java.io.IOException {
     URL url = serverBaseAdmin.resolve(PATH_ADMIN_STORE_INFO).toURL();
-    var con = (java.net.HttpURLConnection) url.openConnection();
+    var con = (HttpURLConnection) url.openConnection();
     con.setRequestMethod("GET");
     con.setConnectTimeout(3000);
     con.setReadTimeout(3000);

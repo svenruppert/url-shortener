@@ -3,17 +3,23 @@ package com.svenruppert.urlshortener.api;
 import com.sun.net.httpserver.HttpServer;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.filter.BlockBrowserPreflightFilter;
-import com.svenruppert.urlshortener.api.handler.*;
-import com.svenruppert.urlshortener.api.handler.admin.*;
+import com.svenruppert.urlshortener.api.handler.RedirectHandler;
+import com.svenruppert.urlshortener.api.handler.admin.StoreInfoHandler;
 import com.svenruppert.urlshortener.api.handler.admin.columns.ColumnVisibilityBulkHandler;
 import com.svenruppert.urlshortener.api.handler.admin.columns.ColumnVisibilityHandler;
 import com.svenruppert.urlshortener.api.handler.admin.columns.ColumnVisibilitySingleHandler;
 import com.svenruppert.urlshortener.api.handler.urlmapping.*;
+import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportApplyHandler;
+import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportConflictsListHandler;
+import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportInvalidListHandler;
+import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportValidateHandler;
+import com.svenruppert.urlshortener.api.store.imports.ImportStagingStore;
+import com.svenruppert.urlshortener.api.store.imports.InMemoryImportStagingStore;
 import com.svenruppert.urlshortener.api.store.preferences.PreferencesStore;
-import com.svenruppert.urlshortener.api.store.provider.inmemory.InMemoryPreferencesStore;
-import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 import com.svenruppert.urlshortener.api.store.provider.eclipsestore.EclipseStore;
+import com.svenruppert.urlshortener.api.store.provider.inmemory.InMemoryPreferencesStore;
 import com.svenruppert.urlshortener.api.store.provider.inmemory.InMemoryUrlMappingStore;
+import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -74,6 +80,7 @@ public class ShortenerServer
 
     UrlMappingStore urlMappingStore;
     PreferencesStore preferencesStore;
+    ImportStagingStore importStagingStore = new InMemoryImportStagingStore();
 
     if (persistent) {
       var eclipseStore = new EclipseStore(
@@ -113,12 +120,16 @@ public class ShortenerServer
     serverAdmin.createContext(PATH_ADMIN_TOGGLE_ACTIVE, new ToggleActiveHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_STORE_INFO, new StoreInfoHandler(urlMappingStore, startedAt)).getFilters().add(new BlockBrowserPreflightFilter());
 
-    serverAdmin.createContext(PATH_ADMIN_PREFERENCES_COLUMNS,        new ColumnVisibilityHandler(preferencesStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_PREFERENCES_COLUMNS_EDIT,   new ColumnVisibilityBulkHandler(preferencesStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_IMPORT_VALIDATE, new ImportValidateHandler(urlMappingStore, importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_IMPORT_APPLY, new ImportApplyHandler(urlMappingStore, importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_IMPORT_CONFLICTS, new ImportConflictsListHandler(importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_IMPORT_INVALID, new ImportInvalidListHandler(importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
+
+
+
+    serverAdmin.createContext(PATH_ADMIN_PREFERENCES_COLUMNS, new ColumnVisibilityHandler(preferencesStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_PREFERENCES_COLUMNS_EDIT, new ColumnVisibilityBulkHandler(preferencesStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_PREFERENCES_COLUMNS_SINGLE, new ColumnVisibilitySingleHandler(preferencesStore)).getFilters().add(new BlockBrowserPreflightFilter());
-
-
-
 
 
     var execRedirect = Executors.newVirtualThreadPerTaskExecutor();

@@ -7,6 +7,10 @@ import com.svenruppert.urlshortener.core.urlmapping.ToggleActive.ToggleActiveRes
 import java.time.Instant;
 
 public interface UrlMappingUpdater {
+
+
+  Result<ShortUrlMapping> createMapping(Instant createdAt, String shortCode, String originalUrl, Instant expiredAt, Boolean active);
+
   Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt, Boolean active);
 
   Result<ShortUrlMapping> editMapping(String alias, String url, Instant expiredAt, Boolean active);

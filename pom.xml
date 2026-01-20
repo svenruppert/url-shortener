@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
@@ -8,7 +8,7 @@
     <parent>
         <groupId>com.svenruppert</groupId>
         <artifactId>dependencies</artifactId>
-        <version>06.00.13</version>
+        <version>06.00.14</version>
     </parent>
 
     <groupId>com.svenruppert.urlshortener</groupId>
@@ -186,6 +186,17 @@
                 <artifactId>serializer</artifactId>
                 <version>3.0.1</version>
             </dependency>
+
+            <dependency>
+                <groupId>tools.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>3.0.3</version>
+            </dependency>
+            <dependency>
+                <groupId>tools.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>3.0.3</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -306,9 +317,9 @@
 
                 </dependencies>
                 <configuration>
-                    <threads>2</threads>
+                    <threads>1</threads>
                     <outputFormats>
-                        <outputFormat>XML</outputFormat>
+<!--                        <outputFormat>XML</outputFormat>-->
                         <outputFormat>HTML</outputFormat>
                     </outputFormats>
                     <targetClasses>
@@ -438,46 +449,46 @@
                 </plugins>
             </build>
         </profile>
-<!--        <profile>-->
-<!--            <id>_shadejar</id>-->
-<!--            <build>-->
-<!--                <finalName>application</finalName>-->
-<!--                <plugins>-->
-<!--                    <plugin>-->
-<!--                        <groupId>org.apache.maven.plugins</groupId>-->
-<!--                        <artifactId>maven-shade-plugin</artifactId>-->
-<!--                        <configuration>-->
-<!--                            <transformers>-->
-<!--                                <transformer-->
-<!--                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">-->
-<!--                                    <mainClass>${app.main.class}-->
-<!--                                    </mainClass> &lt;!&ndash; Here you should put the main class of your application &ndash;&gt;-->
-<!--                                </transformer>-->
-<!--                            </transformers>-->
-<!--                            <filters>-->
-<!--                                <filter> &lt;!&ndash; This filter is needed to avoid a bug in the shade plugin &ndash;&gt;-->
-<!--                                    <artifact>*:*</artifact>-->
-<!--                                    <excludes>-->
-<!--                                        <exclude>META-INF/*.SF</exclude>-->
-<!--                                        <exclude>META-INF/*.DSA</exclude>-->
-<!--                                        <exclude>META-INF/*.RSA</exclude>-->
-<!--                                    </excludes>-->
-<!--                                </filter>-->
-<!--                            </filters>-->
-<!--                        </configuration>-->
-<!--                        <executions>-->
-<!--                            <execution>-->
-<!--                                <phase>package</phase>-->
-<!--                                <goals>-->
-<!--                                    <goal>shade</goal>-->
-<!--                                </goals>-->
-<!--                            </execution>-->
-<!--                        </executions>-->
-<!--                    </plugin>-->
-<!--                </plugins>-->
-<!--            </build>-->
+        <!--        <profile>-->
+        <!--            <id>_shadejar</id>-->
+        <!--            <build>-->
+        <!--                <finalName>application</finalName>-->
+        <!--                <plugins>-->
+        <!--                    <plugin>-->
+        <!--                        <groupId>org.apache.maven.plugins</groupId>-->
+        <!--                        <artifactId>maven-shade-plugin</artifactId>-->
+        <!--                        <configuration>-->
+        <!--                            <transformers>-->
+        <!--                                <transformer-->
+        <!--                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">-->
+        <!--                                    <mainClass>${app.main.class}-->
+        <!--                                    </mainClass> &lt;!&ndash; Here you should put the main class of your application &ndash;&gt;-->
+        <!--                                </transformer>-->
+        <!--                            </transformers>-->
+        <!--                            <filters>-->
+        <!--                                <filter> &lt;!&ndash; This filter is needed to avoid a bug in the shade plugin &ndash;&gt;-->
+        <!--                                    <artifact>*:*</artifact>-->
+        <!--                                    <excludes>-->
+        <!--                                        <exclude>META-INF/*.SF</exclude>-->
+        <!--                                        <exclude>META-INF/*.DSA</exclude>-->
+        <!--                                        <exclude>META-INF/*.RSA</exclude>-->
+        <!--                                    </excludes>-->
+        <!--                                </filter>-->
+        <!--                            </filters>-->
+        <!--                        </configuration>-->
+        <!--                        <executions>-->
+        <!--                            <execution>-->
+        <!--                                <phase>package</phase>-->
+        <!--                                <goals>-->
+        <!--                                    <goal>shade</goal>-->
+        <!--                                </goals>-->
+        <!--                            </execution>-->
+        <!--                        </executions>-->
+        <!--                    </plugin>-->
+        <!--                </plugins>-->
+        <!--            </build>-->
 
-<!--        </profile>-->
+        <!--        </profile>-->
 
 
     </profiles>

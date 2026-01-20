@@ -1,9 +1,6 @@
 package com.svenruppert.urlshortener.api.utils;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -58,4 +55,21 @@ public final class RequestBodyUtils {
       return sb.toString();
     }
   }
+
+  public static byte[] readBodyBytes(InputStream in, int maxBytes) throws IOException {
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    byte[] buf = new byte[8192];
+    int read;
+    int total = 0;
+
+    while ((read = in.read(buf)) != -1) {
+      total += read;
+      if (total > maxBytes) {
+        throw new IOException("Request body too large (" + total + " bytes). Limit is " + maxBytes);
+      }
+      bos.write(buf, 0, read);
+    }
+    return bos.toByteArray();
+  }
+
 }

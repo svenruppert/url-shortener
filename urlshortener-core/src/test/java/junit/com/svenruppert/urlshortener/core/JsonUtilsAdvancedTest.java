@@ -1,9 +1,10 @@
 package junit.com.svenruppert.urlshortener.core;
 
+import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.core.JsonUtils;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenResponse;
-import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -15,36 +16,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class JsonUtilsAdvancedTest {
-
-  @Nested
-  class EscapeUnescape {
-    @Test
-    void roundTrip_ascii_and_quotes() {
-      String original = "simple \"quoted\" \\ text";
-      String escaped = JsonUtils.escape(original);
-      assertEquals("simple \\\"quoted\\\" \\\\ text", escaped);
-      String unescaped = JsonUtils.unescape(escaped);
-      assertEquals(original, unescaped);
-    }
-
-    @Test
-    void escape_controls_and_unicode() {
-      String s = "\b\f\n\r\t\u20ac and snowman: \u2603"; // note: already escaped literals
-      // Build raw containing those control chars and unicode
-      String raw = "\b\f\n\r\t" + '€' + " and snowman: " + '\u2603';
-      String escaped = JsonUtils.escape(raw);
-      assertTrue(escaped.contains("\\b"));
-      assertTrue(escaped.contains("\\f"));
-      assertTrue(escaped.contains("\\n"));
-      assertTrue(escaped.contains("\\r"));
-      assertTrue(escaped.contains("\\t"));
-      // non-ASCII should be encoded as \\uXXXX
-      assertTrue(escaped.contains("\\u20ac"));
-      assertTrue(escaped.contains("\\u2603"));
-      assertEquals(raw, JsonUtils.unescape(escaped));
-    }
-  }
+class JsonUtilsAdvancedTest
+    implements HasLogger {
 
   @Test
   void toJsonArrayOfObjects_handles_nulls_and_order() {
@@ -73,24 +46,54 @@ class JsonUtilsAdvancedTest {
   }
 
   @Nested
+  class EscapeUnescape {
+    @Test
+    void roundTrip_ascii_and_quotes() {
+      String original = "simple \"quoted\" \\ text";
+      String escaped = JsonUtils.escape(original);
+      assertEquals("simple \\\"quoted\\\" \\\\ text", escaped);
+      String unescaped = JsonUtils.unescape(escaped);
+      assertEquals(original, unescaped);
+    }
+
+    @Test
+    void escape_controls_and_unicode() {
+      String raw = "\b\f\n\r\t" + '€' + " and snowman: " + '\u2603';
+      String escaped = JsonUtils.escape(raw);
+
+      assertTrue(escaped.contains("\\b"));
+      assertTrue(escaped.contains("\\f"));
+      assertTrue(escaped.contains("\\n"));
+      assertTrue(escaped.contains("\\r"));
+      assertTrue(escaped.contains("\\t"));
+      assertTrue(escaped.contains("\\u20ac"));
+      assertTrue(escaped.contains("\\u2603"));
+      assertEquals(raw, JsonUtils.unescape(escaped));
+    }
+
+  }
+
+  @Nested
   class DTOJson {
     @Test
     void toJson_ShortenRequest_and_fromJson_roundtrip() {
       ShortenRequest req = new ShortenRequest("https://example.com?q=1", "alias-01", null, true);
       String json = JsonUtils.toJson(req);
+
       assertTrue(json.contains("\"url\":\"https://example.com?q=1\""));
-      assertTrue(json.contains("\"alias\":\"alias-01\""));
+      assertTrue(json.contains("\"shortURL\":\"alias-01\""));
 
       ShortenRequest parsed = JsonUtils.fromJson(json, ShortenRequest.class);
       assertEquals(req.getUrl(), parsed.getUrl());
       assertEquals(req.getShortURL(), parsed.getShortURL());
     }
 
+
     @Test
     void fromJson_invalid_missing_url_throws() {
       String invalid = "{\"alias\":\"x\"}";
       IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-          () -> JsonUtils.fromJson(invalid, ShortenRequest.class));
+                                                 () -> JsonUtils.fromJson(invalid, ShortenRequest.class));
       assertTrue(ex.getMessage().toLowerCase().contains("url"));
     }
 
@@ -98,18 +101,30 @@ class JsonUtilsAdvancedTest {
     void toJson_ShortenResponse_and_ShortUrlMapping() {
       ShortenResponse res = new ShortenResponse("sc", "https://e");
       String resJson = JsonUtils.toJson(res);
+      logger().info("toJson_ShortenResponse_and_ShortUrlMapping - resJson - {}", resJson);
       assertEquals("{\"shortCode\":\"sc\",\"originalUrl\":\"https://e\"}", resJson);
 
-      ShortUrlMapping map = new ShortUrlMapping("sc",
-                                                "https://e",
-                                                Instant.parse("2020-01-01T00:00:00Z"),
-                                                null,
-                                                true);
+
+
+      ShortUrlMapping map = new ShortUrlMapping(
+          "sc",
+          "https://e",
+          Instant.parse("2020-01-01T00:00:00Z"),
+          null,
+          true
+      );
+
       String mapJson = JsonUtils.toJson(map);
+      logger().info("toJson_ShortenResponse_and_ShortUrlMapping - mapJson - {}", mapJson);
       assertTrue(mapJson.contains("\"shortCode\":\"sc\""));
       assertTrue(mapJson.contains("\"originalUrl\":\"https://e\""));
-      assertTrue(mapJson.contains("\"alias\":\"sc\""));
+
+      // alias fällt weg (Option 1)
+      assertFalse(mapJson.contains("\"shortURL\""));
+
+      // createdAt nur prüfen, wenn es wirklich als JSON-Feld existieren soll
       assertTrue(mapJson.contains("\"createdAt\":\"2020-01-01T00:00:00Z\""));
     }
+
   }
 }
