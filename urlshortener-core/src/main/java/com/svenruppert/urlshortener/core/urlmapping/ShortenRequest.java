@@ -9,6 +9,9 @@ public final class ShortenRequest {
   private Instant expiresAt;
   private Boolean active;
 
+  public ShortenRequest() {
+  }
+
   public ShortenRequest(String url, String shortURL, Instant expiresAt, Boolean active) {
     this.url = url;
     this.shortURL = shortURL;

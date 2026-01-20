@@ -12,7 +12,6 @@ import java.io.IOException;
 
 import static com.svenruppert.dependencies.core.net.HttpStatus.OK;
 import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
-import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
 
 public final class StoreInfoHandler
     implements HttpHandler, HasLogger {
@@ -37,10 +36,9 @@ public final class StoreInfoHandler
     logger().info("amount of mappings in db {}", mappings);
 
     var info = new StoreInfo(mode, mappings, startedAtMs);
-    var responseJson = toJson(info);
-    logger().info("responseJson {}", responseJson);
+    logger().info("responseJson {}", info);
 
-    writeJson(ex, OK, responseJson);
+    writeJson(ex, OK, info);
   }
 }
 

@@ -5,17 +5,16 @@ import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.functional.model.Result;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
+import com.svenruppert.urlshortener.api.utils.ErrorResponses;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
+import com.svenruppert.urlshortener.api.utils.SuccessResponses;
 import com.svenruppert.urlshortener.core.urlmapping.ToggleActive.ToggleActiveRequest;
 import com.svenruppert.urlshortener.core.urlmapping.ToggleActive.ToggleActiveResponse;
 
 import java.io.IOException;
 
-import static com.svenruppert.dependencies.core.net.HttpStatus.*;
-import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
 import static com.svenruppert.urlshortener.api.utils.RequestBodyUtils.readBody;
 import static com.svenruppert.urlshortener.core.JsonUtils.fromJson;
-import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
 import static com.svenruppert.urlshortener.core.StringUtils.isNullOrBlank;
 
 /**
@@ -52,7 +51,7 @@ public class ToggleActiveHandler
       ToggleActiveRequest req = fromJson(body, ToggleActiveRequest.class);
       var shortCode = req.shortCode();
       if (isNullOrBlank(shortCode)) {
-        writeJson(ex, BAD_REQUEST, "Missing 'shortCode'");
+        ErrorResponses.badRequest(ex, "Missing 'shortCode'");
         return;
       }
       boolean newActiveValue = req.active();
@@ -61,15 +60,15 @@ public class ToggleActiveHandler
 
       if (mapping.isPresent()) {
         logger().info("Toggling active status successfully");
-        writeJson(ex, OK, toJson(mapping.get()));
+        SuccessResponses.ok(ex, mapping.get());
       } else {
         mapping.
             ifFailed(failed -> logger().info("Toggling active status failed: {}", failed));
-        writeJson(ex, BAD_REQUEST, "Toggling active status failed");
+        ErrorResponses.invalidParameter(ex, "Toggling active status failed");
       }
     } catch (RuntimeException e) {
       logger().warn("catch - {}", e.toString());
-      writeJson(ex, INTERNAL_SERVER_ERROR);
+      ErrorResponses.internalServerError(ex, e);
     } finally {
       logger().info("ToggleActiveHandler .. finally");
       ex.close();

@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ColumnVisibilityClientIT {
 
+  protected static final String VIEW_ID = "overview";
   private ShortenerServer server;
   private PreferencesStore store;
   private ColumnVisibilityClient client;
@@ -41,7 +42,7 @@ class ColumnVisibilityClientIT {
       throws Exception {
 
     // initial load → empty
-    var viewId = "overview";
+    var viewId = VIEW_ID;
     var userId = "u1";
     var m0 = client.load(userId, viewId);
     assertTrue(m0.isEmpty());
@@ -73,20 +74,21 @@ class ColumnVisibilityClientIT {
       throws Exception {
 
     // set two keys
-    client.editBulk("u2", "overview", Map.of("hits", true, "owner", false));
-    var m1 = client.load("u2", "overview");
+    var userId = "u2";
+    client.editBulk(userId, VIEW_ID, Map.of("hits", true, "owner", false));
+    var m1 = client.load(userId, VIEW_ID);
     assertEquals(Boolean.TRUE, m1.get("hits"));
     assertEquals(Boolean.FALSE, m1.get("owner"));
 
     // delete 'owner'
-    client.deleteSingle("u2", "overview", "owner");
-    var m2 = client.load("u2", "overview");
+    client.deleteSingle(userId, VIEW_ID, "owner");
+    var m2 = client.load(userId, VIEW_ID);
     assertEquals(Boolean.TRUE, m2.get("hits"));
     assertNull(m2.get("owner"));
 
     // delete again → should not fail
-    client.deleteSingle("u2", "overview", "owner");
-    var m3 = client.load("u2", "overview");
+    client.deleteSingle(userId, VIEW_ID, "owner");
+    var m3 = client.load(userId, VIEW_ID);
     assertEquals(Boolean.TRUE, m3.get("hits"));
     assertNull(m3.get("owner"));
   }
@@ -94,6 +96,6 @@ class ColumnVisibilityClientIT {
   @Test
   void bulkEdit_withEmptyChanges_throwsIAE() {
     assertThrows(IllegalArgumentException.class,
-                 () -> client.editBulk("u3", "overview", Map.of()));
+                 () -> client.editBulk("u3", VIEW_ID, Map.of()));
   }
 }

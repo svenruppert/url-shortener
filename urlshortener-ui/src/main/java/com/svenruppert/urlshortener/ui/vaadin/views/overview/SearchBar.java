@@ -44,12 +44,11 @@ public class SearchBar
   private final ComboBox<String> dir = new ComboBox<>("Direction");
   private final Select<ActiveState> activeState = new Select<>();
   private final Button resetBtn = new Button("Reset", new Icon(VaadinIcon.ROTATE_LEFT));
-  private final OverviewView holdingComponent;
-  private boolean suppressRefresh = false;
+  private final OverviewView guardOwner;
   private Details advanced;
 
-  public SearchBar(OverviewView holdingComponent) {
-    this.holdingComponent = holdingComponent;
+  public SearchBar(OverviewView guardOwner) {
+    this.guardOwner = guardOwner;
     container().add(buildSearchBar());
     addShortCuts();
     addListeners();
@@ -79,12 +78,12 @@ public class SearchBar
     codePart.setPlaceholder("e.g. ex-");
     codePart.setValueChangeMode(LAZY);
     codePart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
-    codePart.addValueChangeListener(_ -> holdingComponent.safeRefresh());
+    codePart.addValueChangeListener(_ -> safeRefresh());
 
     urlPart.setPlaceholder("e.g. docs");
     urlPart.setValueChangeMode(LAZY);
     urlPart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
-    urlPart.addValueChangeListener(_ -> holdingComponent.safeRefresh());
+    urlPart.addValueChangeListener(_ -> safeRefresh());
 
     sortBy.setItems("createdAt", "shortCode", "originalUrl", "expiresAt");
     dir.setItems("asc", "desc");
@@ -157,8 +156,8 @@ public class SearchBar
 
   private void addListeners() {
     activeState.addValueChangeListener(_ -> {
-      holdingComponent.setCurrentPage(1);
-      holdingComponent.safeRefresh();
+      guardOwner.setCurrentPage(1);
+      safeRefresh();
     });
 
     globalSearch.addValueChangeListener(e -> {
@@ -185,9 +184,9 @@ public class SearchBar
 
 
     pageSize.addValueChangeListener(e -> {
-      holdingComponent.setCurrentPage(1);
-      holdingComponent.setGridPageSize(e.getValue());
-      holdingComponent.safeRefresh();
+      guardOwner.setCurrentPage(1);
+      guardOwner.setGridPageSize(e.getValue());
+      safeRefresh();
     });
 
     advanced.addOpenedChangeListener(ev -> {
@@ -202,9 +201,9 @@ public class SearchBar
     resetBtn.addClickListener(_ -> {
       try (var _ = withRefreshGuard(true)) {
         resetElements();
-        holdingComponent.setCurrentPage(1);
+        guardOwner.setCurrentPage(1);
       } catch (Exception e) {
-        throw new RuntimeException(e);
+        logger().warn("resetBtn.addClickListener .. failed {}", e.getMessage());
       }
     });
 
@@ -262,7 +261,7 @@ public class SearchBar
       setSimpleSearchEnabled(true);
       globalSearch.focus();
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      logger().warn("applyAdvancedToSimpleAndReset failed .. {}", e.getMessage());
     }
   }
 
@@ -272,7 +271,8 @@ public class SearchBar
     ActiveState activeStateValue = activeState.getValue();
     logger().info("buildFilter - activeState == {}", activeStateValue);
     if (activeStateValue != null && activeStateValue.isSet()) {
-      b.active(activeStateValue.toBoolean());
+      var activeStateValueBoolean = activeStateValue.toBoolean();
+      b.active(Boolean.TRUE.equals(activeStateValueBoolean));
     }
     if (codePart.getValue() != null && !codePart.getValue().isBlank()) {
       b.codePart(codePart.getValue());
@@ -349,16 +349,16 @@ public class SearchBar
 
   @Override
   public boolean isRefreshSuppressed() {
-    return suppressRefresh;
+    return guardOwner.isRefreshSuppressed();
   }
 
   @Override
   public void setRefreshSuppressed(boolean suppressed) {
-    this.suppressRefresh = suppressed;
+    guardOwner.setRefreshSuppressed(suppressed);
   }
 
   @Override
   public void safeRefresh() {
-
+    guardOwner.safeRefresh();
   }
 }

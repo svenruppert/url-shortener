@@ -9,11 +9,9 @@ import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.svenruppert.urlshortener.ui.vaadin.components.ColumnVisibilityDialog;
 import com.svenruppert.urlshortener.ui.vaadin.events.MappingCreatedOrChanged;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
-import com.svenruppert.urlshortener.ui.vaadin.tools.ColumnVisibilityClientFactory;
-import com.svenruppert.urlshortener.ui.vaadin.tools.ColumnVisibilityService;
-import com.svenruppert.urlshortener.ui.vaadin.tools.HasRefreshGuard;
-import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
+import com.svenruppert.urlshortener.ui.vaadin.tools.*;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
+import com.svenruppert.urlshortener.ui.vaadin.views.overview.imports.ImportDialog;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -26,15 +24,17 @@ import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.data.provider.CallbackDataProvider;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.streams.DownloadHandler;
+import com.vaadin.flow.server.streams.DownloadResponse;
 
 import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -43,8 +43,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static com.svenruppert.urlshortener.core.DefaultValues.PATTERN_DATE_TIME;
-import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL;
+import static com.svenruppert.urlshortener.core.DefaultValues.*;
+import static com.svenruppert.urlshortener.ui.vaadin.components.ExpiryBadgeFactory.computeStatusText;
 import static com.vaadin.flow.component.button.ButtonVariant.LUMO_ERROR;
 import static com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY_INLINE;
 import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CENTER;
@@ -57,10 +57,7 @@ public class OverviewView
 
   public static final String PATH = "";
   protected static final int VALUE_CHANGE_TIMEOUT = 400;
-  private static final DateTimeFormatter DATE_TIME_FMT =
-      DateTimeFormatter.ofPattern(PATTERN_DATE_TIME)
-          .withLocale(Locale.GERMANY)
-          .withZone(ZoneId.systemDefault());
+  private static final DateTimeFormatter DATE_TIME_FMT = DateTimeFormatter.ofPattern(PATTERN_DATE_TIME).withLocale(Locale.GERMANY).withZone(ZoneId.systemDefault());
   private final URLShortenerClient urlShortenerClient = UrlShortenerClientFactory.newInstance();
   private final ColumnVisibilityClient columnVisibilityClient = ColumnVisibilityClientFactory.newInstance();
   //TODO  Initialize Column Visibility Client/Service (User ID later from security context)
@@ -72,11 +69,17 @@ public class OverviewView
   private final Button prevBtn = new Button("‹ Prev");
   private final Button nextBtn = new Button("Next ›");
   private final Text pageInfo = new Text("");
-  private Integer currentPage = 1;
+
+  private final Button btnExport = new Button("Export", new Icon(VaadinIcon.DOWNLOAD));
+  private final Anchor exportAnchor = initAnchor();
+  private final Button btnImport = new Button("Import", new Icon(VaadinIcon.UPLOAD));
+
+
+  private Integer currentPage = 1;  // hidden, used to trigger browser download
   private Integer totalCount = 0;
   private CallbackDataProvider<ShortUrlMapping, Void> dataProvider;
   private AutoCloseable subscription;
-  private boolean suppressRefresh = false;
+  private volatile boolean suppressRefresh = false;
 
   public OverviewView() {
     setSizeFull();
@@ -85,13 +88,28 @@ public class OverviewView
     add(new H2("URL Shortener – Overview"));
     initDataProvider();
 
-    var pagingBar = new HorizontalLayout(prevBtn, nextBtn, pageInfo, btnSettings);
+
+    btnExport.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    btnExport.getElement().setAttribute("title", "Export current result set as ZIP");
+    btnExport.addClickListener(_ -> triggerExportDownload());
+
+    btnImport.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    btnImport.addClickListener(_ -> new ImportDialog(urlShortenerClient, this::safeRefresh).open());
+
+
+    var pagingBar = new HorizontalLayout(prevBtn, nextBtn, pageInfo, btnImport, btnExport, btnSettings);
+
     pagingBar.setDefaultVerticalComponentAlignment(CENTER);
+
     HorizontalLayout bottomBar = new HorizontalLayout(new Span(), pagingBar);
     bottomBar.setWidthFull();
     bottomBar.expand(bottomBar.getComponentAt(0));
     bottomBar.setAlignItems(CENTER);
-    VerticalLayout container = new VerticalLayout(searchBar, bottomBar);
+
+
+    VerticalLayout container = new VerticalLayout(searchBar, bottomBar, exportAnchor);
+    //    VerticalLayout container = new VerticalLayout(searchBar, bottomBar);
+
     container.setPadding(false);
     container.setSpacing(true);
     container.setWidthFull();
@@ -112,14 +130,45 @@ public class OverviewView
     }
   }
 
+  private Anchor initAnchor() {
+    DownloadHandler downloadHandler = DownloadHandler.fromInputStream(event -> {
+      int chunkSize = Optional.ofNullable(searchBar.getPageSize()).orElse(500);
+      chunkSize = Math.max(1, Math.min(500, chunkSize));
+      UrlMappingListRequest filter = searchBar.buildFilter(1, chunkSize);
+      URLShortenerClient.ExportZipDownload download = urlShortenerClient.exportAllAsZipDownload(filter);
+      return new DownloadResponse(download.inputStreamFactory().get(), download.filename(), APPLICATION_ZIP, -1);
+    }).whenStart(() -> {
+      Notification.show("Download started", 3000, Notification.Position.BOTTOM_START);
+    }).whenComplete(success -> {
+      if (success) {
+        Notification.show("Download completed", 3000, Notification.Position.BOTTOM_START).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+      } else {
+        Notification.show("Download failed", 3000, Notification.Position.BOTTOM_START).addThemeVariants(NotificationVariant.LUMO_ERROR);
+      }
+    });
+
+    var anchor = new Anchor(downloadHandler, "XXX_DOWNLOAD_XXX");
+    anchor.getStyle().set("display", "none");
+    anchor.getElement().setAttribute("download", true);
+    return anchor;
+  }
+
+  private void triggerExportDownload() {
+    try {
+      exportAnchor.getElement().callJsFunction("click");
+
+    } catch (Exception ex) {
+      logger().warn("Export failed", ex);
+      Notifications.operationFailed(ex);
+    }
+  }
+
   private void addListeners() {
-    ComponentUtil.addListener(UI.getCurrent(),
-                              MappingCreatedOrChanged.class,
-                              _ -> {
-                                logger().info("Received MappingCreatedOrChanged -> refreshing overview");
-                                refreshPageInfo();
-                                safeRefresh();
-                              });
+    ComponentUtil.addListener(UI.getCurrent(), MappingCreatedOrChanged.class, _ -> {
+      logger().info("Received MappingCreatedOrChanged -> refreshing overview");
+      refreshPageInfo();
+      safeRefresh();
+    });
 
     grid.addSelectionListener(event -> {
       var all = event.getAllSelectedItems();
@@ -130,7 +179,7 @@ public class OverviewView
       if (hasSelection) {
         int count = all.size();
         String label = count == 1 ? "link selected" : "links selected";
-        bulkBar.selectionInfoText(count + " " + label + " on page " + currentPage);
+        bulkBar.selectionInfoText(count + " " + label);
       } else {
         bulkBar.selectionInfoText("");
       }
@@ -162,36 +211,28 @@ public class OverviewView
     var current = UI.getCurrent();
 
     current.addShortcutListener(_ -> {
-                                  if (!grid.getSelectedItems().isEmpty()) {
-                                    bulkBar.confirmBulkDeleteSelected();
-                                  }
-                                },
-                                Key.DELETE);
+      if (!grid.getSelectedItems().isEmpty()) {
+        bulkBar.confirmBulkDeleteSelected();
+      }
+    }, Key.DELETE);
   }
 
   @Override
   protected void onAttach(AttachEvent attachEvent) {
     super.onAttach(attachEvent);
     try (var _ = withRefreshGuard(false)) {
-      var keys = grid
-          .getColumns()
-          .stream()
-          .map(Grid.Column::getKey)
-          .filter(Objects::nonNull)
-          .toList();
+      var keys = grid.getColumns().stream().map(Grid.Column::getKey).filter(Objects::nonNull).toList();
 
       var vis = columnVisibilityService.mergeWithDefaults(keys);
-      grid.getColumns()
-          .forEach(c -> {
-            var k = c.getKey();
-            if (k != null) c.setVisible(vis.getOrDefault(k, true));
-          });
+      grid.getColumns().forEach(c -> {
+        var k = c.getKey();
+        if (k != null) c.setVisible(vis.getOrDefault(k, true));
+      });
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
 
-    subscription = StoreEvents.subscribe(_ -> getUI()
-        .ifPresent(ui -> ui.access(this::safeRefresh)));
+    subscription = StoreEvents.subscribe(_ -> getUI().ifPresent(ui -> ui.access(this::safeRefresh)));
   }
 
   @Override
@@ -205,7 +246,6 @@ public class OverviewView
       subscription = null;
     }
   }
-
 
   private void configureGrid() {
     logger().info("configureGrid..");
@@ -221,151 +261,103 @@ public class OverviewView
     configureColumActions();
 
     grid.addItemDoubleClickListener(ev -> openDetailsDialog(ev.getItem()));
-    grid.addItemClickListener(ev -> {
-      if (ev.getClickCount() == 2) openDetailsDialog(ev.getItem());
-    });
     grid.getElement().addEventListener("keydown", _ -> {
       grid.getSelectedItems().stream().findFirst().ifPresent(this::openDetailsDialog);
     }).setFilter("event.key === 'Enter'");
 
     GridContextMenu<ShortUrlMapping> menu = new GridContextMenu<>(grid);
-    menu.addItem("Show details", e -> e.getItem()
-        .ifPresent(this::openDetailsDialog));
-    menu.addItem("Open URL", e -> e.getItem()
-        .ifPresent(m ->
-                       UI.getCurrent().getPage().open(m.originalUrl(), "_blank")));
-    menu.addItem("Copy shortcode", e -> e.getItem()
-        .ifPresent(m ->
-                       UI.getCurrent().getPage().executeJs("navigator.clipboard.writeText($0)", m.shortCode())));
-    menu.addItem("Delete…", e -> e.getItem()
-        .ifPresent(m -> confirmDelete(m.shortCode())));
+    menu.addItem("Show details", e -> e.getItem().ifPresent(this::openDetailsDialog));
+    menu.addItem("Open URL", e -> e.getItem().ifPresent(m -> UI.getCurrent().getPage().open(m.originalUrl(), "_blank")));
+    menu.addItem("Copy shortcode", e -> e.getItem().ifPresent(m -> UiActions.copyToClipboard(m.shortCode())));
+    menu.addItem("Delete…", e -> e.getItem().ifPresent(m -> confirmDelete(m.shortCode())));
   }
 
   private void configureColumActions() {
-    grid.addComponentColumn(this::buildGridRowActions)
-        .setHeader("Actions")
-        .setKey("actions")
-        .setAutoWidth(true)
-        .setFlexGrow(0)
-        .setResizable(true);
+    grid.addComponentColumn(this::buildGridRowActions).setHeader("Actions").setKey("actions").setAutoWidth(true).setFlexGrow(0).setResizable(true);
   }
 
   private void configureColumExpires() {
     grid.addComponentColumn(m -> {
-          var pill = new Span(m.expiresAt()
-                                  .map(ts -> {
-                                    var days = Duration.between(Instant.now(), ts).toDays();
-                                    if (days < 0) return "Expired";
-                                    if (days == 0) return "Today";
-                                    return "in " + days + " days";
-                                  })
-                                  .orElse("No expiry"));
-          pill.getElement().getThemeList().add("badge pill small");
 
-          m.expiresAt()
-              .ifPresent(ts -> {
-                long d = Duration.between(Instant.now(), ts).toDays();
-                if (d < 0) pill.getElement().getThemeList().add("error");
-                else if (d <= 3) pill.getElement().getThemeList().add("warning");
-                else pill.getElement().getThemeList().add("success");
-              });
-          return pill;
-        })
-        .setHeader("Expires")
-        .setKey("expires")
-        .setAutoWidth(true)
-        .setResizable(true)
-        .setFlexGrow(0);
+      //          var noExpiry = m.expiresAt()
+      //              .map(ts -> {
+      //                var days = Duration.between(Instant.now(), ts).toDays();
+      //                if (days < 0) return "Expired";
+      //                if (days == 0) return "Today";
+      //                return "in " + days + " days";
+      //              })
+      //              .orElse("No expiry");
+      var statusText = computeStatusText(m.expiresAt());
+      var pill = new Span();
+      pill.setText(statusText.text());
+      pill.getElement().getThemeList().add("badge pill small");
+      pill.getElement().getThemeList().add(statusText.theme());
+      //          m.expiresAt()
+      //              .ifPresent(ts -> {
+      //                long d = Duration.between(Instant.now(), ts).toDays();
+      //                if (d < 0) pill.getElement().getThemeList().add("error");
+      //                else if (d <= 3) pill.getElement().getThemeList().add("warning");
+      //                else pill.getElement().getThemeList().add("success");
+      //              });
+      return pill;
+    }).setHeader("Expires").setKey("expires").setAutoWidth(true).setResizable(true).setFlexGrow(0);
   }
 
   private void configureColumActive() {
     grid.addComponentColumn(m -> {
-          Icon icon = m.active()
-              ? VaadinIcon.CHECK_CIRCLE.create()
-              : VaadinIcon.CLOSE_CIRCLE.create();
+      Icon icon = m.active() ? VaadinIcon.CHECK_CIRCLE.create() : VaadinIcon.CLOSE_CIRCLE.create();
 
-          icon.setColor(m.active()
-                            ? "var(--lumo-success-color)"
-                            : "var(--lumo-error-color)");
-          icon.getStyle().set("cursor", "pointer");
-          icon.getElement().setProperty("title",
-                                        m.active() ? "Deactivate" : "Activate");
+      icon.setColor(m.active() ? "var(--lumo-success-color)" : "var(--lumo-error-color)");
+      icon.getStyle().set("cursor", "pointer");
+      icon.getElement().setProperty("title", m.active() ? "Deactivate" : "Activate");
 
-          icon.addClickListener(_ -> {
-            boolean newValue = !m.active();
+      icon.addClickListener(_ -> {
+        boolean newValue = !m.active();
 
-            try {
-              urlShortenerClient.toggleActive(m.shortCode(), newValue);
-              Notifications.statusUpdatedOK();
-              safeRefresh();
-            } catch (Exception ex) {
-              Notifications.statusUpdatedFailed(ex);
-            }
-          });
-          return icon;
-        })
-        .setHeader("Active")
-        .setKey("active")
-        .setAutoWidth(true)
-        .setResizable(true)
-        .setSortable(true)
-        .setFlexGrow(0);
+        try {
+          urlShortenerClient.toggleActive(m.shortCode(), newValue);
+          Notifications.statusUpdatedOK();
+          safeRefresh();
+        } catch (Exception ex) {
+          Notifications.statusUpdatedFailed(ex);
+        }
+      });
+      return icon;
+    }).setHeader("Active").setKey("active").setAutoWidth(true).setResizable(true).setSortable(true).setFlexGrow(0);
   }
 
   private void configureColumCreated() {
-    grid.addColumn(m -> DATE_TIME_FMT.format(m.createdAt()))
-        .setHeader("Created")
-        .setKey("created")
-        .setAutoWidth(true)
-        .setResizable(true)
-        .setSortable(true)
-        .setFlexGrow(0);
+    grid.addColumn(m -> DATE_TIME_FMT.format(m.createdAt())).setHeader("Created").setKey("created").setAutoWidth(true).setResizable(true).setSortable(true).setFlexGrow(0);
   }
 
   private void configureColumUrl() {
     grid.addComponentColumn(m -> {
-          var a = new Anchor(m.originalUrl(), m.originalUrl());
-          a.setTarget("_blank");
-          a.getStyle()
-              .set("white-space", "nowrap")
-              .set("overflow", "hidden")
-              .set("text-overflow", "ellipsis")
-              .set("display", "inline-block")
-              .set("max-width", "100%");
-          a.getElement().setProperty("title", m.originalUrl());
-          return a;
-        })
-        .setHeader("URL")
-        .setKey("url")
-        .setFlexGrow(1)
-        .setResizable(true);
+      var a = new Anchor(m.originalUrl(), m.originalUrl());
+      a.setTarget("_blank");
+      a.getStyle().set("white-space", "nowrap").set("overflow", "hidden").set("text-overflow", "ellipsis").set("display", "inline-block").set("max-width", "100%");
+      a.getElement().setProperty("title", m.originalUrl());
+      return a;
+    }).setHeader("URL").setKey("url").setFlexGrow(1).setResizable(true);
   }
 
   private void configureColumShortCode() {
     grid.addComponentColumn(m -> {
-          var code = new Span(m.shortCode());
-          code.getStyle().set("font-family", "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace");
+      var code = new Span(m.shortCode());
+      code.getStyle().set("font-family", "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace");
 
-          var copy = new Button(new Icon(VaadinIcon.COPY));
-          copy.addThemeVariants(LUMO_TERTIARY_INLINE);
-          copy.getElement().setProperty("title", "Copy ShortUrl");
-          copy.addClickListener(_ -> {
-            UI.getCurrent()
-                .getPage()
-                .executeJs("navigator.clipboard.writeText($0)", SHORTCODE_BASE_URL + m.shortCode());
-            Notifications.shortCodeCopied();
-          });
-          var wrap = new HorizontalLayout(code, copy);
-          wrap.setSpacing(true);
-          wrap.setPadding(false);
-          return wrap;
-        })
-        .setHeader("Shortcode")
-        .setKey("shortcode")
-        .setAutoWidth(true)
-        .setFrozen(true)
-        .setResizable(true)
-        .setFlexGrow(0);
+      var copy = new Button(new Icon(VaadinIcon.COPY));
+      copy.addThemeVariants(LUMO_TERTIARY_INLINE);
+      copy.getElement().setProperty("title", "Copy ShortUrl");
+      copy.addClickListener(_ -> {
+        var url = SHORTCODE_BASE_URL + m.shortCode();
+        UiActions.copyToClipboard(url);
+        Notifications.shortCodeCopied();
+      });
+      var wrap = new HorizontalLayout(code, copy);
+      wrap.setSpacing(true);
+      wrap.setPadding(false);
+      return wrap;
+    }).setHeader("Shortcode").setKey("shortcode").setAutoWidth(true).setFrozen(true).setResizable(true).setFlexGrow(0);
   }
 
   private void openDetailsDialog(ShortUrlMapping item) {
@@ -379,7 +371,6 @@ public class OverviewView
   }
 
   private Component buildGridRowActions(ShortUrlMapping m) {
-    logger().info("buildGridRowActions..");
     Button delete = new Button(new Icon(VaadinIcon.TRASH));
     delete.addThemeVariants(LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
     delete.addClickListener(_ -> confirmDelete(m.shortCode()));
@@ -392,53 +383,49 @@ public class OverviewView
     return row;
   }
 
-
   private void initDataProvider() {
-    dataProvider = new CallbackDataProvider<>(
-        q -> {
-          final int uiSize = Optional.ofNullable(searchBar.getPageSize()).orElse(25);
-          final int pageStart = (currentPage - 1) * uiSize;
+    dataProvider = new CallbackDataProvider<>(q -> {
+      final int uiSize = Optional.ofNullable(searchBar.getPageSize()).orElse(25);
+      final int pageStart = (currentPage - 1) * uiSize;
 
-          final int vLimit = q.getLimit();
-          final int vOffset = q.getOffset();
+      final int vLimit = q.getLimit();
+      final int vOffset = q.getOffset();
 
-          final int effectiveLimit = (vLimit > 0) ? vLimit : uiSize;
-          final int effectiveOffset = pageStart + vOffset;
+      final int effectiveLimit = (vLimit > 0) ? vLimit : uiSize;
+      final int effectiveOffset = pageStart + vOffset;
 
-          final int page = (effectiveLimit > 0) ? (effectiveOffset / effectiveLimit) + 1 : 1;
-          final int size = (effectiveLimit > 0) ? effectiveLimit : uiSize;
+      final int page = (effectiveLimit > 0) ? (effectiveOffset / effectiveLimit) + 1 : 1;
+      final int size = (effectiveLimit > 0) ? effectiveLimit : uiSize;
 
-          final UrlMappingListRequest req = searchBar.buildFilter(page, size);
-          try {
-            final List<ShortUrlMapping> items = urlShortenerClient.list(req);
-            return items.stream();
-          } catch (IOException ex) {
-            logger().error("Error fetching (page={}, size={})", page, size, ex);
-            Notifications.loadingFailed();
-            return Stream.empty();
-          }
-        },
+      final UrlMappingListRequest req = searchBar.buildFilter(page, size);
+      try {
+        final List<ShortUrlMapping> items = urlShortenerClient.list(req);
+        logger().info("DataProvider q {} - items {}", q, items);
+        return items.stream();
+      } catch (IOException ex) {
+        logger().error("Error fetching (page={}, size={})", page, size, ex);
+        Notifications.loadingFailed();
+        return Stream.empty();
+      }
+    }, _ -> {
+      try {
+        final UrlMappingListRequest base = searchBar.buildFilter(null, null);
+        totalCount = urlShortenerClient.listCount(base);
+        logger().info("DataProvider - totalCount {}", totalCount);
+        final int uiSize = Optional.ofNullable(searchBar.getPageSize()).orElse(25);
+        final int pageStart = (currentPage - 1) * uiSize;
+        final int remaining = Math.max(0, totalCount - pageStart);
+        final int pageCount = Math.min(uiSize, remaining);
 
-        _ -> {
-          try {
-            final UrlMappingListRequest base = searchBar.buildFilter(null, null);
-            totalCount = urlShortenerClient.listCount(base);
-
-            final int uiSize = Optional.ofNullable(searchBar.getPageSize()).orElse(25);
-            final int pageStart = (currentPage - 1) * uiSize;
-            final int remaining = Math.max(0, totalCount - pageStart);
-            final int pageCount = Math.min(uiSize, remaining);
-
-            refreshPageInfo();
-            return pageCount;
-          } catch (IOException ex) {
-            logger().error("Error counting", ex);
-            totalCount = 0;
-            refreshPageInfo();
-            return 0;
-          }
-        }
-    );
+        refreshPageInfo();
+        return pageCount;
+      } catch (IOException ex) {
+        logger().error("Error counting", ex);
+        totalCount = 0;
+        refreshPageInfo();
+        return 0;
+      }
+    });
 
     grid.setPageSize(Optional.ofNullable(searchBar.getPageSize()).orElse(25));
     grid.setDataProvider(dataProvider);
@@ -455,6 +442,7 @@ public class OverviewView
     nextBtn.setEnabled(currentPage < maxPage);
   }
 
+  @Override
   public void safeRefresh() {
     logger().info("safeRefresh");
     if (!suppressRefresh) {
@@ -483,7 +471,6 @@ public class OverviewView
       }
     });
     confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, LUMO_ERROR);
-
     Button cancel = new Button("Cancel", _ -> dialog.close());
 
     dialog.add(new HorizontalLayout(confirm, cancel));
@@ -507,5 +494,6 @@ public class OverviewView
   public void setRefreshSuppressed(boolean suppressed) {
     this.suppressRefresh = suppressed;
   }
+
 
 }

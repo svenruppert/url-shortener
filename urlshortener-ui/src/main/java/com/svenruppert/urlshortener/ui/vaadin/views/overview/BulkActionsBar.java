@@ -168,7 +168,6 @@ public class BulkActionsBar
       Notifications.deletedAndNotDeleted(success, failed);
     });
     confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, LUMO_ERROR);
-
     Button cancel = new Button("Cancel", _ -> dialog.close());
 
     dialog.getFooter().add(new HorizontalLayout(confirm, cancel));
@@ -357,6 +356,7 @@ public class BulkActionsBar
   }
 
   public void selectionInfoText(String txt) {
-
+    selectionInfo.setText(txt);
+    selectionInfo.setVisible(!txt.isBlank());
   }
 }

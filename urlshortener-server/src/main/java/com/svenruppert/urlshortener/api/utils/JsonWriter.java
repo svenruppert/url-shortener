@@ -1,55 +1,45 @@
 package com.svenruppert.urlshortener.api.utils;
 
-import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.dependencies.core.net.HttpStatus;
+import com.svenruppert.urlshortener.core.JacksonJson;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
-import static com.svenruppert.dependencies.core.net.HttpStatus.INTERNAL_SERVER_ERROR;
-import static com.svenruppert.urlshortener.core.DefaultValues.CONTENT_TYPE;
-import static com.svenruppert.urlshortener.core.DefaultValues.JSON_CONTENT_TYPE;
-import static java.nio.charset.StandardCharsets.UTF_8;
-
-public class JsonWriter
+public final class JsonWriter
     implements HasLogger {
 
   private JsonWriter() {
   }
 
-  public static void writeJson(HttpExchange ex, HttpStatus httpStatus)
+  public static void writeJson(HttpExchange ex, HttpStatus status, Object body)
       throws IOException {
-    writeJson(ex, httpStatus, httpStatus.reason());
+    String json = JacksonJson.mapper().writeValueAsString(body);
+    writeJsonRaw(ex, status, json);
   }
 
-  public static void writeJson(HttpExchange ex, HttpStatus httpStatus, String message)
+
+  public static void writeJson(HttpExchange ex, int statusCode, Object body)
       throws IOException {
-    HasLogger.staticLogger().info("writeJson {}, {}", httpStatus, message);
-    byte[] data = message.getBytes(UTF_8);
-    Headers h = ex.getResponseHeaders();
-    h.set(CONTENT_TYPE, JSON_CONTENT_TYPE);
-    ex.sendResponseHeaders(httpStatus.code(), data.length);
+    writeJson(ex, HttpStatus.fromCode(statusCode), body);
+  }
+
+  public static void writeJsonRaw(HttpExchange ex, int statusCode, String rawJson)
+      throws IOException {
+    writeJsonRaw(ex, HttpStatus.fromCode(statusCode), rawJson);
+  }
+
+  public static void writeJsonRaw(HttpExchange ex, HttpStatus status, String rawJson)
+      throws IOException {
+    if (rawJson == null) rawJson = "null";
+    byte[] bytes = rawJson.getBytes(StandardCharsets.UTF_8);
+    ex.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+    ex.sendResponseHeaders(status.code(), bytes.length);
     try (OutputStream os = ex.getResponseBody()) {
-      os.write(data);
-    } catch (Exception e) {
-      HasLogger.staticLogger().info("writeJson {} (catch)", e.getMessage());
-      byte[] body = ("{\"error\":\"" + e.getMessage() + "\"}").getBytes(StandardCharsets.UTF_8);
-      try {
-        ex.getResponseHeaders().set(CONTENT_TYPE, JSON_CONTENT_TYPE);
-        ex.sendResponseHeaders(INTERNAL_SERVER_ERROR.code(), body.length);
-        ex.getResponseBody().write(body);
-      } catch (Exception ignoredI) {
-        HasLogger.staticLogger().info("writeJson (catch - ignored I) {} ", ignoredI.getMessage());
-      }
-    } finally {
-      try {
-        ex.close();
-      } catch (Exception ignoredII) {
-        HasLogger.staticLogger().info("writeJson (catch - ignored II) {} ", ignoredII.getMessage());
-      }
+      os.write(bytes);
     }
   }
 }

@@ -87,8 +87,15 @@ public class InMemoryUrlMappingStore
       store.put(shortCode, updatedUrlMapping);
       return Result.success(new ToggleActiveResponse(shortCode, updatedUrlMapping.active()));
     } else {
-      return Result.failure("shortCode " + shortCode + "not found");
+      return Result.failure("shortCode " + shortCode + " not found");
     }
+  }
+
+  @Override
+  public Result<ShortUrlMapping> createMapping(Instant createdAt, String shortCode, String originalUrl, Instant expiredAt, Boolean active) {
+    logger().info("createMapping - createdAt: {} - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", createdAt, shortCode, originalUrl, expiredAt, active);
+    var originalOrDefaultActive = active != null ? active : true;
+    return creator.create(createdAt, shortCode, originalUrl, expiredAt, originalOrDefaultActive);
   }
 
   @Override

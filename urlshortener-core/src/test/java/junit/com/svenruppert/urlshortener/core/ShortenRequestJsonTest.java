@@ -24,7 +24,7 @@ class ShortenRequestJsonTest {
     String json = toJson(req);
     System.out.println("json = " + json);
     assertTrue(json.contains("\"url\":\"https://example.com/path?q=\\\"x\\\"\""));
-    assertTrue(json.contains("\"alias\":null"));
+    assertTrue(json.contains("\"shortURL\":null"));
   }
 
   @Test
@@ -34,7 +34,7 @@ class ShortenRequestJsonTest {
     System.out.println("json = " + json);
     assertTrue(json.contains("\"url\":\"https://example.com\""));
     // alias should be quoted and contain escapes
-    assertTrue(json.contains("\"alias\":\"a\\tb\\nc\\\"d\""));
+    assertTrue(json.contains("\"shortURL\":\"a\\tb\\nc\\\"d\""));
   }
 
   @Test
