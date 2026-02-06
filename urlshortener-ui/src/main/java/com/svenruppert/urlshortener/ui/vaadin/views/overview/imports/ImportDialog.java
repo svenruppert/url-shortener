@@ -273,6 +273,25 @@ public final class ImportDialog
   }
 
 
+  /**
+   * Updates the state of the "Apply Import" button and its associated hint text based on the current
+   * conditions, such as the presence of a valid staging ID, the number of invalid items, and
+   * conflicts with the option to skip conflicts. The following logic governs the button's state:
+   *
+   * - If there is no valid staging ID, the "Apply Import" button is disabled and a hint is shown
+   *   indicating the need to validate an import archive.
+   * - If there are invalid items, the "Apply Import" button remains disabled, and a hint provides
+   *   guidance on resolving or removing invalid items before proceeding.
+   * - If there are conflicts, but the "Skip conflicts on apply" option is selected, the button's
+   *   visual style is updated to indicate the skipped conflicts.
+   * - If conflicts exist and the "Skip conflicts on apply" option is not selected, the "Apply Import"
+   *   button remains disabled with a hint directing the user to enable skipping conflicts.
+   * - If no invalid items or blocking conflicts exist, the button is enabled, and appropriate text
+   *   is displayed based on the conflict status.
+   *
+   * This method relies on parsing integer values for invalid items and conflicts and toggling
+   * component states accordingly.
+   */
   private void updateApplyState() {
     // Default: disabled
     btnApply.setEnabled(false);

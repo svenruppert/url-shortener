@@ -79,7 +79,7 @@ public final class ImportApplyHandler
         + "\"invalid\":" + staging.invalidItems().size()
         + "}";
 
-    SuccessResponses.ok(ex, body);
+    SuccessResponses.okJson(ex, body);
 
   }
 }
