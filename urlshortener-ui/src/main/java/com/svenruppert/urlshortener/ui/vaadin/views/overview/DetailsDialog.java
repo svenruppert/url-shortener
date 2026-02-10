@@ -82,7 +82,13 @@ public class DetailsDialog
 
 
   /**
-   * @param mapping concrete ShortUrlMapping instance
+   * Constructs an instance of the DetailsDialog, used to display and interact with the
+   * details of a short URL mapping. This dialog includes various controls for viewing,
+   * editing, and managing the mapping properties, as well as validation mechanisms.
+   *
+   * @param client the URLShortenerClient instance responsible for managing URL shortener services
+   * @param mapping the ShortUrlMapping object that contains the details of the short URL to display
+   * @throws NullPointerException if either {@code client} or {@code mapping} is null
    */
   public DetailsDialog(URLShortenerClient client, ShortUrlMapping mapping) {
     Objects.requireNonNull(client, "URLShortenerClient");
@@ -150,7 +156,11 @@ public class DetailsDialog
     form.setColspan(tfUrl, 2);
     add(form);
 
-    Button addAliasesBtn = new Button("Add aliases…", _ -> openAddAliasesDialog(mapping));
+    //Button addAliasesBtn = new Button("Add aliases…", _ -> openAddAliasesDialog(mapping));
+    Button addAliasesBtn = new Button("Add aliases…", _ -> {
+      close();
+      openAddAliasesDialog(mapping);
+    });
     closeBtn.addClickListener(_ -> close());
     getFooter().add(closeBtn, addAliasesBtn);
 
@@ -348,6 +358,7 @@ public class DetailsDialog
         if (ui != null) {
           ComponentUtil.fireEvent(ui, new MappingCreatedOrChanged(this));
         }
+        DetailsDialog.this.open();
       }
     });
 
