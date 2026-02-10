@@ -8,7 +8,7 @@
     <parent>
         <groupId>com.svenruppert</groupId>
         <artifactId>dependencies</artifactId>
-        <version>06.00.14</version>
+        <version>06.00.15</version>
     </parent>
 
     <groupId>com.svenruppert.urlshortener</groupId>
@@ -94,11 +94,12 @@
         <!--        Vaadin Flow Properties-->
         <failOnMissingWebXml>false</failOnMissingWebXml>
 
-        <vaadin.version>24.9.0</vaadin.version>
+        <vaadin.version>25.0.5</vaadin.version>
         <drivers.downloader.phase>pre-integration-test</drivers.downloader.phase>
         <jetty.version>11.0.25</jetty.version>
         <warName>ROOT</warName>
         <restServiceName>urlshortener</restServiceName>
+        <eclipse-store.version>3.1.0</eclipse-store.version>
     </properties>
 
     <repositories>
@@ -179,12 +180,12 @@
             <dependency>
                 <groupId>org.eclipse.store</groupId>
                 <artifactId>storage-embedded</artifactId>
-                <version>3.0.1</version>
+                <version>${eclipse-store.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.serializer</groupId>
                 <artifactId>serializer</artifactId>
-                <version>3.0.1</version>
+                <version>${eclipse-store.version}</version>
             </dependency>
 
             <dependency>
