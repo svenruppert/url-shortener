@@ -81,14 +81,17 @@ public final class ImportDialog
     chkSkipConflicts.setValue(false);
     chkSkipConflicts.addValueChangeListener(_ -> updateApplyState());
 
-    applyHint.getStyle().set("font-size", "var(--lumo-font-size-s)");
-    applyHint.getStyle().set("color", "var(--lumo-secondary-text-color)");
+    applyHint.addClassNames("importdialog-applyhint");
+
+    //applyHint.getStyle().set("font-size", "var(--lumo-font-size-s)");
+    //applyHint.getStyle().set("color", "var(--lumo-secondary-text-color)");
+
     applyHint.setText("Upload a ZIP and validate to continue.");
 
     upload.setAcceptedFileTypes(".zip", APPLICATION_ZIP);
     upload.setMaxFiles(1);
     upload.setMaxFileSize(IMPORT_MAX_ZIP_BYTES);
-    upload.addAllFinishedListener(listener -> {
+    upload.addAllFinishedListener(_ -> {
       logger().info("Upload finished..");
       btnApply.setEnabled(false);
     });

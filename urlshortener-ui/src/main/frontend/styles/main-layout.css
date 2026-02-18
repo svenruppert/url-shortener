@@ -1,0 +1,19 @@
+.mainlayout__title {
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+/* optional: keep header aligned and tidy */
+.mainlayout__header {
+    width: 100%;
+}
+
+/* flex spacer to push right side */
+.mainlayout__spacer {
+    flex: 1 1 auto;
+}
+
+/* store indicator should be right-aligned even without spacer edge cases */
+.mainlayout__right {
+    margin-left: auto;
+}

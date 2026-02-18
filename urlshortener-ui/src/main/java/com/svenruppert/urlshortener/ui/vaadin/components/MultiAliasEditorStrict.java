@@ -1,6 +1,7 @@
 package com.svenruppert.urlshortener.ui.vaadin.components;
 
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
@@ -14,25 +15,32 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@CssImport("./styles/multi-alias-editor-strict.css")
 public class MultiAliasEditorStrict
     extends VerticalLayout {
 
   private static final String RX = "^[A-Za-z0-9_-]{3,64}$";
+
+  // CSS classes
+  private static final String C_ROOT = "multi-alias-editor";
+  private static final String C_BULK = "multi-alias-editor__bulk";
+  private static final String C_TOOLBAR = "multi-alias-editor__toolbar";
+  private static final String C_GRID = "multi-alias-editor__grid";
+  private static final String C_STATUS = "multi-alias-editor__status";
+
   private final Grid<Row> grid = new Grid<>(Row.class, false);
   private final TextArea bulk = new TextArea("Aliases (comma/space/newline)");
   private final Button insertBtn = new Button("Take over");
   private final Button validateBtn = new Button("Validate all");
   private final String baseUrl;
-  private final Function<String, Boolean> isAliasFree;   // Server-Check (true = frei)
+  private final Function<String, Boolean> isAliasFree;
 
-  public MultiAliasEditorStrict(String baseUrl,
-                                Function<String, Boolean> isAliasFree) {
+  public MultiAliasEditorStrict(String baseUrl, Function<String, Boolean> isAliasFree) {
     this.baseUrl = baseUrl;
     this.isAliasFree = isAliasFree;
     build();
   }
 
-  // ==== Public API for the parent view ====
   public void validateAll() {
     var items = new ArrayList<>(grid.getListDataView().getItems().toList());
     items.forEach(this::validateRow);
@@ -40,8 +48,7 @@ public class MultiAliasEditorStrict
   }
 
   public List<String> getValidAliases() {
-    return grid
-        .getListDataView()
+    return grid.getListDataView()
         .getItems()
         .filter(r -> r.getStatus() == Status.VALID)
         .map(Row::getAlias)
@@ -57,8 +64,7 @@ public class MultiAliasEditorStrict
   }
 
   public long countOpen() {
-    return grid
-        .getListDataView()
+    return grid.getListDataView()
         .getItems()
         .filter(r -> r.getStatus() != Status.SAVED)
         .count();
@@ -79,11 +85,13 @@ public class MultiAliasEditorStrict
   }
 
   private void build() {
+    addClassName(C_ROOT);
+
     setPadding(false);
     setSpacing(true);
 
+    bulk.addClassName(C_BULK);
     bulk.setWidthFull();
-    bulk.setMinHeight("120px");
     bulk.setValueChangeMode(ValueChangeMode.LAZY);
     bulk.setClearButtonVisible(true);
     bulk.setPlaceholder("z. B.\nnews-2025\npromo_x\nabc123");
@@ -92,6 +100,7 @@ public class MultiAliasEditorStrict
     validateBtn.addClickListener(_ -> validateAll());
 
     var toolbar = new HorizontalLayout(insertBtn, validateBtn);
+    toolbar.addClassName(C_TOOLBAR);
     toolbar.setSpacing(true);
 
     configureGrid();
@@ -100,6 +109,8 @@ public class MultiAliasEditorStrict
   }
 
   private void configureGrid() {
+    grid.addClassName(C_GRID);
+
     grid.addComponentColumn(row -> {
       var tf = new TextField();
       tf.setWidthFull();
@@ -127,18 +138,19 @@ public class MultiAliasEditorStrict
         case ERROR -> "Error";
         case SAVED -> "Saved";
       };
+
       var badge = new Span(lbl);
-      var theme = switch (row.getStatus()) {
-        case VALID, SAVED -> "badge success";
-        case CONFLICT, INVALID_FORMAT, ERROR -> "badge error";
-        default -> "badge";
-      };
-      badge.getElement().getThemeList().add(theme);
-      if (row.getMsg() != null && !row.getMsg().isBlank()) badge.setTitle(row.getMsg());
+      badge.addClassName(C_STATUS);
+
+      // Status für CSS selektierbar machen
+      badge.getElement().setAttribute("data-status", row.getStatus().name().toLowerCase());
+
+      if (row.getMsg() != null && !row.getMsg().isBlank()) {
+        badge.setTitle(row.getMsg());
+      }
       return badge;
     }).setHeader("Status").setAutoWidth(true);
 
-    // Delete action per row
     grid.addComponentColumn(row -> {
       var del = new Button("✕", e -> {
         var items = new ArrayList<>(grid.getListDataView().getItems().toList());
@@ -151,9 +163,7 @@ public class MultiAliasEditorStrict
 
     grid.setItems(new ArrayList<>());
     grid.setAllRowsVisible(false);
-    grid.setHeight("320px");
   }
-  // ========================================
 
   private void parseBulk() {
     var text = Objects.requireNonNullElse(bulk.getValue(), "");
@@ -183,6 +193,7 @@ public class MultiAliasEditorStrict
       existing.add(tok);
       added++;
     }
+
     grid.getDataProvider().refreshAll();
     bulk.clear();
 
@@ -219,6 +230,7 @@ public class MultiAliasEditorStrict
         return;
       }
     }
+
     r.setStatus(Status.VALID);
     r.setMsg("");
   }

@@ -11,6 +11,7 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.notification.Notification;
@@ -32,12 +33,19 @@ import java.util.Optional;
 import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL;
 
 @Route(value = CreateView.PATH, layout = MainLayout.class)
-public class CreateView
-    extends VerticalLayout
-    implements HasLogger {
+@CssImport("./styles/create-view.css")
+public class CreateView extends VerticalLayout implements HasLogger {
 
   public static final String PATH = "create";
   private static final ZoneId ZONE = ZoneId.systemDefault();
+
+  // class names
+  private static final String C_ROOT = "create-root";
+  private static final String C_SPLIT = "create-split";
+  private static final String C_COL = "create-col";
+  private static final String C_FORM = "create-form";
+  private static final String C_ACTIONS = "create-actions";
+  private static final String C_EDITOR_WRAP = "create-editor";
 
   private final URLShortenerClient urlShortenerClient = UrlShortenerClientFactory.newInstance();
 
@@ -51,6 +59,8 @@ public class CreateView
   private final Checkbox cbActive = new Checkbox("Active");
 
   public CreateView() {
+    addClassName(C_ROOT);
+
     setSpacing(true);
     setPadding(true);
     setSizeFull();
@@ -62,6 +72,7 @@ public class CreateView
     configureExpiryFields();
 
     FormLayout form = new FormLayout();
+    form.addClassName(C_FORM);
     form.add(urlField, noExpiry, cbActive, expiresDate, expiresTime);
     form.setResponsiveSteps(
         new FormLayout.ResponsiveStep("0", 1),
@@ -70,6 +81,7 @@ public class CreateView
     form.setColspan(urlField, 2);
 
     HorizontalLayout actions = new HorizontalLayout(saveAllButton, resetButton);
+    actions.addClassName(C_ACTIONS);
     actions.setWidthFull();
     actions.setJustifyContentMode(JustifyContentMode.START);
 
@@ -94,7 +106,7 @@ public class CreateView
         }
     );
     editor.setSizeFull();
-    editor.getStyle().set("padding", "var(--lumo-space-m)");
+    editor.addClassName(C_EDITOR_WRAP);
 
     saveAllButton.addClickListener(_ -> {
       var validated = binder.validate();
@@ -105,8 +117,8 @@ public class CreateView
         Notification.show("Target URL is empty", 2500, Notification.Position.TOP_CENTER);
         return;
       }
-      editor.validateAll();
 
+      editor.validateAll();
       List<String> validAliases = editor.getValidAliases();
       if (validAliases.isEmpty()) {
         Notification.show("No valid aliases to save", 2000, Notification.Position.TOP_CENTER);
@@ -118,25 +130,25 @@ public class CreateView
       int ok = 0;
       for (String alias : validAliases) {
         try {
-          logger().info("try to save mapping {} / {} ", urlField.getValue(), alias);
           var activeState = cbActive.getValue();
-
-          var customMapping = urlShortenerClient.createCustomMapping(alias,
-                                                                     urlField.getValue(),
-                                                                     expiresAt.orElse(null),
-                                                                     activeState);
-          logger().info("created customMapping is {}", customMapping);
-          if (customMapping != null)
-            logger().info("saved - {}", customMapping);
-          else logger().info("save failed for target {} with alias {}", urlField.getValue(), alias);
-          editor.markSaved(alias);
+          var customMapping = urlShortenerClient.createCustomMapping(
+              alias,
+              urlField.getValue(),
+              expiresAt.orElse(null),
+              activeState
+          );
+          if (customMapping != null) editor.markSaved(alias);
           ok++;
         } catch (Exception ex) {
           editor.markError(alias, String.valueOf(ex.getMessage()));
-          logger().info("failed to save url with alias {}", alias);
         }
       }
-      Notification.show("Saved: " + ok + " | Open: " + editor.countOpen(), 3500, Notification.Position.TOP_CENTER);
+
+      Notification.show(
+          "Saved: " + ok + " | Open: " + editor.countOpen(),
+          3500,
+          Notification.Position.TOP_CENTER
+      );
     });
 
     resetButton.addClickListener(_ -> {
@@ -144,18 +156,21 @@ public class CreateView
       editor.clearAllRows();
     });
 
-    // — SplitLayout
+    // --- SplitLayout
     var leftCol = new VerticalLayout(new H2("Create new short links"), form, actions);
+    leftCol.addClassName(C_COL);
     leftCol.setPadding(false);
     leftCol.setSpacing(true);
     leftCol.setSizeFull();
 
     var rightCol = new VerticalLayout(new H2("Aliases"), editor);
+    rightCol.addClassName(C_COL);
     rightCol.setPadding(false);
     rightCol.setSpacing(true);
     rightCol.setSizeFull();
 
     SplitLayout split = new SplitLayout(leftCol, rightCol);
+    split.addClassName(C_SPLIT);
     split.setSizeFull();
     split.setSplitterPosition(40);
 

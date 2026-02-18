@@ -1,31 +1,47 @@
 package com.svenruppert.urlshortener.ui.vaadin.views.overview.imports;
 
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 
 import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CENTER;
 
+@CssImport("./styles/paging-bar.css")
 public final class PagingBar
     extends HorizontalLayout {
+
+  private static final String C_ROOT = "paging-bar";
+  private static final String C_BUTTON = "paging-bar__button";
+  private static final String C_INFO = "paging-bar__info";
 
   private final int size;
   private final Button prev = new Button("‹ Prev");
   private final Button next = new Button("Next ›");
   private final Span info = new Span();
+
   private int page = 1;
   private int total = 0;
   private Runnable onPageChange = () -> { };
 
   public PagingBar(int size) {
     this.size = size;
+
+    addClassName(C_ROOT);
+
     setDefaultVerticalComponentAlignment(CENTER);
-    add(prev, next, info);
+
+    prev.addClassName(C_BUTTON);
+    next.addClassName(C_BUTTON);
+    info.addClassName(C_INFO);
+
+    add(prev, info, next);
     updateInfo();
 
     prev.addClickListener(_ -> {
       if (page > 1) {
         page--;
+        updateInfo();
         onPageChange.run();
       }
     });
@@ -33,9 +49,14 @@ public final class PagingBar
     next.addClickListener(_ -> {
       if (page < maxPages()) {
         page++;
+        updateInfo();
         onPageChange.run();
       }
     });
+  }
+
+  public void setOnPageChange(Runnable r) {
+    this.onPageChange = r != null ? r : () -> { };
   }
 
   public int page() {

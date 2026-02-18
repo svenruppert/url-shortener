@@ -7,6 +7,7 @@ import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.icon.Icon;
@@ -27,9 +28,29 @@ import java.util.Optional;
 import static com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView.VALUE_CHANGE_TIMEOUT;
 import static com.vaadin.flow.data.value.ValueChangeMode.LAZY;
 
+@CssImport("./styles/search-bar.css")
 public class SearchBar
     extends Composite<HorizontalLayout>
     implements HasLogger, HasRefreshGuard {
+
+  // CSS classes
+  private static final String C_ROOT = "search-bar";
+  private static final String C_TOP = "search-bar__top";
+  private static final String C_ADV = "search-bar__advanced";
+  private static final String C_ADV_WRAP = "search-bar__adv-wrap";
+  private static final String C_SEARCH_BLOCK = "search-bar__search-block";
+  private static final String C_SORTBAR = "search-bar__sortbar";
+  private static final String C_FROM_GROUP = "search-bar__from-group";
+  private static final String C_TO_GROUP = "search-bar__to-group";
+
+  private static final String C_GLOBAL = "search-bar__global";
+  private static final String C_SCOPE = "search-bar__scope";
+  private static final String C_PAGESIZE = "search-bar__pagesize";
+  private static final String C_ACTIVE = "search-bar__active";
+  private static final String C_RESET = "search-bar__reset";
+
+  private static final String C_SORTBY = "search-bar__sortby";
+  private static final String C_DIR = "search-bar__dir";
 
   private final TextField globalSearch = new TextField();
   private final ComboBox<String> searchScope = new ComboBox<>("Search in");
@@ -44,12 +65,16 @@ public class SearchBar
   private final ComboBox<String> dir = new ComboBox<>("Direction");
   private final Select<ActiveState> activeState = new Select<>();
   private final Button resetBtn = new Button("Reset", new Icon(VaadinIcon.ROTATE_LEFT));
+
   private final OverviewView guardOwner;
   private Details advanced;
 
   public SearchBar(OverviewView guardOwner) {
     this.guardOwner = guardOwner;
+
+    container().addClassName(C_ROOT);
     container().add(buildSearchBar());
+
     addShortCuts();
     addListeners();
   }
@@ -59,22 +84,42 @@ public class SearchBar
   }
 
   private Component buildSearchBar() {
+    // --- Top bar ---
+    globalSearch.addClassName(C_GLOBAL);
     globalSearch.setPlaceholder("Search all…");
     globalSearch.setClearButtonVisible(true);
-    globalSearch.setWidth("28rem");
     globalSearch.setValueChangeMode(LAZY);
     globalSearch.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
 
+    searchScope.addClassName(C_SCOPE);
     searchScope.setItems("URL", "Shortcode");
     searchScope.setValue("URL");
-    searchScope.setWidth("11rem");
 
+    pageSize.addClassName(C_PAGESIZE);
     pageSize.setMin(1);
     pageSize.setMax(500);
     pageSize.setStepButtonsVisible(true);
-    pageSize.setWidth("140px");
 
+    activeState.addClassName(C_ACTIVE);
+    activeState.setLabel("Active state");
+    activeState.setItems(ActiveState.values());
+    activeState.setItemLabelGenerator(state -> switch (state) {
+      case ACTIVE -> "Active";
+      case INACTIVE -> "Inactive";
+      case NOT_SET -> "Not set";
+    });
+    activeState.setEmptySelectionAllowed(false);
+    activeState.setValue(ActiveState.NOT_SET);
 
+    resetBtn.addClassName(C_RESET);
+
+    HorizontalLayout topBar = new HorizontalLayout(globalSearch, searchScope, pageSize, activeState, resetBtn);
+    topBar.addClassName(C_TOP);
+    topBar.setWidthFull();
+    topBar.setSpacing(true);
+    topBar.setAlignItems(FlexComponent.Alignment.END);
+
+    // --- Advanced block ---
     codePart.setPlaceholder("e.g. ex-");
     codePart.setValueChangeMode(LAZY);
     codePart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
@@ -85,24 +130,36 @@ public class SearchBar
     urlPart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
     urlPart.addValueChangeListener(_ -> safeRefresh());
 
+    sortBy.addClassName(C_SORTBY);
     sortBy.setItems("createdAt", "shortCode", "originalUrl", "expiresAt");
+    sortBy.setLabel(null);
+    sortBy.setPlaceholder("Sort by");
+
+    dir.addClassName(C_DIR);
     dir.setItems("asc", "desc");
+    dir.setLabel(null);
+    dir.setPlaceholder("Direction");
 
     fromDate.setClearButtonVisible(true);
     toDate.setClearButtonVisible(true);
+
     fromTime.setStep(Duration.ofMinutes(15));
     toTime.setStep(Duration.ofMinutes(15));
     fromTime.setPlaceholder("hh:mm");
     toTime.setPlaceholder("hh:mm");
 
     var fromGroup = new HorizontalLayout(fromDate, fromTime);
+    fromGroup.addClassName(C_FROM_GROUP);
     fromGroup.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.END);
+
     var toGroup = new HorizontalLayout(toDate, toTime);
+    toGroup.addClassName(C_TO_GROUP);
     toGroup.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.END);
 
     FormLayout searchBlock = new FormLayout();
+    searchBlock.addClassName(C_SEARCH_BLOCK);
     searchBlock.setWidthFull();
-    searchBlock.add(codePart, urlPart, new HorizontalLayout()); //TODO not nice!!
+    searchBlock.add(codePart, urlPart, new HorizontalLayout()); //TODO replace placeholder later if you want
     searchBlock.add(fromGroup, toGroup);
     searchBlock.setResponsiveSteps(
         new FormLayout.ResponsiveStep("0", 1),
@@ -110,47 +167,30 @@ public class SearchBar
         new FormLayout.ResponsiveStep("56rem", 3)
     );
 
-    sortBy.setLabel(null);
-    sortBy.setPlaceholder("Sort by");
-    sortBy.setWidth("12rem");
-
-    dir.setLabel(null);
-    dir.setPlaceholder("Direction");
-    dir.setWidth("8rem");
-
     HorizontalLayout sortToolbar = new HorizontalLayout(sortBy, dir);
+    sortToolbar.addClassName(C_SORTBAR);
     sortToolbar.setAlignItems(FlexComponent.Alignment.END);
 
     HorizontalLayout advHeader = new HorizontalLayout(searchBlock, sortToolbar);
+    advHeader.addClassName(C_ADV_WRAP);
     advHeader.setWidthFull();
     advHeader.setSpacing(true);
     advHeader.setAlignItems(FlexComponent.Alignment.START);
     advHeader.expand(searchBlock);
-    advHeader.getStyle().set("flex-wrap", "wrap");
     advHeader.setVerticalComponentAlignment(FlexComponent.Alignment.END, sortToolbar);
 
     advanced = new Details("Advanced filters", advHeader);
+    advanced.addClassName(C_ADV);
     advanced.setOpened(false);
     advanced.getElement().getThemeList().add("filled");
 
     setSimpleSearchEnabled(!advanced.isOpened());
 
-    activeState.setLabel("Active state");
-    activeState.setItems(ActiveState.values());
-    activeState.setItemLabelGenerator(state -> switch (state) {
-      case ACTIVE -> "Active";
-      case INACTIVE -> "Inactive";
-      case NOT_SET -> "Not set";
-    });
-    activeState.setEmptySelectionAllowed(false);
-    activeState.setValue(ActiveState.NOT_SET);
-    HorizontalLayout topBar = new HorizontalLayout(globalSearch, searchScope, pageSize, activeState, resetBtn);
-    topBar.setWidthFull();
-    topBar.setSpacing(true);
-    topBar.setAlignItems(FlexComponent.Alignment.END);
-
     var searchBar = new VerticalLayout();
+    searchBar.setPadding(false);
+    searchBar.setSpacing(true);
     searchBar.add(topBar, advanced);
+
     return searchBar;
   }
 
@@ -162,7 +202,7 @@ public class SearchBar
 
     globalSearch.addValueChangeListener(e -> {
       var v = Optional.ofNullable(e.getValue()).orElse("");
-      if (searchScope.getValue().equals("Shortcode")) {
+      if ("Shortcode".equals(searchScope.getValue())) {
         codePart.setValue(v);
         urlPart.clear();
       } else {
@@ -181,7 +221,6 @@ public class SearchBar
         codePart.clear();
       }
     });
-
 
     pageSize.addValueChangeListener(e -> {
       guardOwner.setCurrentPage(1);
@@ -203,24 +242,20 @@ public class SearchBar
         resetElements();
         guardOwner.setCurrentPage(1);
       } catch (Exception e) {
-        logger().warn("resetBtn.addClickListener .. failed {}", e.getMessage());
+        logger().warn("resetBtn.addClickListener failed {}", e.getMessage());
       }
     });
-
   }
 
   private void addShortCuts() {
     var current = UI.getCurrent();
     current.addShortcutListener(_ -> {
-                                  if (globalSearch.isEnabled()) globalSearch.focus();
-                                },
-                                Key.KEY_K, KeyModifier.CONTROL);
+      if (globalSearch.isEnabled()) globalSearch.focus();
+    }, Key.KEY_K, KeyModifier.CONTROL);
+
     current.addShortcutListener(_ -> {
-                                  if (globalSearch.isEnabled()) globalSearch.focus();
-                                },
-                                Key.KEY_K, KeyModifier.META);
-
-
+      if (globalSearch.isEnabled()) globalSearch.focus();
+    }, Key.KEY_K, KeyModifier.META);
   }
 
   private void setSimpleSearchEnabled(boolean enabled) {
@@ -252,16 +287,13 @@ public class SearchBar
       dir.setValue("desc");
 
       searchScope.setValue(winnerScope);
-      if (!winnerValue.isBlank()) {
-        globalSearch.setValue(winnerValue);
-      } else {
-        globalSearch.clear();
-      }
+      if (!winnerValue.isBlank()) globalSearch.setValue(winnerValue);
+      else globalSearch.clear();
 
       setSimpleSearchEnabled(true);
       globalSearch.focus();
     } catch (Exception e) {
-      logger().warn("applyAdvancedToSimpleAndReset failed .. {}", e.getMessage());
+      logger().warn("applyAdvancedToSimpleAndReset failed {}", e.getMessage());
     }
   }
 
@@ -269,18 +301,13 @@ public class SearchBar
     UrlMappingListRequest.Builder b = UrlMappingListRequest.builder();
 
     ActiveState activeStateValue = activeState.getValue();
-    logger().info("buildFilter - activeState == {}", activeStateValue);
     if (activeStateValue != null && activeStateValue.isSet()) {
-      var activeStateValueBoolean = activeStateValue.toBoolean();
-      b.active(Boolean.TRUE.equals(activeStateValueBoolean));
-    }
-    if (codePart.getValue() != null && !codePart.getValue().isBlank()) {
-      b.codePart(codePart.getValue());
+      var v = activeStateValue.toBoolean();
+      b.active(Boolean.TRUE.equals(v));
     }
 
-    if (urlPart.getValue() != null && !urlPart.getValue().isBlank()) {
-      b.urlPart(urlPart.getValue());
-    }
+    if (codePart.getValue() != null && !codePart.getValue().isBlank()) b.codePart(codePart.getValue());
+    if (urlPart.getValue() != null && !urlPart.getValue().isBlank()) b.urlPart(urlPart.getValue());
 
     if (fromDate.getValue() != null && fromTime.getValue() != null) {
       var zdt = ZonedDateTime.of(fromDate.getValue(), fromTime.getValue(), ZoneId.systemDefault());
@@ -301,13 +328,9 @@ public class SearchBar
     if (sortBy.getValue() != null && !sortBy.getValue().isBlank()) b.sort(sortBy.getValue());
     if (dir.getValue() != null && !dir.getValue().isBlank()) b.dir(dir.getValue());
 
-    if (page != null && size != null) {
-      b.page(page).size(size);
-    }
+    if (page != null && size != null) b.page(page).size(size);
 
-    var filter = b.build();
-    logger().info("buildFilter - {}", filter);
-    return filter;
+    return b.build();
   }
 
   public void resetElements() {

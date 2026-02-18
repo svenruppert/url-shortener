@@ -14,6 +14,7 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.datepicker.DatePicker.DatePickerI18n;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.html.Span;
@@ -40,10 +41,7 @@ import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL
 import static com.svenruppert.urlshortener.ui.vaadin.components.ExpiryBadgeFactory.computeStatusText;
 import static com.svenruppert.urlshortener.ui.vaadin.tools.UiActions.copyToClipboard;
 
-/**
- * Displays detailed information for a ShortUrlMapping.
- * Independent of any specific view; communicates through component events.
- */
+@CssImport("./styles/details-dialog.css")
 public class DetailsDialog
     extends Dialog
     implements HasLogger {
@@ -52,13 +50,20 @@ public class DetailsDialog
   private static final DateTimeFormatter DATE_TIME_FMT =
       DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(ZONE);
 
+  private static final String C_ROOT = "details-dialog";
+  private static final String C_HEADER_LEFT = "details-dialog__header-left";
+  private static final String C_HEADER_RIGHT = "details-dialog__header-right";
+  private static final String C_FORM = "details-dialog__form";
+  private static final String C_URL = "details-dialog__url";
+  private static final String C_EXPIRES_ROW = "details-dialog__expires-row";
+  private static final String C_ALIAS_DLG = "details-dialog__alias-dialog";
+
   private final String shortCode;
   private final String originalUrl;
   private final Instant createdAt;
   private final Optional<Instant> expiresAt;
   private final Boolean active;
 
-  // UI components
   private final TextField tfShort = new TextField("Shortcode");
   private final TextField tfUrl = new TextField("Original URL");
   private final TextField tfCreated = new TextField("Created on");
@@ -76,20 +81,11 @@ public class DetailsDialog
   private final Button saveBtn = new Button(new Icon(VaadinIcon.CHECK));
   private final Button cancelBtn = new Button(new Icon(VaadinIcon.CLOSE));
   private final DateTimePicker expiresField = new DateTimePicker("Expires");
+
   private final URLShortenerClient client;
   private final ShortUrlMapping item;
   private final Binder<ShortUrlMapping> binder = new Binder<>(ShortUrlMapping.class);
 
-
-  /**
-   * Constructs an instance of the DetailsDialog, used to display and interact with the
-   * details of a short URL mapping. This dialog includes various controls for viewing,
-   * editing, and managing the mapping properties, as well as validation mechanisms.
-   *
-   * @param client the URLShortenerClient instance responsible for managing URL shortener services
-   * @param mapping the ShortUrlMapping object that contains the details of the short URL to display
-   * @throws NullPointerException if either {@code client} or {@code mapping} is null
-   */
   public DetailsDialog(URLShortenerClient client, ShortUrlMapping mapping) {
     Objects.requireNonNull(client, "URLShortenerClient");
     Objects.requireNonNull(mapping, "ShortUrlMapping");
@@ -103,12 +99,13 @@ public class DetailsDialog
     this.expiresAt = mapping.expiresAt();
     this.active = mapping.active();
 
+    addClassName(C_ROOT);
+
     setHeaderTitle("Details: " + shortCode);
-    //setModal(true);
     setModality(ModalityMode.STRICT);
     setDraggable(true);
     setResizable(true);
-    setWidth("820px");
+    // width moved to CSS via ::part(overlay)
 
     openBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
@@ -123,8 +120,7 @@ public class DetailsDialog
         .asRequired("URL must not be blank")
         .withValidator((String url, ValueContext _) -> {
           var res = UrlValidator.validate(url);
-          if (res.valid()) return ValidationResult.ok();
-          else return ValidationResult.error(res.message());
+          return res.valid() ? ValidationResult.ok() : ValidationResult.error(res.message());
         })
         .bind(ShortUrlMapping::originalUrl, (_, _) -> { });
 
@@ -135,20 +131,24 @@ public class DetailsDialog
         );
     binder.readBean(item);
 
-    HorizontalLayout rightHeader = new HorizontalLayout(editBtn, saveBtn, cancelBtn);
+    // Build header content (these ARE your components -> you can className them)
+    var leftHeader = new HorizontalLayout(openBtn, copyShortBtn, copyUrlBtn, deleteBtn);
+    leftHeader.addClassName(C_HEADER_LEFT);
+    leftHeader.setSpacing(true);
+    leftHeader.setPadding(false);
+
+    var rightHeader = new HorizontalLayout(editBtn, saveBtn, cancelBtn);
+    rightHeader.addClassName(C_HEADER_RIGHT);
     rightHeader.setSpacing(true);
     rightHeader.setPadding(false);
     rightHeader.setAlignItems(FlexComponent.Alignment.CENTER);
-
-    var leftHeader = new HorizontalLayout(openBtn, copyShortBtn, copyUrlBtn, deleteBtn);
-    leftHeader.setSpacing(true);
-    leftHeader.setPadding(false);
 
     getHeader().add(leftHeader, rightHeader);
 
     configureFields();
 
     var form = new FormLayout();
+    form.addClassName(C_FORM);
     form.setResponsiveSteps(
         new FormLayout.ResponsiveStep("0", 1),
         new FormLayout.ResponsiveStep("600px", 2)
@@ -157,35 +157,33 @@ public class DetailsDialog
     form.setColspan(tfUrl, 2);
     add(form);
 
-    //Button addAliasesBtn = new Button("Add aliases…", _ -> openAddAliasesDialog(mapping));
     Button addAliasesBtn = new Button("Add aliases…", _ -> {
       close();
       openAddAliasesDialog(mapping);
     });
     closeBtn.addClickListener(_ -> close());
-    getFooter().add(closeBtn, addAliasesBtn);
+
+    // Footer layout wrapper is YOUR component -> className is fine
+    var footer = new HorizontalLayout(closeBtn, addAliasesBtn);
+    footer.setSpacing(true);
+    footer.setPadding(false);
+    getFooter().add(footer);
 
     wireActions();
   }
 
-
-
-  /**
-   * Configures and populates all field components with the mapping values.
-   */
   private void configureFields() {
     tfShort.setValue(shortCode);
     tfShort.setReadOnly(true);
 
+    tfUrl.addClassName(C_URL);
     tfUrl.setValue(originalUrl);
     tfUrl.setReadOnly(true);
     tfUrl.getElement().setProperty("title", originalUrl);
-    tfUrl.getStyle().set("white-space", "nowrap")
-        .set("overflow", "hidden")
-        .set("text-overflow", "ellipsis");
 
     cbActive.setValue(active);
     cbActive.setReadOnly(true);
+
     tfCreated.setValue(DATE_TIME_FMT.format(createdAt));
     tfCreated.setReadOnly(true);
 
@@ -210,11 +208,10 @@ public class DetailsDialog
     expiresField.setWidthFull();
     expiresField.setVisible(false);
     expiresField.setWeekNumbersVisible(true);
-    expiresField.setDatePickerI18n(
-        new DatePickerI18n().setFirstDayOfWeek(1));
-    expiresField.setStep(Duration.ofMinutes(1));
-    expiresField.setWidthFull();
+    expiresField.setDatePickerI18n(new DatePickerI18n().setFirstDayOfWeek(1));
+
     HorizontalLayout row = new HorizontalLayout(expiresField);
+    row.addClassName(C_EXPIRES_ROW);
     row.setSpacing(true);
     row.setPadding(false);
     row.setWidthFull();
@@ -222,13 +219,7 @@ public class DetailsDialog
     return row;
   }
 
-
-
-  /**
-   * Sets up button actions and event propagation.
-   */
   private void wireActions() {
-    //TODO use Shortcode to open and check if it works
     openBtn.addClickListener(_ -> {
       fireEvent(new OpenEvent(this, shortCode, originalUrl));
       getUI().ifPresent(ui -> ui.getPage().open(originalUrl, "_blank"));
@@ -256,7 +247,6 @@ public class DetailsDialog
       binder.readBean(item);
       switchToEdit(false);
     });
-
   }
 
   private void switchToEdit(boolean enable) {
@@ -266,7 +256,6 @@ public class DetailsDialog
 
     expiresField.setVisible(enable);
     expiresField.setReadOnly(!enable);
-
 
     editBtn.setVisible(!enable);
     saveBtn.setVisible(enable);
@@ -287,8 +276,7 @@ public class DetailsDialog
       LocalDateTime ldt = expiresField.getValue();
       Instant expires = (ldt == null) ? null : ldt.atZone(ZoneId.systemDefault()).toInstant();
 
-      var cbActiveValue = cbActive.getValue();
-      boolean ok = client.edit(item.shortCode(), newUrl, expires, cbActiveValue);
+      boolean ok = client.edit(item.shortCode(), newUrl, expires, cbActive.getValue());
       if (ok) {
         Notifications.saved();
         fireEvent(new SavedEvent(this, item.shortCode()));
@@ -303,20 +291,15 @@ public class DetailsDialog
     }
   }
 
-  // ---------- Public API
-
   private void openAddAliasesDialog(ShortUrlMapping currentMapping) {
     var client = UrlShortenerClientFactory.newInstance();
 
     Dialog dlg = new Dialog();
+    dlg.addClassName(C_ALIAS_DLG);
     dlg.setHeaderTitle("new alias for: " + currentMapping.shortCode());
-    //dlg.setModal(true);
     dlg.setModality(ModalityMode.STRICT);
     dlg.setCloseOnEsc(true);
     dlg.setCloseOnOutsideClick(false);
-
-    dlg.setWidth("70vw");
-    dlg.getElement().getStyle().set("max-width", "1100px");
 
     var editor = new MultiAliasEditorStrict(
         SHORTCODE_BASE_URL,
@@ -329,6 +312,7 @@ public class DetailsDialog
         }
     );
     editor.setWidthFull();
+
     Button saveBtn = new Button("Save", _ -> {
       editor.validateAll();
       var validAliases = editor.getValidAliases();
@@ -396,9 +380,6 @@ public class DetailsDialog
     return addListener(SavedEvent.class, listener);
   }
 
-  // ---------- Event classes
-
-  // ---- Event API ----
   public static class SavedEvent
       extends ComponentEvent<DetailsDialog> {
     private final String shortCode;
@@ -412,8 +393,6 @@ public class DetailsDialog
       return shortCode;
     }
   }
-
-//  private record Status(String text, String theme) { }
 
   public static class DetailsEvent
       extends ComponentEvent<DetailsDialog> {
@@ -463,5 +442,4 @@ public class DetailsDialog
       this.shortCode = sc;
     }
   }
-
 }

@@ -15,6 +15,7 @@ import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -29,9 +30,15 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 
 import static com.vaadin.flow.component.icon.VaadinIcon.*;
 
+@CssImport("./styles/main-layout.css")
 public class MainLayout
     extends AppLayout
     implements BeforeEnterObserver, HasLogger {
+
+  private static final String C_APP_TITLE = "mainlayout__title";
+  private static final String C_HEADER_ROW = "mainlayout__header";
+  private static final String C_SPACER = "mainlayout__spacer";
+  private static final String C_RIGHT = "mainlayout__right";
 
   public MainLayout() {
     createHeader();
@@ -39,9 +46,7 @@ public class MainLayout
 
   private void createHeader() {
     H1 appTitle = new H1("URL Shortener");
-    appTitle.getStyle()
-        .set("font-size", "1.1rem")
-        .set("margin", "0");
+    appTitle.addClassName(C_APP_TITLE);
 
     SideNav views = getPrimaryNavigation();
     Scroller scroller = new Scroller(views);
@@ -51,26 +56,35 @@ public class MainLayout
 
     var adminClient = AdminClientFactory.newInstance();
     var storeIndicator = new StoreIndicator(adminClient);
-    storeIndicator.getStyle().set("margin-left", "auto"); // nach rechts schieben
+    storeIndicator.addClassName(C_RIGHT); // push to right
 
     HorizontalLayout headerRow;
+
     if (LoginConfig.isLoginEnabled()) {
       var logoutButton = new Button("Logout", _ -> {
         SessionAuth.clearAuthentication();
         UI.getCurrent().getPage().setLocation("/" + LoginView.PATH);
       });
       logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
-      headerRow = new HorizontalLayout(toggle, appTitle, new Span(), storeIndicator, logoutButton);
+
+      Span spacer = new Span();
+      spacer.addClassName(C_SPACER);
+
+      headerRow = new HorizontalLayout(toggle, appTitle, spacer, storeIndicator, logoutButton);
+
     } else {
-      headerRow = new HorizontalLayout(toggle, appTitle, new Span(), storeIndicator);
+      Span spacer = new Span();
+      spacer.addClassName(C_SPACER);
+
+      headerRow = new HorizontalLayout(toggle, appTitle, spacer, storeIndicator);
     }
 
+    headerRow.addClassName(C_HEADER_ROW);
     headerRow.setWidthFull();
     headerRow.setAlignItems(FlexComponent.Alignment.CENTER);
     headerRow.setSpacing(true);
     headerRow.setPadding(true);
     headerRow.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
-    headerRow.expand(headerRow.getComponentAt(2));
 
     VerticalLayout viewHeader = new VerticalLayout(headerRow);
     viewHeader.setPadding(false);
@@ -95,25 +109,17 @@ public class MainLayout
 
   @Override
   public void beforeEnter(BeforeEnterEvent event) {
-
-    // If login is globally disabled, do not protect any routes.
-    if (!LoginConfig.isLoginEnabled()) {
-      return;
-    }
+    if (!LoginConfig.isLoginEnabled()) return;
 
     logger().info("beforeEnter target={} authenticated={}",
                   event.getNavigationTarget().getSimpleName(),
                   SessionAuth.isAuthenticated());
 
-    // The login view itself must never be protected, otherwise we create a loop
-    if (event.getNavigationTarget().equals(LoginView.class)) {
-      return;
-    }
+    if (event.getNavigationTarget().equals(LoginView.class)) return;
 
     if (!SessionAuth.isAuthenticated()) {
       logger().info("beforeEnter.. isAuthenticated()==false - reroute to LoginView");
       event.rerouteTo(LoginView.class);
     }
   }
-
 }

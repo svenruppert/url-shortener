@@ -9,12 +9,12 @@ import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
-//import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.timepicker.TimePicker;
@@ -29,20 +29,25 @@ import java.util.Set;
 
 import static com.vaadin.flow.component.button.ButtonVariant.LUMO_ERROR;
 
+@CssImport("./styles/bulk-actions-bar.css")
 public class BulkActionsBar
     extends Composite<HorizontalLayout>
     implements HasLogger {
 
+  private static final String C_ROOT = "bulk-actions-bar";
+  private static final String C_INFO = "bulk-actions-bar__info";
+  private static final String C_BTN  = "bulk-actions-bar__btn";
+  private static final String C_ICON = "bulk-actions-bar__icon";
 
   private final URLShortenerClient urlShortenerClient;
   private final Grid<ShortUrlMapping> grid;
   private final OverviewView holdingComponent;
 
-  private final Button bulkDeleteBtn = new Button(new Icon(VaadinIcon.TRASH));
-  private final Button bulkSetExpiryBtn = new Button(new Icon(VaadinIcon.CLOCK));
-  private final Button bulkClearExpiryBtn = new Button(new Icon(VaadinIcon.CLOSE_CIRCLE));
-  private final Button bulkActivateBtn = new Button(new Icon(VaadinIcon.PLAY));
-  private final Button bulkDeactivateBtn = new Button(new Icon(VaadinIcon.STOP));
+  private final Button bulkDeleteBtn = new Button();
+  private final Button bulkSetExpiryBtn = new Button();
+  private final Button bulkClearExpiryBtn = new Button();
+  private final Button bulkActivateBtn = new Button();
+  private final Button bulkDeactivateBtn = new Button();
 
   private final Span selectionInfo = new Span();
 
@@ -62,27 +67,36 @@ public class BulkActionsBar
   }
 
   private void buildBulkBar() {
+    bulkBar().addClassName(C_ROOT);
 
-    // --- Common style ---
-    bulkBar().getStyle()
-        .set("background", "var(--lumo-contrast-5pct)")
-        .set("padding", "0.4rem 0.8rem")
-        .set("border-radius", "var(--lumo-border-radius-m)")
-        .set("border-bottom", "1px solid var(--lumo-contrast-20pct)");
+    selectionInfo.addClassName(C_INFO);
 
-    // --- Button setup ---
-    setupIconButton(bulkDeleteBtn,       VaadinIcon.TRASH,          "Delete selected links",       "var(--lumo-error-color)");
-    setupIconButton(bulkSetExpiryBtn,    VaadinIcon.CALENDAR_CLOCK, "Set expiry for selected",      "var(--lumo-primary-color)");
-    setupIconButton(bulkClearExpiryBtn,  VaadinIcon.CALENDAR_CLOCK,   "Clear expiry for selected",    "var(--lumo-secondary-text-color)");
-    setupIconButton(bulkActivateBtn,     VaadinIcon.CHECK_CIRCLE,   "Activate selected",            "var(--lumo-success-color)");
-    setupIconButton(bulkDeactivateBtn,   VaadinIcon.CLOSE_CIRCLE,            "Deactivate selected",          "var(--lumo-error-color)");
+    setupIconButton(bulkDeleteBtn,
+                    VaadinIcon.TRASH,
+                    "Delete selected links",
+                    "danger");
+
+    setupIconButton(bulkSetExpiryBtn,
+                    VaadinIcon.CALENDAR_CLOCK,
+                    "Set expiry for selected",
+                    "primary");
+
+    setupIconButton(bulkClearExpiryBtn,
+                    VaadinIcon.CALENDAR_CLOCK,
+                    "Clear expiry for selected",
+                    "neutral");
+
+    setupIconButton(bulkActivateBtn,
+                    VaadinIcon.CHECK_CIRCLE,
+                    "Activate selected",
+                    "success");
+
+    setupIconButton(bulkDeactivateBtn,
+                    VaadinIcon.CLOSE_CIRCLE,
+                    "Deactivate selected",
+                    "danger");
 
     bulkBar().removeAll();
-
-    selectionInfo.getStyle().set("opacity", "0.7");
-    selectionInfo.getStyle().set("font-size", "var(--lumo-font-size-s)");
-    selectionInfo.getStyle().set("margin-right", "var(--lumo-space-m)");
-
     bulkBar().add(
         selectionInfo,
         bulkDeleteBtn,
@@ -98,16 +112,20 @@ public class BulkActionsBar
     bulkBar().setVisible(false);
   }
 
-  private void setupIconButton(Button btn, VaadinIcon icon, String tooltip, String color) {
+  private void setupIconButton(Button btn,
+                               VaadinIcon icon,
+                               String tooltip,
+                               String role) {
+
+    btn.addClassName(C_BTN);
+    btn.addClassName(C_BTN + "--" + role);
+
     Icon ic = icon.create();
-    ic.setSize("30px");
-    ic.getStyle().set("color", "var(--lumo-success-color)");
-    ic.getStyle().set("color", color);
+    ic.addClassName(C_ICON);
 
     btn.setIcon(ic);
     btn.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_TERTIARY_INLINE);
     btn.getElement().setProperty("title", tooltip);
-    btn.getStyle().set("margin-left", "0.2rem");
   }
 
   private void addListeners() {
@@ -136,9 +154,7 @@ public class BulkActionsBar
 
     if (!exampleCodes.isEmpty()) {
       String preview = String.join(", ", exampleCodes);
-      if (selected.size() > 5) {
-        preview += ", …";
-      }
+      if (selected.size() > 5) preview += ", …";
       dialog.add(new Text("Examples: " + preview));
     } else {
       dialog.add(new Text("Delete selected short links?"));
@@ -151,11 +167,7 @@ public class BulkActionsBar
       for (var m : selected) {
         try {
           boolean ok = urlShortenerClient.delete(m.shortCode());
-          if (ok) {
-            success++;
-          } else {
-            failed++;
-          }
+          if (ok) success++; else failed++;
         } catch (IOException ex) {
           logger().error("Bulk delete failed for {}", m.shortCode(), ex);
           failed++;
@@ -168,8 +180,8 @@ public class BulkActionsBar
       Notifications.deletedAndNotDeleted(success, failed);
     });
     confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, LUMO_ERROR);
-    Button cancel = new Button("Cancel", _ -> dialog.close());
 
+    Button cancel = new Button("Cancel", _ -> dialog.close());
     dialog.getFooter().add(new HorizontalLayout(confirm, cancel));
     dialog.open();
   }
@@ -199,7 +211,8 @@ public class BulkActionsBar
         return;
       }
 
-      var localTime = Optional.ofNullable(time.getValue()).orElse(java.time.LocalTime.of(0, 0));
+      var localTime = Optional.ofNullable(time.getValue())
+          .orElse(java.time.LocalTime.of(0, 0));
       var zdt = ZonedDateTime.of(date.getValue(), localTime, ZoneId.systemDefault());
       Instant expiresAt = zdt.toInstant();
 
@@ -214,8 +227,7 @@ public class BulkActionsBar
               expiresAt,
               m.active()
           );
-          if (ok) success++;
-          else failed++;
+          if (ok) success++; else failed++;
         } catch (IOException ex) {
           logger().error("Bulk set expiry failed for {}", m.shortCode(), ex);
           failed++;
@@ -271,11 +283,7 @@ public class BulkActionsBar
             null,
             m.active()
         );
-        if (ok) {
-          success++;
-        } else {
-          failed++;
-        }
+        if (ok) success++; else failed++;
       } catch (IOException ex) {
         logger().error("Bulk clear expiry failed for {}", m.shortCode(), ex);
         failed++;
@@ -294,11 +302,7 @@ public class BulkActionsBar
     for (var m : selected) {
       try {
         var ok = urlShortenerClient.toggleActive(m.shortCode(), activate);
-        if (ok) {
-          success++;
-        } else {
-          failed++;
-        }
+        if (ok) success++; else failed++;
       } catch (IOException ex) {
         logger().error("Toggle active state failed for {}", m.shortCode(), ex);
         failed++;
@@ -334,6 +338,7 @@ public class BulkActionsBar
       bulkSetActive(Set.copyOf(selected), activate);
     });
     confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
     dialog.getFooter().add(new HorizontalLayout(cancel, confirm));
     dialog.open();
   }
@@ -345,7 +350,6 @@ public class BulkActionsBar
   private void confirmBulkDeactivateSelected() {
     confirmBulkSetActiveSelected(false);
   }
-
 
   public void setButtonsEnabled(boolean hasSelection) {
     bulkDeleteBtn.setEnabled(hasSelection);
