@@ -104,7 +104,8 @@ public class DetailsDialog
     this.active = mapping.active();
 
     setHeaderTitle("Details: " + shortCode);
-    setModal(true);
+    //setModal(true);
+    setModality(ModalityMode.STRICT);
     setDraggable(true);
     setResizable(true);
     setWidth("820px");
@@ -309,7 +310,8 @@ public class DetailsDialog
 
     Dialog dlg = new Dialog();
     dlg.setHeaderTitle("new alias for: " + currentMapping.shortCode());
-    dlg.setModal(true);
+    //dlg.setModal(true);
+    dlg.setModality(ModalityMode.STRICT);
     dlg.setCloseOnEsc(true);
     dlg.setCloseOnOutsideClick(false);
 

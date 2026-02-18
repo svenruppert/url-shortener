@@ -1,6 +1,7 @@
 package com.svenruppert.urlshortener.ui.vaadin.components;
 
 import com.svenruppert.urlshortener.ui.vaadin.tools.ColumnVisibilityService;
+import com.vaadin.flow.component.ModalityMode;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -18,7 +19,8 @@ public final class ColumnVisibilityDialog<T>
   public ColumnVisibilityDialog(Grid<T> grid, ColumnVisibilityService service) {
     Objects.requireNonNull(service);
     setHeaderTitle("Columns");
-    setModal(true);
+    //setModal(true);
+    setModality(ModalityMode.STRICT);
     setDraggable(true);
     setResizable(true);
 

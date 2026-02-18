@@ -6,6 +6,7 @@ import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.imports.ImportResult;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.ModalityMode;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -69,7 +70,8 @@ public final class ImportDialog
 
 
     setHeaderTitle("Import");
-    setModal(true);
+    //setModal(true);
+    setModality(ModalityMode.STRICT);
     setResizable(true);
     setDraggable(true);
     setWidth("1100px");
