@@ -5,22 +5,22 @@ import com.vaadin.flow.component.ModalityMode;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.dependency.CssImport;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
 @CssImport("./styles/column-visibility-dialog.css")
-public final class ColumnVisibilityDialog<T> extends Dialog {
+public final class ColumnVisibilityDialog<T>
+    extends Dialog {
 
-  private static final String CLASS_ROOT   = "column-visibility-dialog";
-  private static final String CLASS_FORM   = "column-visibility-dialog__form";
-  private static final String CLASS_CB     = "column-visibility-dialog__checkbox";
-  private static final String CLASS_FOOTER = "column-visibility-dialog__footer";
+  private static final String CLASS_ROOT = "column-visibility-dialog";
+  private static final String CLASS_FORM = "column-visibility-dialog__form";
+  private static final String CLASS_CB = "column-visibility-dialog__checkbox";
 
   public ColumnVisibilityDialog(Grid<T> grid, ColumnVisibilityService service) {
     Objects.requireNonNull(service);
@@ -64,12 +64,7 @@ public final class ColumnVisibilityDialog<T> extends Dialog {
       cb.addValueChangeListener(ev -> {
         boolean v = Boolean.TRUE.equals(ev.getValue());
         col.setVisible(v);
-
-        // (unverändert) aktuell: sofort persistieren
         service.setSingle(key, v);
-
-        // (unverändert) pending wird nicht genutzt
-        // pending.put(key, v);
       });
 
       form.add(cb);
@@ -78,17 +73,7 @@ public final class ColumnVisibilityDialog<T> extends Dialog {
     var btnClose = new Button("Close", _ -> close());
     btnClose.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
-    var btnApply = new Button("Apply bulk", _ -> {
-      if (!pending.isEmpty()) {
-        service.setBulk(new LinkedHashMap<>(pending));
-        pending.clear();
-      }
-      close();
-    });
-    btnApply.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-    // Footer stylen: Class auf den Footer-Container
-    getFooter().add(btnClose, btnApply);
+    getFooter().add(btnClose);
 
     add(form);
   }
