@@ -6,11 +6,13 @@ import com.svenruppert.urlshortener.ui.vaadin.security.LoginConfig;
 import com.svenruppert.urlshortener.ui.vaadin.security.SessionAuth;
 import com.svenruppert.urlshortener.ui.vaadin.tools.AdminClientFactory;
 import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
+import com.svenruppert.urlshortener.ui.vaadin.tools.LocaleSelection;
 import com.svenruppert.urlshortener.ui.vaadin.views.AboutView;
 import com.svenruppert.urlshortener.ui.vaadin.views.CreateView;
 import com.svenruppert.urlshortener.ui.vaadin.views.YoutubeView;
 import com.svenruppert.urlshortener.ui.vaadin.views.login.LoginView;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
@@ -27,7 +29,10 @@ import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
+import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+
+import java.util.Locale;
 
 import static com.vaadin.flow.component.icon.VaadinIcon.*;
 
@@ -49,6 +54,10 @@ public class MainLayout
   private static final String K_NAV_CREATE = "nav.create";
   private static final String K_NAV_YOUTUBE = "nav.youtube";
   private static final String K_NAV_ABOUT = "nav.about";
+
+  //  private final ComboBox<Locale> languageSelector = new ComboBox<>();
+  Component languageSwitch = createLanguageSwitch();
+
 
   public MainLayout() {
     createHeader();
@@ -79,11 +88,10 @@ public class MainLayout
         UI.getCurrent().getPage().setLocation("/" + LoginView.PATH);
       });
       logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
-
-      headerRow = new HorizontalLayout(toggle, appTitle, spacer, storeIndicator, logoutButton);
-
+      headerRow = new HorizontalLayout(toggle, appTitle, spacer, languageSwitch, storeIndicator, logoutButton);
     } else {
-      headerRow = new HorizontalLayout(toggle, appTitle, spacer, storeIndicator);
+      headerRow = new HorizontalLayout(toggle, appTitle, spacer, languageSwitch, storeIndicator);
+
     }
 
     headerRow.addClassName(C_HEADER_ROW);
@@ -129,4 +137,89 @@ public class MainLayout
       event.rerouteTo(LoginView.class);
     }
   }
+
+
+  private Component createLanguageSwitch() {
+
+    Locale current = LocaleSelection.resolveAndStore(
+        VaadinSession.getCurrent(),
+        UI.getCurrent().getLocale()
+    );
+
+    Button de = flagButton(LocaleSelection.DE, current);
+    Button en = flagButton(LocaleSelection.EN, current);
+    Button fi = flagButton(LocaleSelection.FI, current);
+
+    HorizontalLayout bar = new HorizontalLayout(de, en, fi);
+    bar.setSpacing(false);
+    bar.getStyle()
+        .set("gap", "6px")
+        .set("padding", "2px")
+        .set("border-radius", "999px")
+        .set("background", "var(--lumo-contrast-5pct)");
+
+    return bar;
+  }
+
+  private Button flagButton(Locale locale, Locale current) {
+
+    String flag = flagEmoji(locale);
+
+    Button b = new Button(new Span(flag));
+    b.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+
+    b.getStyle()
+        .set("width", "38px")
+        .set("height", "32px")
+        .set("min-width", "38px")
+        .set("border-radius", "999px")
+        .set("padding", "0")
+        .set("line-height", "1")
+        .set("font-size", "18px");
+
+    boolean active = locale.getLanguage().equalsIgnoreCase(current.getLanguage());
+    applyActiveStyle(b, active);
+
+    b.addClickListener(e -> switchLocale(locale));
+
+    // Tooltip (optional, aber nice)
+    b.getElement().setProperty("title", locale.getLanguage().toUpperCase());
+
+    return b;
+  }
+
+  private void applyActiveStyle(Button b, boolean active) {
+    if (active) {
+      b.getStyle()
+          .set("background", "var(--lumo-primary-color-10pct)")
+          .set("outline", "2px solid var(--lumo-primary-color-50pct)");
+    } else {
+      b.getStyle()
+          .remove("background")
+          .remove("outline");
+    }
+  }
+
+  private void switchLocale(Locale selected) {
+    UI ui = UI.getCurrent();
+    VaadinSession session = VaadinSession.getCurrent();
+
+    Locale effective = LocaleSelection.match(selected);
+
+    LocaleSelection.setToSession(session, effective);
+    session.setLocale(effective);
+    ui.setLocale(effective);
+
+    ui.getPage().reload();
+  }
+
+  private String flagEmoji(Locale locale) {
+    return switch (locale.getLanguage()) {
+      case "de" -> "🇩🇪";
+      case "fi" -> "🇫🇮";
+      default -> "🇬🇧"; // EN
+    };
+  }
+
+
 }
