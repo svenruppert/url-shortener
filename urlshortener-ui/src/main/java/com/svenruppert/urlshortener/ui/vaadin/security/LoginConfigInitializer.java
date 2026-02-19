@@ -32,8 +32,13 @@ public class LoginConfigInitializer implements ServletContextListener, HasLogger
 
       props.load(in);
 
-      String enabledRaw = props.getProperty("login.enabled", "true").trim();
-      boolean enabled = Boolean.parseBoolean(enabledRaw);
+      String enabledRaw = props.getProperty("login.enabled", "true").trim().toLowerCase();
+      boolean enabled = switch (enabledRaw) {
+        case "true", "yes", "y", "1", "on" -> true;
+        case "false", "no", "n", "0", "off" -> false;
+        default -> Boolean.parseBoolean(enabledRaw);
+      };
+
       String password = props.getProperty("login.password");
 
       LoginConfig.initialise(enabled, password);
