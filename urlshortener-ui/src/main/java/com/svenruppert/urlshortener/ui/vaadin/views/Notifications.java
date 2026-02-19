@@ -1,5 +1,6 @@
 package com.svenruppert.urlshortener.ui.vaadin.views;
 
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18n;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 
@@ -12,127 +13,144 @@ public final class Notifications {
   private Notifications() {
   }
 
-  // =========================
-  // Core helpers
-  // =========================
-
   private static void show(String message,
                            NotificationVariant variant,
                            int duration,
                            Notification.Position position) {
-
     Notification n = new Notification(message, duration, position);
-
-    if (variant != null) {
-      n.addThemeVariants(variant);
-    }
-
+    if (variant != null) n.addThemeVariants(variant);
     n.open();
   }
 
-  private static void success(String message) {
-    show(message, NotificationVariant.LUMO_SUCCESS,
-         DEFAULT_DURATION, DEFAULT_POSITION);
+  private static void success(String key, String fallback, Object... params) {
+    show(I18n.tr(key, fallback, params),
+         NotificationVariant.LUMO_SUCCESS,
+         DEFAULT_DURATION,
+         DEFAULT_POSITION);
   }
 
-  private static void error(String message) {
-    show(message, NotificationVariant.LUMO_ERROR,
-         DEFAULT_DURATION, DEFAULT_POSITION);
+  private static void error(String key, String fallback, Object... params) {
+    show(I18n.tr(key, fallback, params),
+         NotificationVariant.LUMO_ERROR,
+         DEFAULT_DURATION,
+         DEFAULT_POSITION);
   }
 
-  private static void warning(String message) {
-    show(message, NotificationVariant.LUMO_WARNING,
-         DEFAULT_DURATION, DEFAULT_POSITION);
+  private static void warning(String key, String fallback, Object... params) {
+    show(I18n.tr(key, fallback, params),
+         NotificationVariant.LUMO_WARNING,
+         DEFAULT_DURATION,
+         DEFAULT_POSITION);
   }
 
-  private static void info(String message) {
-    show(message, null,
-         DEFAULT_DURATION, DEFAULT_POSITION);
+  private static void info(String key, String fallback, Object... params) {
+    show(I18n.tr(key, fallback, params),
+         null,
+         DEFAULT_DURATION,
+         DEFAULT_POSITION);
   }
 
   // =========================
-  // Public API
+  // i18n / generic API
   // =========================
+
+  public static void infoKey(String key, String fallback, Object... params) {
+    show(com.svenruppert.urlshortener.ui.vaadin.tools.I18n.tr(key, fallback, params),
+         null, DEFAULT_DURATION, DEFAULT_POSITION);
+  }
+
+  public static void successKey(String key, String fallback, Object... params) {
+    show(com.svenruppert.urlshortener.ui.vaadin.tools.I18n.tr(key, fallback, params),
+         NotificationVariant.LUMO_SUCCESS, DEFAULT_DURATION, DEFAULT_POSITION);
+  }
+
+  public static void warningKey(String key, String fallback, Object... params) {
+    show(com.svenruppert.urlshortener.ui.vaadin.tools.I18n.tr(key, fallback, params),
+         NotificationVariant.LUMO_WARNING, DEFAULT_DURATION, DEFAULT_POSITION);
+  }
+
+  public static void errorKey(String key, String fallback, Object... params) {
+    show(com.svenruppert.urlshortener.ui.vaadin.tools.I18n.tr(key, fallback, params),
+         NotificationVariant.LUMO_ERROR, DEFAULT_DURATION, DEFAULT_POSITION);
+  }
 
   public static void saved() {
-    success("Saved successfully");
+    success("notifications.saved", "Saved successfully");
   }
 
   public static void savedAndNotSaved(long success, long failed) {
-    success("Saved: " + success + " | Failed: " + failed);
+    success("notifications.savedAndFailed", "Saved: {0} | Failed: {1}", success, failed);
   }
 
   public static void updatedAndNotUpdated(long success, long failed) {
-    success("Updated: " + success + " | Failed: " + failed);
+    success("notifications.updatedAndFailed", "Updated: {0} | Failed: {1}", success, failed);
   }
 
   public static void deletedAndNotDeleted(long success, long failed) {
-    success("Deleted: " + success + " | Failed: " + failed);
+    success("notifications.deletedAndFailed", "Deleted: {0} | Failed: {1}", success, failed);
   }
 
   public static void noChanges() {
-    info("No changes detected");
+    info("notifications.noChanges", "No changes detected");
   }
 
   public static void noValidShortCode() {
-    warning("No valid short code");
+    warning("notifications.noValidShortCode", "No valid short code");
   }
 
   public static void noDateSelected() {
-    warning("No date selected");
+    warning("notifications.noDateSelected", "No date selected");
   }
 
   public static void noSelection() {
-    warning("No entries selected");
+    warning("notifications.noSelection", "No entries selected");
   }
 
   public static void loadingFailed() {
-    error("Loading failed");
+    error("notifications.loadingFailed", "Loading failed");
   }
 
   public static void shortCodeDeleted() {
-    success("Short code deleted");
+    success("notifications.shortCodeDeleted", "Short code deleted");
   }
 
   public static void shortCodeNotFound() {
-    warning("Short code not found");
+    warning("notifications.shortCodeNotFound", "Short code not found");
   }
 
   public static void shortCodeCopied() {
-    info("Short code copied");
+    info("notifications.shortCodeCopied", "Short code copied");
   }
 
   public static void urlCopied() {
-    info("URL copied");
+    info("notifications.urlCopied", "URL copied");
   }
 
   public static void statusUpdatedOK() {
-    success("Status updated");
+    success("notifications.statusUpdated", "Status updated");
   }
 
   public static void statusUpdatedFailed(Exception ex) {
-    error("Error updating status: " + safeMessage(ex));
+    error("notifications.statusUpdatedFailed", "Error updating status: {0}", safeMessage(ex));
   }
 
   public static void operationFailed(Exception ex) {
-    error("Operation failed: " + safeMessage(ex));
+    error("notifications.operationFailed", "Operation failed: {0}", safeMessage(ex));
   }
 
   public static void loginCurrentlyDisabled() {
-    warning("Login is currently disabled. Check server configuration.");
+    warning("notifications.loginDisabled",
+            "Login is currently disabled. Check server configuration.");
   }
 
   public static void loginCurrentlyNotConfigured() {
-    warning("Login is not configured. Verify configuration file.");
+    warning("notifications.loginNotConfigured",
+            "Login is not configured. Verify configuration file.");
   }
-
-  // =========================
-  // Safety helper
-  // =========================
 
   private static String safeMessage(Exception ex) {
     return (ex == null || ex.getMessage() == null)
-        ? "Unknown error"
+        ? I18n.tr("notifications.unknownError", "Unknown error")
         : ex.getMessage();
   }
 }

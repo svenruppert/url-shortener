@@ -4,6 +4,7 @@ import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.imports.ImportResult;
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ModalityMode;
@@ -36,95 +37,148 @@ import static com.svenruppert.urlshortener.core.urlmapping.imports.JsonFieldExtr
 
 public final class ImportDialog
     extends Dialog
-    implements HasLogger {
+    implements HasLogger, I18nSupport {
 
   private final URLShortenerClient client;
 
   private final Upload upload = new Upload();
   private byte[] zipBytes;
 
-  private final Button btnValidate = new Button("Validate");
-  private final Button btnApply = new Button("Apply Import");
-  private final Button btnClose = new Button("Close");
+  private final Button btnValidate = new Button();
+  private final Button btnApply = new Button();
+  private final Button btnClose = new Button();
 
   private final Span lblStaging = new Span("-");
   private final Span lblNew = new Span("0");
   private final Span lblConflicts = new Span("0");
   private final Span lblInvalid = new Span("0");
-  private final Tab tabConflicts = new Tab("Conflicts");
-  private final Tab tabInvalid = new Tab("Invalid");
+
+  private final Tab tabConflicts = new Tab();
+  private final Tab tabInvalid = new Tab();
   private final Tabs tabs = new Tabs(tabConflicts, tabInvalid);
+
   private final Grid<ConflictRow> gridConflicts = new Grid<>(ConflictRow.class, false);
   private final Grid<InvalidRow> gridInvalid = new Grid<>(InvalidRow.class, false);
+
   private final PagingBar pagingConflicts = new PagingBar(50);
   private final PagingBar pagingInvalid = new PagingBar(50);
+
   private final Runnable onImportApplied;
-  private final Checkbox chkSkipConflicts = new Checkbox("Skip conflicts on apply");
+  private final Checkbox chkSkipConflicts = new Checkbox();
   private final Div applyHint = new Div();
+
   private String stagingId;
 
+  // i18n keys
+  private static final String K_TITLE = "overview.import.title";
+
+  private static final String K_SECTION_UPLOAD = "overview.import.section.uploadZip";
+  private static final String K_SECTION_PREVIEW = "overview.import.section.preview";
+
+  private static final String K_BTN_VALIDATE = "overview.import.btn.validate";
+  private static final String K_BTN_APPLY = "overview.import.btn.apply";
+  private static final String K_BTN_CLOSE = "overview.import.btn.close";
+
+  private static final String K_SKIP_CONFLICTS = "overview.import.checkbox.skipConflicts";
+
+  private static final String K_HINT_INITIAL = "overview.import.hint.initial";
+  private static final String K_HINT_NEED_VALIDATE = "overview.import.hint.needValidate";
+  private static final String K_HINT_DISABLED_INVALID = "overview.import.hint.disabledInvalid";
+  private static final String K_HINT_DISABLED_CONFLICTS = "overview.import.hint.disabledConflicts";
+  private static final String K_HINT_READY = "overview.import.hint.ready";
+  private static final String K_HINT_APPLIED = "overview.import.hint.applied";
+
+  private static final String K_APPLY_SKIP_CONFLICTS = "overview.import.apply.skipConflicts";
+
+  private static final String K_TAB_CONFLICTS = "overview.import.tab.conflicts";
+  private static final String K_TAB_INVALID = "overview.import.tab.invalid";
+
+  private static final String K_SUMMARY_STAGING = "overview.import.summary.stagingId";
+  private static final String K_SUMMARY_NEW = "overview.import.summary.new";
+  private static final String K_SUMMARY_CONFLICTS = "overview.import.summary.conflicts";
+  private static final String K_SUMMARY_INVALID = "overview.import.summary.invalid";
+
+  private static final String K_GRID_C_SHORTCODE = "overview.import.grid.conflicts.shortCode";
+  private static final String K_GRID_C_DIFF = "overview.import.grid.conflicts.diff";
+  private static final String K_GRID_C_EXISTING_URL = "overview.import.grid.conflicts.existingUrl";
+  private static final String K_GRID_C_INCOMING_URL = "overview.import.grid.conflicts.incomingUrl";
+  private static final String K_GRID_C_EXISTING_ACTIVE = "overview.import.grid.conflicts.existingActive";
+  private static final String K_GRID_C_INCOMING_ACTIVE = "overview.import.grid.conflicts.incomingActive";
+  private static final String K_GRID_C_EXISTING_EXPIRES = "overview.import.grid.conflicts.existingExpiresAt";
+  private static final String K_GRID_C_INCOMING_EXPIRES = "overview.import.grid.conflicts.incomingExpiresAt";
+
+  private static final String K_GRID_I_SHORTCODE = "overview.import.grid.invalid.shortCode";
+  private static final String K_GRID_I_REASON = "overview.import.grid.invalid.reason";
+
+  private static final String K_TOAST_NO_ZIP = "overview.import.toast.noZip";
+  private static final String K_TOAST_VALIDATED = "overview.import.toast.validated";
+  private static final String K_TOAST_APPLIED = "overview.import.toast.applied";
 
   public ImportDialog(URLShortenerClient client, Runnable onImportApplied) {
     this.client = client;
     this.onImportApplied = onImportApplied != null ? onImportApplied : () -> { };
 
-
-    setHeaderTitle("Import");
-    //setModal(true);
+    // Dialog config
+    setHeaderTitle(tr(K_TITLE, "Import"));
     setModality(ModalityMode.STRICT);
     setResizable(true);
     setDraggable(true);
     setWidth("1100px");
     setHeight("750px");
 
+    // Tabs
+    tabConflicts.setLabel(tr(K_TAB_CONFLICTS, "Conflicts"));
+    tabInvalid.setLabel(tr(K_TAB_INVALID, "Invalid"));
+    tabs.setSelectedTab(tabConflicts);
+
+    // Checkbox + hint
+    chkSkipConflicts.setLabel(tr(K_SKIP_CONFLICTS, "Skip conflicts on apply"));
     chkSkipConflicts.setEnabled(false);
     chkSkipConflicts.setValue(false);
     chkSkipConflicts.addValueChangeListener(_ -> updateApplyState());
 
     applyHint.addClassNames("importdialog-applyhint");
+    applyHint.setText(tr(K_HINT_INITIAL, "Upload a ZIP and validate to continue."));
 
-    //applyHint.getStyle().set("font-size", "var(--lumo-font-size-s)");
-    //applyHint.getStyle().set("color", "var(--lumo-secondary-text-color)");
-
-    applyHint.setText("Upload a ZIP and validate to continue.");
-
+    // Upload
     upload.setAcceptedFileTypes(".zip", APPLICATION_ZIP);
     upload.setMaxFiles(1);
     upload.setMaxFileSize(IMPORT_MAX_ZIP_BYTES);
+
     upload.addAllFinishedListener(_ -> {
       logger().info("Upload finished..");
       btnApply.setEnabled(false);
     });
+
     upload.addFileRejectedListener(event -> {
       String errorMessage = event.getErrorMessage();
-      Notification notification = Notification.show(errorMessage, 5000,
-                                                    Notification.Position.MIDDLE);
+      Notification notification = Notification.show(errorMessage, 5000, Notification.Position.MIDDLE);
       notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
       logger().warn("upload.addFileRejectedListener - {}", errorMessage);
     });
-    UploadHandler inMemoryUploadHandler = UploadHandler
-        .inMemory((metadata, bytes) -> {
-          String fileName = metadata.fileName();
-          //String mimeType = metadata.contentType();
-          long contentLength = metadata.contentLength();
-          logger().info("uploaded file: fileName: {} , contentLength {}", fileName, contentLength);
-          zipBytes = bytes;
-          logger().info("setting zipBytes..");
-          btnValidate.setEnabled(true);
-        });
+
+    UploadHandler inMemoryUploadHandler = UploadHandler.inMemory((metadata, bytes) -> {
+      logger().info("uploaded file: fileName: {} , contentLength {}", metadata.fileName(), metadata.contentLength());
+      zipBytes = bytes;
+      btnValidate.setEnabled(true);
+    });
     upload.setUploadHandler(inMemoryUploadHandler);
 
+    // Buttons
+    btnValidate.setText(tr(K_BTN_VALIDATE, "Validate"));
     btnValidate.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     btnValidate.setEnabled(false);
+    btnValidate.addClickListener(_ -> validate());
 
+    btnApply.setText(tr(K_BTN_APPLY, "Apply Import"));
     btnApply.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
     btnApply.setEnabled(false);
-
-    btnClose.addClickListener(_ -> close());
-
-    btnValidate.addClickListener(_ -> validate());
     btnApply.addClickListener(_ -> applyImport());
 
+    btnClose.setText(tr(K_BTN_CLOSE, "Close"));
+    btnClose.addClickListener(_ -> close());
+
+    // Grids + content
     initGrids();
     add(buildContent());
     getFooter().add(btnClose, btnValidate, btnApply);
@@ -149,10 +203,10 @@ public final class ImportDialog
 
   private Component buildContent() {
     var summary = new HorizontalLayout(
-        labelPair("stagingId", lblStaging),
-        labelPair("new", lblNew),
-        labelPair("conflicts", lblConflicts),
-        labelPair("invalid", lblInvalid)
+        labelPair(tr(K_SUMMARY_STAGING, "stagingId"), lblStaging),
+        labelPair(tr(K_SUMMARY_NEW, "new"), lblNew),
+        labelPair(tr(K_SUMMARY_CONFLICTS, "conflicts"), lblConflicts),
+        labelPair(tr(K_SUMMARY_INVALID, "invalid"), lblInvalid)
     );
     summary.setWidthFull();
 
@@ -161,19 +215,17 @@ public final class ImportDialog
     applyRow.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
     applyRow.expand(applyHint);
 
-
     var tabContent = new VerticalLayout();
     tabContent.setPadding(false);
     tabContent.setSpacing(false);
     tabContent.setSizeFull();
 
-    tabs.addSelectedChangeListener(e -> renderTab(tabContent));
-    tabs.setSelectedTab(tabConflicts);
+    tabs.addSelectedChangeListener(_ -> renderTab(tabContent));
 
     var root = new VerticalLayout(
-        new H3("Upload ZIP"),
+        new H3(tr(K_SECTION_UPLOAD, "Upload ZIP")),
         upload,
-        new H3("Preview"),
+        new H3(tr(K_SECTION_PREVIEW, "Preview")),
         summary,
         applyRow,
         tabs,
@@ -188,22 +240,20 @@ public final class ImportDialog
   }
 
   private void initGrids() {
-    gridConflicts.addColumn(ConflictRow::shortCode).setHeader("shortCode").setAutoWidth(true).setFlexGrow(0);
-    gridConflicts.addColumn(ConflictRow::diff).setHeader("diff").setAutoWidth(true).setFlexGrow(0);
-    gridConflicts.addColumn(ConflictRow::existingUrl).setHeader("existingUrl").setAutoWidth(true);
-    gridConflicts.addColumn(ConflictRow::incomingUrl).setHeader("incomingUrl").setAutoWidth(true);
-    gridConflicts.addColumn(ConflictRow::existingActive).setHeader("existingActive").setAutoWidth(true).setFlexGrow(0);
-    gridConflicts.addColumn(ConflictRow::incomingActive).setHeader("incomingActive").setAutoWidth(true).setFlexGrow(0);
-    gridConflicts.addColumn(ConflictRow::existingExpiresAt).setHeader("existingExpiresAt").setAutoWidth(true).setFlexGrow(0);
-    gridConflicts.addColumn(ConflictRow::incomingExpiresAt).setHeader("incomingExpiresAt").setAutoWidth(true).setFlexGrow(0);
+    gridConflicts.addColumn(ConflictRow::shortCode).setHeader(tr(K_GRID_C_SHORTCODE, "shortCode")).setAutoWidth(true).setFlexGrow(0);
+    gridConflicts.addColumn(ConflictRow::diff).setHeader(tr(K_GRID_C_DIFF, "diff")).setAutoWidth(true).setFlexGrow(0);
+    gridConflicts.addColumn(ConflictRow::existingUrl).setHeader(tr(K_GRID_C_EXISTING_URL, "existingUrl")).setAutoWidth(true);
+    gridConflicts.addColumn(ConflictRow::incomingUrl).setHeader(tr(K_GRID_C_INCOMING_URL, "incomingUrl")).setAutoWidth(true);
+    gridConflicts.addColumn(ConflictRow::existingActive).setHeader(tr(K_GRID_C_EXISTING_ACTIVE, "existingActive")).setAutoWidth(true).setFlexGrow(0);
+    gridConflicts.addColumn(ConflictRow::incomingActive).setHeader(tr(K_GRID_C_INCOMING_ACTIVE, "incomingActive")).setAutoWidth(true).setFlexGrow(0);
+    gridConflicts.addColumn(ConflictRow::existingExpiresAt).setHeader(tr(K_GRID_C_EXISTING_EXPIRES, "existingExpiresAt")).setAutoWidth(true).setFlexGrow(0);
+    gridConflicts.addColumn(ConflictRow::incomingExpiresAt).setHeader(tr(K_GRID_C_INCOMING_EXPIRES, "incomingExpiresAt")).setAutoWidth(true).setFlexGrow(0);
     gridConflicts.setSizeFull();
 
-    gridInvalid.addColumn(InvalidRow::shortCode).setHeader("shortCode").setAutoWidth(true).setFlexGrow(0);
-    gridInvalid.addColumn(InvalidRow::reason).setHeader("reason").setAutoWidth(true);
+    gridInvalid.addColumn(InvalidRow::shortCode).setHeader(tr(K_GRID_I_SHORTCODE, "shortCode")).setAutoWidth(true).setFlexGrow(0);
+    gridInvalid.addColumn(InvalidRow::reason).setHeader(tr(K_GRID_I_REASON, "reason")).setAutoWidth(true);
     gridInvalid.setSizeFull();
   }
-
-
 
   private void renderTab(VerticalLayout container) {
     container.removeAll();
@@ -221,13 +271,13 @@ public final class ImportDialog
   private void validate() {
     try {
       if (zipBytes == null || zipBytes.length == 0) {
-        Notification.show("No ZIP uploaded.", 2500, Notification.Position.TOP_CENTER);
+        Notification.show(tr(K_TOAST_NO_ZIP, "No ZIP uploaded."), 2500, Notification.Position.TOP_CENTER);
         return;
       }
 
-      // B3: raw preview JSON (mit conflictItems[] + invalidItems[])
       String previewJson = client.importValidateRaw(zipBytes);
       logger().info("importValidateRaw response ->|{}|<-", previewJson);
+
       this.stagingId = extractJsonString(previewJson, "stagingId");
       int newItems = extractJsonInt(previewJson, "newItems", 0);
       int conflicts = extractJsonInt(previewJson, "conflicts", 0);
@@ -238,7 +288,6 @@ public final class ImportDialog
       lblConflicts.setText(String.valueOf(conflicts));
       lblInvalid.setText(String.valueOf(invalid));
 
-      // B3: Arrays direkt aus dem Validate-Response lesen
       List<ConflictRow> conflictRows = new ArrayList<>();
       try (StringReader r = new StringReader(previewJson)) {
         for (String obj : new ItemsArrayIterator(r, "conflictItems")) {
@@ -258,18 +307,17 @@ public final class ImportDialog
       gridConflicts.setItems(conflictRows);
       gridInvalid.setItems(invalidRows);
 
-      // Paging ist bei B3 nur noch "Anzeige", keine Server-Calls mehr
       pagingConflicts.setTotal(conflictRows.size());
       pagingConflicts.setPage(1);
       pagingInvalid.setTotal(invalidRows.size());
       pagingInvalid.setPage(1);
 
       chkSkipConflicts.setEnabled(conflicts > 0);
-      chkSkipConflicts.setValue(false); // immer reset
+      chkSkipConflicts.setValue(false);
 
       updateApplyState();
 
-      Notification.show("Import validated.", 2500, Notification.Position.TOP_CENTER);
+      Notification.show(tr(K_TOAST_VALIDATED, "Import validated."), 2500, Notification.Position.TOP_CENTER);
 
     } catch (Exception ex) {
       Notifications.operationFailed(ex);
@@ -277,33 +325,12 @@ public final class ImportDialog
     }
   }
 
-
-  /**
-   * Updates the state of the "Apply Import" button and its associated hint text based on the current
-   * conditions, such as the presence of a valid staging ID, the number of invalid items, and
-   * conflicts with the option to skip conflicts. The following logic governs the button's state:
-   *
-   * - If there is no valid staging ID, the "Apply Import" button is disabled and a hint is shown
-   *   indicating the need to validate an import archive.
-   * - If there are invalid items, the "Apply Import" button remains disabled, and a hint provides
-   *   guidance on resolving or removing invalid items before proceeding.
-   * - If there are conflicts, but the "Skip conflicts on apply" option is selected, the button's
-   *   visual style is updated to indicate the skipped conflicts.
-   * - If conflicts exist and the "Skip conflicts on apply" option is not selected, the "Apply Import"
-   *   button remains disabled with a hint directing the user to enable skipping conflicts.
-   * - If no invalid items or blocking conflicts exist, the button is enabled, and appropriate text
-   *   is displayed based on the conflict status.
-   *
-   * This method relies on parsing integer values for invalid items and conflicts and toggling
-   * component states accordingly.
-   */
   private void updateApplyState() {
-    // Default: disabled
     btnApply.setEnabled(false);
-    btnApply.setText("Apply Import");
+    btnApply.setText(tr(K_BTN_APPLY, "Apply Import"));
 
     if (stagingId == null || stagingId.isBlank()) {
-      applyHint.setText("Validate an import archive first.");
+      applyHint.setText(tr(K_HINT_NEED_VALIDATE, "Validate an import archive first."));
       return;
     }
 
@@ -311,8 +338,12 @@ public final class ImportDialog
     int conflicts = parseInt(lblConflicts.getText(), 0);
 
     if (invalid > 0) {
-      applyHint.setText("Apply disabled: " + invalid + " invalid item(s). Fix/remove them before applying.");
-      btnApply.setText("Apply Import");
+      applyHint.setText(tr(
+          K_HINT_DISABLED_INVALID,
+          "Apply disabled: {0} invalid item(s). Fix/remove them before applying.",
+          invalid
+      ));
+      btnApply.setText(tr(K_BTN_APPLY, "Apply Import"));
       return;
     }
 
@@ -323,14 +354,20 @@ public final class ImportDialog
     }
 
     if (conflicts > 0 && !chkSkipConflicts.getValue()) {
-      applyHint.setText("Apply disabled: " + conflicts + " conflict(s). Tick “Skip conflicts on apply” to proceed.");
-      btnApply.setText("Apply Import");
+      applyHint.setText(tr(
+          K_HINT_DISABLED_CONFLICTS,
+          "Apply disabled: {0} conflict(s). Tick \u201cSkip conflicts on apply\u201d to proceed.",
+          conflicts
+      ));
+      btnApply.setText(tr(K_BTN_APPLY, "Apply Import"));
       return;
     }
 
     btnApply.setEnabled(true);
-    btnApply.setText(conflicts > 0 ? "Apply (skip conflicts)" : "Apply Import");
-    applyHint.setText("Ready to apply import.");
+    btnApply.setText(conflicts > 0
+                         ? tr(K_APPLY_SKIP_CONFLICTS, "Apply (skip conflicts)")
+                         : tr(K_BTN_APPLY, "Apply Import"));
+    applyHint.setText(tr(K_HINT_READY, "Ready to apply import."));
   }
 
   private void applyImport() {
@@ -339,18 +376,19 @@ public final class ImportDialog
     try {
       ImportResult res = client.importApply(stagingId);
       onImportApplied.run();
-      close(); // optional: wenn du ihn offen lassen willst, entferne diese Zeile
+      close();
 
-      Notification.show("Import applied: created=" + res.created()
-                            + ", skippedConflicts=" + res.skippedConflicts()
-                            + ", invalid=" + res.invalid(),
-                        3500, Notification.Position.TOP_CENTER);
+      Notification.show(tr(
+          K_TOAST_APPLIED,
+          "Import applied: created={0}, skippedConflicts={1}, invalid={2}",
+          res.created(), res.skippedConflicts(), res.invalid()
+      ), 3500, Notification.Position.TOP_CENTER);
 
       btnApply.setEnabled(false);
       btnValidate.setEnabled(false);
       chkSkipConflicts.setEnabled(false);
       chkSkipConflicts.setValue(false);
-      applyHint.setText("Import applied. Upload a new ZIP to continue.");
+      applyHint.setText(tr(K_HINT_APPLIED, "Import applied. Upload a new ZIP to continue."));
 
     } catch (Exception ex) {
       Notifications.operationFailed(ex);

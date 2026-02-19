@@ -6,6 +6,7 @@ import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.validation.UrlValidator;
 import com.svenruppert.urlshortener.ui.vaadin.components.MultiAliasEditorStrict;
 import com.svenruppert.urlshortener.ui.vaadin.events.MappingCreatedOrChanged;
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.vaadin.flow.component.*;
@@ -44,7 +45,7 @@ import static com.svenruppert.urlshortener.ui.vaadin.tools.UiActions.copyToClipb
 @CssImport("./styles/details-dialog.css")
 public class DetailsDialog
     extends Dialog
-    implements HasLogger {
+    implements HasLogger, I18nSupport {
 
   public static final ZoneId ZONE = ZoneId.systemDefault();
   private static final DateTimeFormatter DATE_TIME_FMT =
@@ -58,29 +59,58 @@ public class DetailsDialog
   private static final String C_EXPIRES_ROW = "details-dialog__expires-row";
   private static final String C_ALIAS_DLG = "details-dialog__alias-dialog";
 
+  // i18n keys (Overview-leading)
+  private static final String K_TITLE = "overview.details.title"; // Details: {0}
+
+  private static final String K_F_SHORTCODE = "overview.details.field.shortcode";
+  private static final String K_F_URL = "overview.details.field.originalUrl";
+  private static final String K_F_CREATED = "overview.details.field.createdOn";
+  private static final String K_F_EXPIRES = "overview.details.field.expires";
+  private static final String K_F_ACTIVE = "overview.details.field.active";
+
+  private static final String K_NO_EXPIRY = "overview.details.noExpiry"; // No expiry date
+
+  private static final String K_BTN_OPEN = "overview.details.btn.open";
+  private static final String K_BTN_COPY_SHORT = "overview.details.btn.copyShortUrl";
+  private static final String K_BTN_COPY_URL = "overview.details.btn.copyUrl";
+  private static final String K_BTN_DELETE = "overview.details.btn.delete";
+  private static final String K_BTN_CLOSE = "common.close";
+
+  private static final String K_BTN_EDIT = "overview.details.btn.edit";
+  private static final String K_TT_EDIT = "overview.details.tt.edit";
+  private static final String K_TT_SAVE = "overview.details.tt.save";
+  private static final String K_TT_CANCEL = "overview.details.tt.cancel";
+
+  private static final String K_VALID_URL_REQUIRED = "overview.details.validation.url.required"; // URL must not be blank
+
+  private static final String K_ALIAS_BTN_ADD = "overview.details.alias.btn.add";
+  private static final String K_ALIAS_TITLE = "overview.details.alias.title"; // New alias for: {0}
+  private static final String K_ALIAS_BTN_SAVE = "common.save";
+  private static final String K_ALIAS_BTN_CLOSE = "common.close";
+
   private final String shortCode;
   private final String originalUrl;
   private final Instant createdAt;
   private final Optional<Instant> expiresAt;
   private final Boolean active;
 
-  private final TextField tfShort = new TextField("Shortcode");
-  private final TextField tfUrl = new TextField("Original URL");
-  private final TextField tfCreated = new TextField("Created on");
-  private final TextField tfExpires = new TextField("Expires");
-  private final Checkbox cbActive = new Checkbox("Active");
+  private final TextField tfShort = new TextField();
+  private final TextField tfUrl = new TextField();
+  private final TextField tfCreated = new TextField();
+  private final TextField tfExpires = new TextField();
+  private final Checkbox cbActive = new Checkbox();
   private final Span statusPill = new Span();
 
-  private final Button openBtn = new Button("Open", new Icon(VaadinIcon.EXTERNAL_LINK));
-  private final Button copyShortBtn = new Button("Copy ShortURL", new Icon(VaadinIcon.COPY));
-  private final Button copyUrlBtn = new Button("Copy URL", new Icon(VaadinIcon.COPY));
-  private final Button deleteBtn = new Button("Delete…", new Icon(VaadinIcon.TRASH));
-  private final Button closeBtn = new Button("Close");
+  private final Button openBtn = new Button(new Icon(VaadinIcon.EXTERNAL_LINK));
+  private final Button copyShortBtn = new Button(new Icon(VaadinIcon.COPY));
+  private final Button copyUrlBtn = new Button(new Icon(VaadinIcon.COPY));
+  private final Button deleteBtn = new Button(new Icon(VaadinIcon.TRASH));
+  private final Button closeBtn = new Button();
 
-  private final Button editBtn = new Button("Edit", new Icon(VaadinIcon.EDIT));
+  private final Button editBtn = new Button(new Icon(VaadinIcon.EDIT));
   private final Button saveBtn = new Button(new Icon(VaadinIcon.CHECK));
   private final Button cancelBtn = new Button(new Icon(VaadinIcon.CLOSE));
-  private final DateTimePicker expiresField = new DateTimePicker("Expires");
+  private final DateTimePicker expiresField = new DateTimePicker();
 
   private final URLShortenerClient client;
   private final ShortUrlMapping item;
@@ -101,12 +131,12 @@ public class DetailsDialog
 
     addClassName(C_ROOT);
 
-    setHeaderTitle("Details: " + shortCode);
+    setHeaderTitle(tr(K_TITLE, "Details: {0}", shortCode));
     setModality(ModalityMode.STRICT);
     setDraggable(true);
     setResizable(true);
-    // width moved to CSS via ::part(overlay)
 
+    // Button styling
     openBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
     saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -116,8 +146,12 @@ public class DetailsDialog
     saveBtn.setVisible(false);
     cancelBtn.setVisible(false);
 
+    // i18n labels/texts
+    applyI18n();
+
+    // Binder
     binder.forField(tfUrl)
-        .asRequired("URL must not be blank")
+        .asRequired(tr(K_VALID_URL_REQUIRED, "URL must not be blank"))
         .withValidator((String url, ValueContext _) -> {
           var res = UrlValidator.validate(url);
           return res.valid() ? ValidationResult.ok() : ValidationResult.error(res.message());
@@ -131,7 +165,7 @@ public class DetailsDialog
         );
     binder.readBean(item);
 
-    // Build header content (these ARE your components -> you can className them)
+    // Build header content
     var leftHeader = new HorizontalLayout(openBtn, copyShortBtn, copyUrlBtn, deleteBtn);
     leftHeader.addClassName(C_HEADER_LEFT);
     leftHeader.setSpacing(true);
@@ -157,19 +191,41 @@ public class DetailsDialog
     form.setColspan(tfUrl, 2);
     add(form);
 
-    Button addAliasesBtn = new Button("Add aliases…", _ -> {
+    Button addAliasesBtn = new Button(tr(K_ALIAS_BTN_ADD, "Add aliases…"), _ -> {
       close();
       openAddAliasesDialog(mapping);
     });
+
     closeBtn.addClickListener(_ -> close());
 
-    // Footer layout wrapper is YOUR component -> className is fine
     var footer = new HorizontalLayout(closeBtn, addAliasesBtn);
     footer.setSpacing(true);
     footer.setPadding(false);
     getFooter().add(footer);
 
     wireActions();
+  }
+
+  private void applyI18n() {
+    tfShort.setLabel(tr(K_F_SHORTCODE, "Shortcode"));
+    tfUrl.setLabel(tr(K_F_URL, "Original URL"));
+    tfCreated.setLabel(tr(K_F_CREATED, "Created on"));
+    tfExpires.setLabel(tr(K_F_EXPIRES, "Expires"));
+    cbActive.setLabel(tr(K_F_ACTIVE, "Active"));
+
+    openBtn.setText(tr(K_BTN_OPEN, "Open"));
+    copyShortBtn.setText(tr(K_BTN_COPY_SHORT, "Copy ShortURL"));
+    copyUrlBtn.setText(tr(K_BTN_COPY_URL, "Copy URL"));
+    deleteBtn.setText(tr(K_BTN_DELETE, "Delete…"));
+    closeBtn.setText(tr(K_BTN_CLOSE, "Close"));
+
+    editBtn.setText(tr(K_BTN_EDIT, "Edit"));
+
+    editBtn.getElement().setAttribute("title", tr(K_TT_EDIT, "Edit"));
+    saveBtn.getElement().setAttribute("title", tr(K_TT_SAVE, "Save"));
+    cancelBtn.getElement().setAttribute("title", tr(K_TT_CANCEL, "Cancel"));
+
+    expiresField.setLabel(tr(K_F_EXPIRES, "Expires"));
   }
 
   private void configureFields() {
@@ -187,7 +243,7 @@ public class DetailsDialog
     tfCreated.setValue(DATE_TIME_FMT.format(createdAt));
     tfCreated.setReadOnly(true);
 
-    tfExpires.setValue(expiresAt.map(DATE_TIME_FMT::format).orElse("No expiry date"));
+    tfExpires.setValue(expiresAt.map(DATE_TIME_FMT::format).orElse(tr(K_NO_EXPIRY, "No expiry date")));
     tfExpires.setReadOnly(true);
 
     statusPill.getElement().getThemeList().add("badge");
@@ -196,14 +252,9 @@ public class DetailsDialog
     var statusText = computeStatusText(expiresAt);
     statusPill.setText(statusText.text());
     statusPill.getElement().getThemeList().add(statusText.theme());
-
-    editBtn.getElement().setAttribute("title", "Edit");
-    saveBtn.getElement().setAttribute("title", "Save");
-    cancelBtn.getElement().setAttribute("title", "Cancel");
   }
 
   private Component buildExpiresRow() {
-    expiresField.setLabel("Expires");
     expiresField.setStep(Duration.ofMinutes(1));
     expiresField.setWidthFull();
     expiresField.setVisible(false);
@@ -296,7 +347,7 @@ public class DetailsDialog
 
     Dialog dlg = new Dialog();
     dlg.addClassName(C_ALIAS_DLG);
-    dlg.setHeaderTitle("new alias for: " + currentMapping.shortCode());
+    dlg.setHeaderTitle(tr(K_ALIAS_TITLE, "New alias for: {0}", currentMapping.shortCode()));
     dlg.setModality(ModalityMode.STRICT);
     dlg.setCloseOnEsc(true);
     dlg.setCloseOnOutsideClick(false);
@@ -313,7 +364,7 @@ public class DetailsDialog
     );
     editor.setWidthFull();
 
-    Button saveBtn = new Button("Save", _ -> {
+    Button saveBtn = new Button(tr(K_ALIAS_BTN_SAVE, "Save"), _ -> {
       editor.validateAll();
       var validAliases = editor.getValidAliases();
       if (validAliases.isEmpty()) {
@@ -336,7 +387,7 @@ public class DetailsDialog
       refreshAfterAliasAdd();
     });
 
-    Button closeBtn = new Button("Close", _ -> dlg.close());
+    Button closeBtn = new Button(tr(K_ALIAS_BTN_CLOSE, "Close"), _ -> dlg.close());
 
     dlg.addOpenedChangeListener(e -> {
       if (!e.isOpened()) {
@@ -380,8 +431,7 @@ public class DetailsDialog
     return addListener(SavedEvent.class, listener);
   }
 
-  public static class SavedEvent
-      extends ComponentEvent<DetailsDialog> {
+  public static class SavedEvent extends ComponentEvent<DetailsDialog> {
     private final String shortCode;
 
     public SavedEvent(DetailsDialog src, String shortCode) {
@@ -394,15 +444,13 @@ public class DetailsDialog
     }
   }
 
-  public static class DetailsEvent
-      extends ComponentEvent<DetailsDialog> {
+  public static class DetailsEvent extends ComponentEvent<DetailsDialog> {
     public DetailsEvent(DetailsDialog source) {
       super(source, false);
     }
   }
 
-  public static class OpenEvent
-      extends DetailsEvent {
+  public static class OpenEvent extends DetailsEvent {
     public final String shortCode;
     public final String originalUrl;
 
@@ -413,8 +461,7 @@ public class DetailsDialog
     }
   }
 
-  public static class CopyShortcodeEvent
-      extends DetailsEvent {
+  public static class CopyShortcodeEvent extends DetailsEvent {
     public final String shortCode;
 
     public CopyShortcodeEvent(DetailsDialog src, String sc) {
@@ -423,8 +470,7 @@ public class DetailsDialog
     }
   }
 
-  public static class CopyUrlEvent
-      extends DetailsEvent {
+  public static class CopyUrlEvent extends DetailsEvent {
     public final String url;
 
     public CopyUrlEvent(DetailsDialog src, String url) {
@@ -433,8 +479,7 @@ public class DetailsDialog
     }
   }
 
-  public static class DeleteEvent
-      extends DetailsEvent {
+  public static class DeleteEvent extends DetailsEvent {
     public final String shortCode;
 
     public DeleteEvent(DetailsDialog src, String sc) {

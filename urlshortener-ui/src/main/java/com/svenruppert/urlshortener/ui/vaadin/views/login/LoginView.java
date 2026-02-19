@@ -2,6 +2,7 @@ package com.svenruppert.urlshortener.ui.vaadin.views.login;
 
 import com.svenruppert.urlshortener.ui.vaadin.security.LoginConfig;
 import com.svenruppert.urlshortener.ui.vaadin.security.SessionAuth;
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
 import com.vaadin.flow.component.UI;
@@ -12,15 +13,15 @@ import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.PasswordField;
-import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
-import com.vaadin.flow.router.PageTitle;
-import com.vaadin.flow.router.Route;
+import com.vaadin.flow.router.*;
 
 @Route(LoginView.PATH)
-@PageTitle("Admin Login | URL Shortener")
 @CssImport("./styles/login-view.css")
-public class LoginView extends VerticalLayout implements BeforeEnterObserver {
+public class LoginView
+    extends VerticalLayout
+    implements BeforeEnterObserver, I18nSupport, HasDynamicTitle {
+
+  private static final String K_PAGE_TITLE = "login.pageTitle";
 
   public static final String PATH = "login";
 
@@ -29,8 +30,15 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
   private static final String C_FIELD = "login-view__field";
   private static final String C_BUTTON = "login-view__button";
 
-  private final PasswordField passwordField = new PasswordField("Password");
-  private final Button loginButton = new Button("Login");
+  // i18n keys
+  private static final String K_TITLE = "login.title";
+  private static final String K_SUBTITLE = "login.subtitle";
+  private static final String K_PASSWORD = "login.field.password";
+  private static final String K_LOGIN = "login.btn.login";
+  private static final String K_ERR_INCORRECT_PW = "login.error.incorrectPassword";
+
+  private final PasswordField passwordField = new PasswordField();
+  private final Button loginButton = new Button();
 
   public LoginView() {
     addClassName(C_ROOT);
@@ -39,8 +47,14 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
     setAlignItems(Alignment.CENTER);
     setJustifyContentMode(JustifyContentMode.CENTER);
 
+    applyI18n();
     configureForm();
     buildLayout();
+  }
+
+  private void applyI18n() {
+    passwordField.setLabel(tr(K_PASSWORD, "Password"));
+    loginButton.setText(tr(K_LOGIN, "Login"));
   }
 
   private void configureForm() {
@@ -64,10 +78,11 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
   }
 
   private void buildLayout() {
-    H2 title = new H2("Admin Login");
-    Paragraph subtitle = new Paragraph(
+    H2 title = new H2(tr(K_TITLE, "Admin Login"));
+    Paragraph subtitle = new Paragraph(tr(
+        K_SUBTITLE,
         "Please enter the administrator password to access the management interface."
-    );
+    ));
 
     VerticalLayout formLayout =
         new VerticalLayout(title, subtitle, passwordField, loginButton);
@@ -102,7 +117,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
       SessionAuth.markAuthenticated();
       UI.getCurrent().navigate(OverviewView.PATH);
     } else {
-      passwordField.setErrorMessage("Incorrect password");
+      passwordField.setErrorMessage(tr(K_ERR_INCORRECT_PW, "Incorrect password"));
       passwordField.setInvalid(true);
     }
   }
@@ -118,4 +133,10 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
       event.forwardTo(OverviewView.PATH);
     }
   }
+
+  @Override
+  public String getPageTitle() {
+    return tr(K_PAGE_TITLE, "Admin Login | URL Shortener");
+  }
+
 }

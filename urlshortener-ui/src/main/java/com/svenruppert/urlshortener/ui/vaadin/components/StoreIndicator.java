@@ -6,6 +6,7 @@ import com.svenruppert.urlshortener.core.StoreInfo;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreConnectionChanged;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreMode;
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.dependency.CssImport;
@@ -24,24 +25,30 @@ import java.util.Objects;
 @CssImport("./styles/store-indicator.css")
 public class StoreIndicator
     extends HorizontalLayout
-    implements HasLogger {
-
-  private final AdminClient adminClient;
-  private final Icon dbIcon = VaadinIcon.DATABASE.create();
-  private final Span badge = new Span();
-  private final Span details = new Span();
-
-  private StoreMode lastMode = StoreMode.UNAVAILABLE;
+    implements HasLogger, I18nSupport {
 
   // CSS classes
   private static final String CLASS_ROOT = "store-indicator";
   private static final String CLASS_ICON = "store-indicator__icon";
   private static final String CLASS_BADGE = "store-indicator__badge";
   private static final String CLASS_DETAILS = "store-indicator__details";
-
   private static final String STATE_ECLIPSE = "store-indicator--eclipse";
-  private static final String STATE_MEMORY  = "store-indicator--memory";
-  private static final String STATE_DOWN    = "store-indicator--unavailable";
+  private static final String STATE_MEMORY = "store-indicator--memory";
+  private static final String STATE_DOWN = "store-indicator--unavailable";
+  // i18n keys
+  private static final String NS = "storeIndicator";
+  private static final String K_BADGE_ECLIPSE = NS + ".badge.eclipse";
+  private static final String K_BADGE_MEMORY = NS + ".badge.memory";
+  private static final String K_BADGE_UNAVAILABLE = NS + ".badge.unavailable";
+  private static final String K_DETAILS_ITEMS = NS + ".details.items"; // "· {0} items"
+  private static final String K_TITLE_ECLIPSE = NS + ".title.eclipse";
+  private static final String K_TITLE_MEMORY = NS + ".title.memory";
+  private static final String K_TITLE_UNAVAILABLE = NS + ".title.unavailable";
+  private final AdminClient adminClient;
+  private final Icon dbIcon = VaadinIcon.DATABASE.create();
+  private final Span badge = new Span();
+  private final Span details = new Span();
+  private StoreMode lastMode = StoreMode.UNAVAILABLE;
 
   public StoreIndicator(AdminClient adminClient) {
     this.adminClient = adminClient;
@@ -58,6 +65,7 @@ public class StoreIndicator
 
     add(dbIcon, badge, details);
     applyState(StoreMode.UNAVAILABLE);
+    applyTexts(StoreMode.UNAVAILABLE, 0);
   }
 
   @Override
@@ -77,38 +85,18 @@ public class StoreIndicator
         StoreInfo info = adminClient.getStoreInfo();
         boolean persistent = "EclipseStore".equalsIgnoreCase(info.mode());
 
-        badge.setText(persistent ? "EclipseStore" : "InMemory");
-        details.setText("· " + info.mappings() + " items");
-        getElement().setAttribute("title",
-                                  persistent ? "Persistent via EclipseStore" : "Volatile (InMemory)");
         var newMode = persistent ? StoreMode.ECLIPSE_STORE : StoreMode.IN_MEMORY;
+
+        applyTexts(newMode, info.mappings());
         applyState(newMode);
+
         if (newMode != lastMode) {
           lastMode = newMode;
           StoreEvents.publish(new StoreConnectionChanged(newMode, info.mappings()));
         }
-//        if (persistent) {
-//          badge.getStyle()
-//              .set("background-color", "var(--lumo-success-color-10pct)")
-//              .set("color", "var(--lumo-success-text-color)");
-//          dbIcon.getStyle().set("color", "var(--lumo-success-color)");
-//        } else {
-//          badge.getStyle()
-//              .set("background-color", "var(--lumo-primary-color-10pct)")
-//              .set("color", "var(--lumo-primary-text-color)");
-//          dbIcon.getStyle().set("color", "var(--lumo-primary-color)");
-//        }
-
 
       } catch (Exception e) {
-        badge.setText("Unavailable");
-//        badge.getStyle()
-//            .set("background-color", "var(--lumo-error-color-10pct)")
-//            .set("color", "var(--lumo-error-text-color)");
-//        dbIcon.getStyle().set("color", "var(--lumo-error-color)");
-        details.setText("");
-        getElement().setAttribute("title", "StoreInfo endpoint unavailable");
-
+        applyTexts(StoreMode.UNAVAILABLE, 0);
         applyState(StoreMode.UNAVAILABLE);
 
         if (lastMode != StoreMode.UNAVAILABLE) {
@@ -118,6 +106,29 @@ public class StoreIndicator
       }
     }));
   }
+
+  private void applyTexts(StoreMode mode, long mappings) {
+    Objects.requireNonNull(mode, "mode");
+
+    switch (mode) {
+      case ECLIPSE_STORE -> {
+        badge.setText(tr(K_BADGE_ECLIPSE, "EclipseStore"));
+        details.setText(tr(K_DETAILS_ITEMS, "· {0} items", mappings));
+        getElement().setAttribute("title", tr(K_TITLE_ECLIPSE, "Persistent via EclipseStore"));
+      }
+      case IN_MEMORY -> {
+        badge.setText(tr(K_BADGE_MEMORY, "InMemory"));
+        details.setText(tr(K_DETAILS_ITEMS, "· {0} items", mappings));
+        getElement().setAttribute("title", tr(K_TITLE_MEMORY, "Volatile (InMemory)"));
+      }
+      default -> {
+        badge.setText(tr(K_BADGE_UNAVAILABLE, "Unavailable"));
+        details.setText("");
+        getElement().setAttribute("title", tr(K_TITLE_UNAVAILABLE, "StoreInfo endpoint unavailable"));
+      }
+    }
+  }
+
   private void applyState(StoreMode mode) {
     // nur die drei Zustandsklassen managen
     removeClassNames(STATE_ECLIPSE, STATE_MEMORY, STATE_DOWN);

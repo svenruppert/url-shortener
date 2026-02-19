@@ -3,6 +3,7 @@ package com.svenruppert.urlshortener.ui.vaadin.views.overview;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.vaadin.flow.component.Composite;
 import com.vaadin.flow.component.Text;
@@ -32,12 +33,44 @@ import static com.vaadin.flow.component.button.ButtonVariant.LUMO_ERROR;
 @CssImport("./styles/bulk-actions-bar.css")
 public class BulkActionsBar
     extends Composite<HorizontalLayout>
-    implements HasLogger {
+    implements HasLogger, I18nSupport {
 
   private static final String C_ROOT = "bulk-actions-bar";
   private static final String C_INFO = "bulk-actions-bar__info";
   private static final String C_BTN  = "bulk-actions-bar__btn";
   private static final String C_ICON = "bulk-actions-bar__icon";
+
+  // i18n keys (Overview-leading namespace)
+  private static final String K_TT_DELETE = "overview.bulk.tooltip.delete";
+  private static final String K_TT_SET_EXPIRY = "overview.bulk.tooltip.setExpiry";
+  private static final String K_TT_CLEAR_EXPIRY = "overview.bulk.tooltip.clearExpiry";
+  private static final String K_TT_ACTIVATE = "overview.bulk.tooltip.activate";
+  private static final String K_TT_DEACTIVATE = "overview.bulk.tooltip.deactivate";
+
+  private static final String K_DLG_BULK_DELETE_TITLE = "overview.bulk.delete.title";
+  private static final String K_DLG_BULK_DELETE_EXAMPLES = "overview.bulk.delete.examples";
+  private static final String K_DLG_BULK_DELETE_FALLBACK = "overview.bulk.delete.fallback";
+
+  private static final String K_DLG_SET_EXPIRY_TITLE = "overview.bulk.expiry.set.title";
+  private static final String K_DLG_SET_EXPIRY_DATE = "overview.bulk.expiry.set.date";
+  private static final String K_DLG_SET_EXPIRY_TIME = "overview.bulk.expiry.set.time";
+  private static final String K_DLG_SET_EXPIRY_APPLY = "overview.bulk.expiry.set.apply";
+
+  private static final String K_DLG_CLEAR_EXPIRY_TITLE = "overview.bulk.expiry.clear.title";
+  private static final String K_DLG_CLEAR_EXPIRY_BODY = "overview.bulk.expiry.clear.body";
+  private static final String K_DLG_CLEAR_EXPIRY_CONFIRM = "overview.bulk.expiry.clear.confirm";
+
+  private static final String K_DLG_SET_ACTIVE_TITLE = "overview.bulk.active.title";
+  private static final String K_DLG_SET_ACTIVE_BODY = "overview.bulk.active.body";
+  private static final String K_DLG_SET_ACTIVE_CONFIRM = "overview.bulk.active.confirm";
+
+  private static final String K_WORD_ACTIVATE = "overview.bulk.word.activate";
+  private static final String K_WORD_DEACTIVATE = "overview.bulk.word.deactivate";
+  private static final String K_WORD_ACTIVE = "overview.bulk.word.active";
+  private static final String K_WORD_INACTIVE = "overview.bulk.word.inactive";
+
+  private static final String K_COMMON_DELETE = "common.delete";
+  private static final String K_COMMON_CANCEL = "common.cancel";
 
   private final URLShortenerClient urlShortenerClient;
   private final Grid<ShortUrlMapping> grid;
@@ -71,30 +104,40 @@ public class BulkActionsBar
 
     selectionInfo.addClassName(C_INFO);
 
-    setupIconButton(bulkDeleteBtn,
-                    VaadinIcon.TRASH,
-                    "Delete selected links",
-                    "danger");
+    setupIconButton(
+        bulkDeleteBtn,
+        VaadinIcon.TRASH,
+        tr(K_TT_DELETE, "Delete selected links"),
+        "danger"
+    );
 
-    setupIconButton(bulkSetExpiryBtn,
-                    VaadinIcon.CALENDAR_CLOCK,
-                    "Set expiry for selected",
-                    "primary");
+    setupIconButton(
+        bulkSetExpiryBtn,
+        VaadinIcon.CALENDAR_CLOCK,
+        tr(K_TT_SET_EXPIRY, "Set expiry for selected"),
+        "primary"
+    );
 
-    setupIconButton(bulkClearExpiryBtn,
-                    VaadinIcon.CALENDAR_CLOCK,
-                    "Clear expiry for selected",
-                    "neutral");
+    setupIconButton(
+        bulkClearExpiryBtn,
+        VaadinIcon.CALENDAR_CLOCK,
+        tr(K_TT_CLEAR_EXPIRY, "Clear expiry for selected"),
+        "neutral"
+    );
 
-    setupIconButton(bulkActivateBtn,
-                    VaadinIcon.CHECK_CIRCLE,
-                    "Activate selected",
-                    "success");
+    setupIconButton(
+        bulkActivateBtn,
+        VaadinIcon.CHECK_CIRCLE,
+        tr(K_TT_ACTIVATE, "Activate selected"),
+        "success"
+    );
 
-    setupIconButton(bulkDeactivateBtn,
-                    VaadinIcon.CLOSE_CIRCLE,
-                    "Deactivate selected",
-                    "danger");
+    setupIconButton(
+        bulkDeactivateBtn,
+        VaadinIcon.CLOSE_CIRCLE,
+        tr(K_TT_DEACTIVATE, "Deactivate selected"),
+        "danger"
+    );
 
     bulkBar().removeAll();
     bulkBar().add(
@@ -144,7 +187,11 @@ public class BulkActionsBar
     }
 
     Dialog dialog = new Dialog();
-    dialog.setHeaderTitle("Delete " + selected.size() + " short links?");
+    dialog.setHeaderTitle(tr(
+        K_DLG_BULK_DELETE_TITLE,
+        "Delete {0} short links?",
+        selected.size()
+    ));
 
     var exampleCodes = selected.stream()
         .map(ShortUrlMapping::shortCode)
@@ -155,12 +202,19 @@ public class BulkActionsBar
     if (!exampleCodes.isEmpty()) {
       String preview = String.join(", ", exampleCodes);
       if (selected.size() > 5) preview += ", …";
-      dialog.add(new Text("Examples: " + preview));
+      dialog.add(new Text(tr(
+          K_DLG_BULK_DELETE_EXAMPLES,
+          "Examples: {0}",
+          preview
+      )));
     } else {
-      dialog.add(new Text("Delete selected short links?"));
+      dialog.add(new Text(tr(
+          K_DLG_BULK_DELETE_FALLBACK,
+          "Delete selected short links?"
+      )));
     }
 
-    Button confirm = new Button("Delete", _ -> {
+    Button confirm = new Button(tr(K_COMMON_DELETE, "Delete"), _ -> {
       int success = 0;
       int failed = 0;
 
@@ -181,7 +235,7 @@ public class BulkActionsBar
     });
     confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, LUMO_ERROR);
 
-    Button cancel = new Button("Cancel", _ -> dialog.close());
+    Button cancel = new Button(tr(K_COMMON_CANCEL, "Cancel"), _ -> dialog.close());
     dialog.getFooter().add(new HorizontalLayout(confirm, cancel));
     dialog.open();
   }
@@ -194,18 +248,22 @@ public class BulkActionsBar
     }
 
     Dialog dialog = new Dialog();
-    dialog.setHeaderTitle("Set expiry for " + selected.size() + " short links");
+    dialog.setHeaderTitle(tr(
+        K_DLG_SET_EXPIRY_TITLE,
+        "Set expiry for {0} short links",
+        selected.size()
+    ));
 
-    DatePicker date = new DatePicker("Date");
-    TimePicker time = new TimePicker("Time");
+    DatePicker date = new DatePicker(tr(K_DLG_SET_EXPIRY_DATE, "Date"));
+    TimePicker time = new TimePicker(tr(K_DLG_SET_EXPIRY_TIME, "Time"));
     time.setStep(Duration.ofMinutes(15));
 
     HorizontalLayout body = new HorizontalLayout(date, time);
     body.setAlignItems(FlexComponent.Alignment.END);
     dialog.add(body);
 
-    Button cancel = new Button("Cancel", _ -> dialog.close());
-    Button apply = new Button("Apply", _ -> {
+    Button cancel = new Button(tr(K_COMMON_CANCEL, "Cancel"), _ -> dialog.close());
+    Button apply = new Button(tr(K_DLG_SET_EXPIRY_APPLY, "Apply"), _ -> {
       if (date.getValue() == null) {
         Notifications.noDateSelected();
         return;
@@ -253,15 +311,22 @@ public class BulkActionsBar
     }
 
     Dialog dialog = new Dialog();
-    dialog.setHeaderTitle("Remove expiry for " + selected.size() + " short links?");
-
-    dialog.add(new Text(
-        "This will remove the expiry date from all selected short links. "
-            + "They will no longer expire automatically."
+    dialog.setHeaderTitle(tr(
+        K_DLG_CLEAR_EXPIRY_TITLE,
+        "Remove expiry for {0} short links?",
+        selected.size()
     ));
 
-    Button cancel = new Button("Cancel", _ -> dialog.close());
-    Button confirm = new Button("Remove expiry", _ -> {
+    dialog.add(new Text(tr(
+        K_DLG_CLEAR_EXPIRY_BODY,
+        "This will remove the expiry date from all selected short links. They will no longer expire automatically."
+    )));
+
+    Button cancel = new Button(tr(K_COMMON_CANCEL, "Cancel"), _ -> dialog.close());
+    Button confirm = new Button(tr(
+        K_DLG_CLEAR_EXPIRY_CONFIRM,
+        "Remove expiry"
+    ), _ -> {
       dialog.close();
       bulkClearExpiry(selected);
     });
@@ -321,19 +386,39 @@ public class BulkActionsBar
       return;
     }
 
-    var verb = activate ? "activate" : "deactivate";
-    var verbCap = activate ? "Activate" : "Deactivate";
+    final String verb = activate
+        ? tr(K_WORD_ACTIVATE, "activate")
+        : tr(K_WORD_DEACTIVATE, "deactivate");
+
+    final String stateAfter = activate
+        ? tr(K_WORD_ACTIVE, "active")
+        : tr(K_WORD_INACTIVE, "inactive");
+
+    final String verbCap = activate
+        ? capitalize(verb)
+        : capitalize(verb);
 
     Dialog dialog = new Dialog();
-    dialog.setHeaderTitle(verbCap + " all " + selected.size() + " short links?");
-
-    dialog.add(new Text(
-        "This will " + verb + " all selected short links. "
-            + "They will be " + (activate ? "active" : "inactive") + " afterwards."
+    dialog.setHeaderTitle(tr(
+        K_DLG_SET_ACTIVE_TITLE,
+        "{0} all {1} short links?",
+        verbCap,
+        selected.size()
     ));
 
-    Button cancel = new Button("Cancel", _ -> dialog.close());
-    Button confirm = new Button(verbCap + " All", _ -> {
+    dialog.add(new Text(tr(
+        K_DLG_SET_ACTIVE_BODY,
+        "This will {0} all selected short links. They will be {1} afterwards.",
+        verb,
+        stateAfter
+    )));
+
+    Button cancel = new Button(tr(K_COMMON_CANCEL, "Cancel"), _ -> dialog.close());
+    Button confirm = new Button(tr(
+        K_DLG_SET_ACTIVE_CONFIRM,
+        "{0} All",
+        verbCap
+    ), _ -> {
       dialog.close();
       bulkSetActive(Set.copyOf(selected), activate);
     });
@@ -362,5 +447,10 @@ public class BulkActionsBar
   public void selectionInfoText(String txt) {
     selectionInfo.setText(txt);
     selectionInfo.setVisible(!txt.isBlank());
+  }
+
+  private static String capitalize(String s) {
+    if (s == null || s.isBlank()) return s;
+    return Character.toUpperCase(s.charAt(0)) + s.substring(1);
   }
 }

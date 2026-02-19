@@ -5,6 +5,7 @@ import com.svenruppert.urlshortener.ui.vaadin.components.StoreIndicator;
 import com.svenruppert.urlshortener.ui.vaadin.security.LoginConfig;
 import com.svenruppert.urlshortener.ui.vaadin.security.SessionAuth;
 import com.svenruppert.urlshortener.ui.vaadin.tools.AdminClientFactory;
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.svenruppert.urlshortener.ui.vaadin.views.AboutView;
 import com.svenruppert.urlshortener.ui.vaadin.views.CreateView;
 import com.svenruppert.urlshortener.ui.vaadin.views.YoutubeView;
@@ -33,19 +34,28 @@ import static com.vaadin.flow.component.icon.VaadinIcon.*;
 @CssImport("./styles/main-layout.css")
 public class MainLayout
     extends AppLayout
-    implements BeforeEnterObserver, HasLogger {
+    implements BeforeEnterObserver, HasLogger, I18nSupport {
 
   private static final String C_APP_TITLE = "mainlayout__title";
   private static final String C_HEADER_ROW = "mainlayout__header";
   private static final String C_SPACER = "mainlayout__spacer";
   private static final String C_RIGHT = "mainlayout__right";
 
+  // i18n keys
+  private static final String K_APP_TITLE = "main.appTitle";
+  private static final String K_LOGOUT = "main.logout";
+
+  private static final String K_NAV_OVERVIEW = "nav.overview";
+  private static final String K_NAV_CREATE = "nav.create";
+  private static final String K_NAV_YOUTUBE = "nav.youtube";
+  private static final String K_NAV_ABOUT = "nav.about";
+
   public MainLayout() {
     createHeader();
   }
 
   private void createHeader() {
-    H1 appTitle = new H1("URL Shortener");
+    H1 appTitle = new H1(tr(K_APP_TITLE, "URL Shortener"));
     appTitle.addClassName(C_APP_TITLE);
 
     SideNav views = getPrimaryNavigation();
@@ -60,22 +70,19 @@ public class MainLayout
 
     HorizontalLayout headerRow;
 
+    Span spacer = new Span();
+    spacer.addClassName(C_SPACER);
+
     if (LoginConfig.isLoginEnabled()) {
-      var logoutButton = new Button("Logout", _ -> {
+      var logoutButton = new Button(tr(K_LOGOUT, "Logout"), _ -> {
         SessionAuth.clearAuthentication();
         UI.getCurrent().getPage().setLocation("/" + LoginView.PATH);
       });
       logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
 
-      Span spacer = new Span();
-      spacer.addClassName(C_SPACER);
-
       headerRow = new HorizontalLayout(toggle, appTitle, spacer, storeIndicator, logoutButton);
 
     } else {
-      Span spacer = new Span();
-      spacer.addClassName(C_SPACER);
-
       headerRow = new HorizontalLayout(toggle, appTitle, spacer, storeIndicator);
     }
 
@@ -99,10 +106,10 @@ public class MainLayout
   private SideNav getPrimaryNavigation() {
     SideNav sideNav = new SideNav();
     sideNav.addItem(
-        new SideNavItem("Overview", "/" + OverviewView.PATH, DASHBOARD.create()),
-        new SideNavItem("Create", "/" + CreateView.PATH, DASHBOARD.create()),
-        new SideNavItem("Youtube", "/" + YoutubeView.PATH, CART.create()),
-        new SideNavItem("About", "/" + AboutView.PATH, USER_HEART.create())
+        new SideNavItem(tr(K_NAV_OVERVIEW, "Overview"), "/" + OverviewView.PATH, DASHBOARD.create()),
+        new SideNavItem(tr(K_NAV_CREATE, "Create"), "/" + CreateView.PATH, DASHBOARD.create()),
+        new SideNavItem(tr(K_NAV_YOUTUBE, "Youtube"), "/" + YoutubeView.PATH, CART.create()),
+        new SideNavItem(tr(K_NAV_ABOUT, "About"), "/" + AboutView.PATH, USER_HEART.create())
     );
     return sideNav;
   }

@@ -6,6 +6,7 @@ import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
 import com.svenruppert.urlshortener.core.validation.UrlValidator;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.svenruppert.urlshortener.ui.vaadin.components.MultiAliasEditorStrict;
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -34,7 +35,7 @@ import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL
 
 @Route(value = CreateView.PATH, layout = MainLayout.class)
 @CssImport("./styles/create-view.css")
-public class CreateView extends VerticalLayout implements HasLogger {
+public class CreateView extends VerticalLayout implements HasLogger, I18nSupport {
 
   public static final String PATH = "create";
   private static final ZoneId ZONE = ZoneId.systemDefault();
@@ -49,14 +50,37 @@ public class CreateView extends VerticalLayout implements HasLogger {
 
   private final URLShortenerClient urlShortenerClient = UrlShortenerClientFactory.newInstance();
 
-  private final TextField urlField = new TextField("Target URL");
-  private final Button saveAllButton = new Button("Save");
-  private final Button resetButton = new Button("Reset");
+  // i18n keys
+  private static final String K_TITLE_LEFT = "create.title.left";
+  private static final String K_TITLE_RIGHT = "create.title.right";
 
-  private final DatePicker expiresDate = new DatePicker("Expires (date)");
-  private final TimePicker expiresTime = new TimePicker("Expires (time)");
-  private final Checkbox noExpiry = new Checkbox("No expiry");
-  private final Checkbox cbActive = new Checkbox("Active");
+  private static final String K_FIELD_URL = "create.field.url";
+  private static final String K_FIELD_EXPIRES_DATE = "create.field.expiresDate";
+  private static final String K_FIELD_EXPIRES_TIME = "create.field.expiresTime";
+  private static final String K_FIELD_NO_EXPIRY = "create.field.noExpiry";
+  private static final String K_FIELD_ACTIVE = "create.field.active";
+
+  private static final String K_PH_DATE = "create.placeholder.date";
+  private static final String K_PH_TIME = "create.placeholder.time";
+
+  private static final String K_BTN_SAVE = "common.save";
+  private static final String K_BTN_RESET = "common.reset";
+
+  private static final String K_VALID_URL_REQUIRED = "create.validation.url.required";
+
+  private static final String K_TOAST_URL_EMPTY = "create.toast.urlEmpty";
+  private static final String K_TOAST_NO_ALIASES = "create.toast.noAliases";
+  private static final String K_TOAST_EXPIRES_FUTURE = "create.toast.expiresFuture";
+  private static final String K_TOAST_SAVED = "create.toast.saved"; // Saved: {0} | Open: {1}
+
+  private final TextField urlField = new TextField();
+  private final Button saveAllButton = new Button();
+  private final Button resetButton = new Button();
+
+  private final DatePicker expiresDate = new DatePicker();
+  private final TimePicker expiresTime = new TimePicker();
+  private final Checkbox noExpiry = new Checkbox();
+  private final Checkbox cbActive = new Checkbox();
 
   public CreateView() {
     addClassName(C_ROOT);
@@ -64,6 +88,8 @@ public class CreateView extends VerticalLayout implements HasLogger {
     setSpacing(true);
     setPadding(true);
     setSizeFull();
+
+    applyI18n();
 
     urlField.setWidthFull();
     saveAllButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -88,7 +114,7 @@ public class CreateView extends VerticalLayout implements HasLogger {
     Binder<ShortenRequest> binder = new Binder<>(ShortenRequest.class);
 
     binder.forField(urlField)
-        .asRequired("URL must not be empty")
+        .asRequired(tr(K_VALID_URL_REQUIRED, "URL must not be empty"))
         .withValidator((String url, ValueContext _) -> {
           var res = UrlValidator.validate(url);
           return res.valid() ? ValidationResult.ok() : ValidationResult.error(res.message());
@@ -114,14 +140,14 @@ public class CreateView extends VerticalLayout implements HasLogger {
       if (!validateExpiryInFuture()) return;
 
       if (urlField.getValue() == null || urlField.getValue().isBlank()) {
-        Notification.show("Target URL is empty", 2500, Notification.Position.TOP_CENTER);
+        Notification.show(tr(K_TOAST_URL_EMPTY, "Target URL is empty"), 2500, Notification.Position.TOP_CENTER);
         return;
       }
 
       editor.validateAll();
       List<String> validAliases = editor.getValidAliases();
       if (validAliases.isEmpty()) {
-        Notification.show("No valid aliases to save", 2000, Notification.Position.TOP_CENTER);
+        Notification.show(tr(K_TOAST_NO_ALIASES, "No valid aliases to save"), 2000, Notification.Position.TOP_CENTER);
         return;
       }
 
@@ -145,7 +171,7 @@ public class CreateView extends VerticalLayout implements HasLogger {
       }
 
       Notification.show(
-          "Saved: " + ok + " | Open: " + editor.countOpen(),
+          tr(K_TOAST_SAVED, "Saved: {0} | Open: {1}", ok, editor.countOpen()),
           3500,
           Notification.Position.TOP_CENTER
       );
@@ -157,13 +183,13 @@ public class CreateView extends VerticalLayout implements HasLogger {
     });
 
     // --- SplitLayout
-    var leftCol = new VerticalLayout(new H2("Create new short links"), form, actions);
+    var leftCol = new VerticalLayout(new H2(tr(K_TITLE_LEFT, "Create new short links")), form, actions);
     leftCol.addClassName(C_COL);
     leftCol.setPadding(false);
     leftCol.setSpacing(true);
     leftCol.setSizeFull();
 
-    var rightCol = new VerticalLayout(new H2("Aliases"), editor);
+    var rightCol = new VerticalLayout(new H2(tr(K_TITLE_RIGHT, "Aliases")), editor);
     rightCol.addClassName(C_COL);
     rightCol.setPadding(false);
     rightCol.setSpacing(true);
@@ -177,11 +203,24 @@ public class CreateView extends VerticalLayout implements HasLogger {
     add(split);
   }
 
+  private void applyI18n() {
+    urlField.setLabel(tr(K_FIELD_URL, "Target URL"));
+
+    saveAllButton.setText(tr(K_BTN_SAVE, "Save"));
+    resetButton.setText(tr(K_BTN_RESET, "Reset"));
+
+    expiresDate.setLabel(tr(K_FIELD_EXPIRES_DATE, "Expires (date)"));
+    expiresTime.setLabel(tr(K_FIELD_EXPIRES_TIME, "Expires (time)"));
+    noExpiry.setLabel(tr(K_FIELD_NO_EXPIRY, "No expiry"));
+    cbActive.setLabel(tr(K_FIELD_ACTIVE, "Active"));
+
+    expiresDate.setPlaceholder(tr(K_PH_DATE, "dd.MM.yyyy"));
+    expiresTime.setPlaceholder(tr(K_PH_TIME, "HH:mm"));
+  }
+
   private void configureExpiryFields() {
     expiresDate.setClearButtonVisible(true);
-    expiresDate.setPlaceholder("dd.MM.yyyy");
     expiresTime.setStep(Duration.ofMinutes(1));
-    expiresTime.setPlaceholder("HH:mm");
 
     expiresTime.setEnabled(false);
     expiresDate.addValueChangeListener(ev -> {
@@ -211,7 +250,7 @@ public class CreateView extends VerticalLayout implements HasLogger {
   private boolean validateExpiryInFuture() {
     var exp = computeExpiresAt();
     if (exp.isPresent() && exp.get().isBefore(Instant.now())) {
-      Notification.show("Expiry must be in the future");
+      Notification.show(tr(K_TOAST_EXPIRES_FUTURE, "Expiry must be in the future"));
       return false;
     }
     return true;

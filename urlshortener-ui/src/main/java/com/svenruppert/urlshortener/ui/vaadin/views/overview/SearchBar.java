@@ -3,6 +3,7 @@ package com.svenruppert.urlshortener.ui.vaadin.views.overview;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
 import com.svenruppert.urlshortener.ui.vaadin.tools.HasRefreshGuard;
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -31,7 +32,7 @@ import static com.vaadin.flow.data.value.ValueChangeMode.LAZY;
 @CssImport("./styles/search-bar.css")
 public class SearchBar
     extends Composite<HorizontalLayout>
-    implements HasLogger, HasRefreshGuard {
+    implements HasLogger, HasRefreshGuard, I18nSupport {
 
   // CSS classes
   private static final String C_ROOT = "search-bar";
@@ -52,19 +53,62 @@ public class SearchBar
   private static final String C_SORTBY = "search-bar__sortby";
   private static final String C_DIR = "search-bar__dir";
 
+  // i18n keys (Overview-leading)
+  private static final String K_SCOPE_LABEL = "overview.search.scope.label";
+  private static final String K_SCOPE_URL = "overview.search.scope.url";
+  private static final String K_SCOPE_SHORTCODE = "overview.search.scope.shortcode";
+
+  private static final String K_GLOBAL_PLACEHOLDER = "overview.search.global.placeholder";
+
+  private static final String K_CODE_LABEL = "overview.search.advanced.shortcode.label";
+  private static final String K_CODE_PLACEHOLDER = "overview.search.advanced.shortcode.placeholder";
+
+  private static final String K_URL_LABEL = "overview.search.advanced.url.label";
+  private static final String K_URL_PLACEHOLDER = "overview.search.advanced.url.placeholder";
+
+  private static final String K_PAGESIZE_LABEL = "overview.search.pagesize.label";
+
+  private static final String K_FROM_LABEL = "overview.search.from.label";
+  private static final String K_TO_LABEL = "overview.search.to.label";
+  private static final String K_TIME_LABEL = "overview.search.time.label";
+  private static final String K_TIME_PLACEHOLDER = "overview.search.time.placeholder";
+
+  private static final String K_SORTBY_PLACEHOLDER = "overview.search.sortBy.placeholder";
+  private static final String K_DIR_PLACEHOLDER = "overview.search.dir.placeholder";
+
+  private static final String K_SORTBY_ITEM_CREATED = "overview.search.sortBy.createdAt";
+  private static final String K_SORTBY_ITEM_SHORTCODE = "overview.search.sortBy.shortCode";
+  private static final String K_SORTBY_ITEM_URL = "overview.search.sortBy.originalUrl";
+  private static final String K_SORTBY_ITEM_EXPIRES = "overview.search.sortBy.expiresAt";
+
+  private static final String K_DIR_ITEM_ASC = "overview.search.dir.asc";
+  private static final String K_DIR_ITEM_DESC = "overview.search.dir.desc";
+
+  private static final String K_ACTIVE_LABEL = "overview.search.active.label";
+  private static final String K_ACTIVE_ACTIVE = "overview.search.active.active";
+  private static final String K_ACTIVE_INACTIVE = "overview.search.active.inactive";
+  private static final String K_ACTIVE_NOT_SET = "overview.search.active.notSet";
+
+  private static final String K_RESET = "overview.search.reset";
+  private static final String K_ADVANCED = "overview.search.advanced.title";
+
+  // technical constants (do NOT translate these)
+  private static final String SCOPE_URL = "url";
+  private static final String SCOPE_SHORTCODE = "shortcode";
+
   private final TextField globalSearch = new TextField();
-  private final ComboBox<String> searchScope = new ComboBox<>("Search in");
-  private final TextField codePart = new TextField("Shortcode contains");
-  private final TextField urlPart = new TextField("Original URL contains");
-  private final IntegerField pageSize = new IntegerField("Page size");
-  private final DatePicker fromDate = new DatePicker("From (local)");
-  private final TimePicker fromTime = new TimePicker("Time");
-  private final DatePicker toDate = new DatePicker("To (local)");
-  private final TimePicker toTime = new TimePicker("Time");
-  private final ComboBox<String> sortBy = new ComboBox<>("Sort by");
-  private final ComboBox<String> dir = new ComboBox<>("Direction");
+  private final ComboBox<String> searchScope = new ComboBox<>();
+  private final TextField codePart = new TextField();
+  private final TextField urlPart = new TextField();
+  private final IntegerField pageSize = new IntegerField();
+  private final DatePicker fromDate = new DatePicker();
+  private final TimePicker fromTime = new TimePicker();
+  private final DatePicker toDate = new DatePicker();
+  private final TimePicker toTime = new TimePicker();
+  private final ComboBox<String> sortBy = new ComboBox<>();
+  private final ComboBox<String> dir = new ComboBox<>();
   private final Select<ActiveState> activeState = new Select<>();
-  private final Button resetBtn = new Button("Reset", new Icon(VaadinIcon.ROTATE_LEFT));
+  private final Button resetBtn = new Button(new Icon(VaadinIcon.ROTATE_LEFT));
 
   private final OverviewView guardOwner;
   private Details advanced;
@@ -75,6 +119,7 @@ public class SearchBar
     container().addClassName(C_ROOT);
     container().add(buildSearchBar());
 
+    applyI18n();
     addShortCuts();
     addListeners();
   }
@@ -83,17 +128,74 @@ public class SearchBar
     return this.getContent();
   }
 
+  private void applyI18n() {
+    // top bar
+    globalSearch.setPlaceholder(tr(K_GLOBAL_PLACEHOLDER, "Search all…"));
+
+    searchScope.setLabel(tr(K_SCOPE_LABEL, "Search in"));
+    // item labels are translated, values are technical and stable
+    searchScope.setItemLabelGenerator(v -> SCOPE_SHORTCODE.equals(v)
+        ? tr(K_SCOPE_SHORTCODE, "Shortcode")
+        : tr(K_SCOPE_URL, "URL"));
+
+    pageSize.setLabel(tr(K_PAGESIZE_LABEL, "Page size"));
+
+    activeState.setLabel(tr(K_ACTIVE_LABEL, "Active state"));
+    activeState.setItemLabelGenerator(state -> switch (state) {
+      case ACTIVE -> tr(K_ACTIVE_ACTIVE, "Active");
+      case INACTIVE -> tr(K_ACTIVE_INACTIVE, "Inactive");
+      case NOT_SET -> tr(K_ACTIVE_NOT_SET, "Not set");
+    });
+
+    resetBtn.setText(tr(K_RESET, "Reset"));
+
+    // advanced fields
+    codePart.setLabel(tr(K_CODE_LABEL, "Shortcode contains"));
+    codePart.setPlaceholder(tr(K_CODE_PLACEHOLDER, "e.g. ex-"));
+
+    urlPart.setLabel(tr(K_URL_LABEL, "Original URL contains"));
+    urlPart.setPlaceholder(tr(K_URL_PLACEHOLDER, "e.g. docs"));
+
+    fromDate.setLabel(tr(K_FROM_LABEL, "From (local)"));
+    toDate.setLabel(tr(K_TO_LABEL, "To (local)"));
+    fromTime.setLabel(tr(K_TIME_LABEL, "Time"));
+    toTime.setLabel(tr(K_TIME_LABEL, "Time"));
+
+    fromTime.setPlaceholder(tr(K_TIME_PLACEHOLDER, "hh:mm"));
+    toTime.setPlaceholder(tr(K_TIME_PLACEHOLDER, "hh:mm"));
+
+    sortBy.setPlaceholder(tr(K_SORTBY_PLACEHOLDER, "Sort by"));
+    dir.setPlaceholder(tr(K_DIR_PLACEHOLDER, "Direction"));
+
+    // show translated labels for sortBy + dir while keeping technical values
+    sortBy.setItemLabelGenerator(v -> switch (v) {
+      case "createdAt" -> tr(K_SORTBY_ITEM_CREATED, "Created");
+      case "shortCode" -> tr(K_SORTBY_ITEM_SHORTCODE, "Shortcode");
+      case "originalUrl" -> tr(K_SORTBY_ITEM_URL, "Original URL");
+      case "expiresAt" -> tr(K_SORTBY_ITEM_EXPIRES, "Expires");
+      default -> v;
+    });
+
+    dir.setItemLabelGenerator(v -> "asc".equals(v)
+        ? tr(K_DIR_ITEM_ASC, "Ascending")
+        : tr(K_DIR_ITEM_DESC, "Descending"));
+
+    // advanced container title
+    if (advanced != null) {
+      advanced.setSummaryText(tr(K_ADVANCED, "Advanced filters"));
+    }
+  }
+
   private Component buildSearchBar() {
     // --- Top bar ---
     globalSearch.addClassName(C_GLOBAL);
-    globalSearch.setPlaceholder("Search all…");
     globalSearch.setClearButtonVisible(true);
     globalSearch.setValueChangeMode(LAZY);
     globalSearch.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
 
     searchScope.addClassName(C_SCOPE);
-    searchScope.setItems("URL", "Shortcode");
-    searchScope.setValue("URL");
+    searchScope.setItems(SCOPE_URL, SCOPE_SHORTCODE);
+    searchScope.setValue(SCOPE_URL);
 
     pageSize.addClassName(C_PAGESIZE);
     pageSize.setMin(1);
@@ -101,13 +203,7 @@ public class SearchBar
     pageSize.setStepButtonsVisible(true);
 
     activeState.addClassName(C_ACTIVE);
-    activeState.setLabel("Active state");
     activeState.setItems(ActiveState.values());
-    activeState.setItemLabelGenerator(state -> switch (state) {
-      case ACTIVE -> "Active";
-      case INACTIVE -> "Inactive";
-      case NOT_SET -> "Not set";
-    });
     activeState.setEmptySelectionAllowed(false);
     activeState.setValue(ActiveState.NOT_SET);
 
@@ -120,12 +216,10 @@ public class SearchBar
     topBar.setAlignItems(FlexComponent.Alignment.END);
 
     // --- Advanced block ---
-    codePart.setPlaceholder("e.g. ex-");
     codePart.setValueChangeMode(LAZY);
     codePart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
     codePart.addValueChangeListener(_ -> safeRefresh());
 
-    urlPart.setPlaceholder("e.g. docs");
     urlPart.setValueChangeMode(LAZY);
     urlPart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
     urlPart.addValueChangeListener(_ -> safeRefresh());
@@ -133,20 +227,16 @@ public class SearchBar
     sortBy.addClassName(C_SORTBY);
     sortBy.setItems("createdAt", "shortCode", "originalUrl", "expiresAt");
     sortBy.setLabel(null);
-    sortBy.setPlaceholder("Sort by");
 
     dir.addClassName(C_DIR);
     dir.setItems("asc", "desc");
     dir.setLabel(null);
-    dir.setPlaceholder("Direction");
 
     fromDate.setClearButtonVisible(true);
     toDate.setClearButtonVisible(true);
 
     fromTime.setStep(Duration.ofMinutes(15));
     toTime.setStep(Duration.ofMinutes(15));
-    fromTime.setPlaceholder("hh:mm");
-    toTime.setPlaceholder("hh:mm");
 
     var fromGroup = new HorizontalLayout(fromDate, fromTime);
     fromGroup.addClassName(C_FROM_GROUP);
@@ -159,7 +249,7 @@ public class SearchBar
     FormLayout searchBlock = new FormLayout();
     searchBlock.addClassName(C_SEARCH_BLOCK);
     searchBlock.setWidthFull();
-    searchBlock.add(codePart, urlPart, new HorizontalLayout()); //TODO replace placeholder later if you want
+    searchBlock.add(codePart, urlPart, new HorizontalLayout()); // placeholder
     searchBlock.add(fromGroup, toGroup);
     searchBlock.setResponsiveSteps(
         new FormLayout.ResponsiveStep("0", 1),
@@ -179,7 +269,7 @@ public class SearchBar
     advHeader.expand(searchBlock);
     advHeader.setVerticalComponentAlignment(FlexComponent.Alignment.END, sortToolbar);
 
-    advanced = new Details("Advanced filters", advHeader);
+    advanced = new Details(tr(K_ADVANCED, "Advanced filters"), advHeader);
     advanced.addClassName(C_ADV);
     advanced.setOpened(false);
     advanced.getElement().getThemeList().add("filled");
@@ -202,7 +292,7 @@ public class SearchBar
 
     globalSearch.addValueChangeListener(e -> {
       var v = Optional.ofNullable(e.getValue()).orElse("");
-      if ("Shortcode".equals(searchScope.getValue())) {
+      if (SCOPE_SHORTCODE.equals(searchScope.getValue())) {
         codePart.setValue(v);
         urlPart.clear();
       } else {
@@ -213,7 +303,7 @@ public class SearchBar
 
     searchScope.addValueChangeListener(_ -> {
       var v = Optional.ofNullable(globalSearch.getValue()).orElse("");
-      if ("Shortcode".equals(searchScope.getValue())) {
+      if (SCOPE_SHORTCODE.equals(searchScope.getValue())) {
         codePart.setValue(v);
         urlPart.clear();
       } else {
@@ -271,7 +361,7 @@ public class SearchBar
     final boolean hasCode = !code.isBlank();
     final boolean hasUrl = !url.isBlank();
     final String winnerValue = hasCode ? code : (hasUrl ? url : "");
-    final String winnerScope = hasCode ? "Shortcode" : "URL";
+    final String winnerScope = hasCode ? SCOPE_SHORTCODE : SCOPE_URL;
 
     try (var _ = withRefreshGuard(true)) {
       codePart.clear();
@@ -347,7 +437,7 @@ public class SearchBar
     sortBy.setValue("createdAt");
     dir.setValue("desc");
 
-    searchScope.setValue("URL");
+    searchScope.setValue(SCOPE_URL);
     advanced.setOpened(false);
     setSimpleSearchEnabled(true);
     globalSearch.focus();

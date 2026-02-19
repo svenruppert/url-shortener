@@ -1,5 +1,6 @@
 package com.svenruppert.urlshortener.ui.vaadin.views.overview.imports;
 
+import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Span;
@@ -9,15 +10,21 @@ import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CE
 
 @CssImport("./styles/paging-bar.css")
 public final class PagingBar
-    extends HorizontalLayout {
+    extends HorizontalLayout
+    implements I18nSupport {
 
   private static final String C_ROOT = "paging-bar";
   private static final String C_BUTTON = "paging-bar__button";
   private static final String C_INFO = "paging-bar__info";
 
+  private static final String K_PREV = "overview.paging.prev";
+  private static final String K_NEXT = "overview.paging.next";
+  private static final String K_INFO = "overview.paging.info";
+
   private final int size;
-  private final Button prev = new Button("‹ Prev");
-  private final Button next = new Button("Next ›");
+
+  private final Button prev = new Button();
+  private final Button next = new Button();
   private final Span info = new Span();
 
   private int page = 1;
@@ -28,8 +35,10 @@ public final class PagingBar
     this.size = size;
 
     addClassName(C_ROOT);
-
     setDefaultVerticalComponentAlignment(CENTER);
+
+    prev.setText(tr(K_PREV, "‹ Prev"));
+    next.setText(tr(K_NEXT, "Next ›"));
 
     prev.addClassName(C_BUTTON);
     next.addClassName(C_BUTTON);
@@ -83,7 +92,14 @@ public final class PagingBar
   }
 
   private void updateInfo() {
-    info.setText("Page " + page + " / " + maxPages() + " (total " + total + ")");
+    info.setText(tr(
+        K_INFO,
+        "Page {0} / {1} (total {2})",
+        page,
+        maxPages(),
+        total
+    ));
+
     prev.setEnabled(page > 1);
     next.setEnabled(page < maxPages());
   }

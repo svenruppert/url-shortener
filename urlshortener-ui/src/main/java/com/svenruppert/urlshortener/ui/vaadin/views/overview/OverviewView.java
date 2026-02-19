@@ -55,7 +55,7 @@ import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CE
 @CssImport("./styles/overview-view.css")
 public class OverviewView
     extends VerticalLayout
-    implements HasLogger, HasRefreshGuard {
+    implements HasLogger, HasRefreshGuard, I18nSupport {
 
   public static final String PATH = "";
   protected static final int VALUE_CHANGE_TIMEOUT = 400;
@@ -78,6 +78,50 @@ public class OverviewView
   private static final String C_ROW_ACTIONS = "overview-view__row-actions";
   private static final String C_ACTIVE_ICON = "overview-view__active-icon";
 
+  // i18n keys (Overview is leading)
+  private static final String K_OVERVIEW_H2 = "overview.h2";
+
+  private static final String K_PAGING_PREV = "overview.paging.prev";
+  private static final String K_PAGING_NEXT = "overview.paging.next";
+  private static final String K_PAGING_PAGE = "overview.paging.page";
+  private static final String K_PAGING_TOTAL = "overview.paging.total";
+
+  private static final String K_EXPORT = "overview.export";
+  private static final String K_EXPORT_TOOLTIP = "overview.export.tooltip";
+  private static final String K_EXPORT_ANCHOR = "overview.export.anchor";
+  private static final String K_IMPORT = "overview.import";
+
+  private static final String K_DOWNLOAD_STARTED = "overview.download.started";
+  private static final String K_DOWNLOAD_COMPLETED = "overview.download.completed";
+  private static final String K_DOWNLOAD_FAILED = "overview.download.failed";
+
+  private static final String K_SELECTION_ONE = "overview.selection.one";
+  private static final String K_SELECTION_MANY = "overview.selection.many";
+
+  private static final String K_MENU_SHOW_DETAILS = "overview.menu.showDetails";
+  private static final String K_MENU_OPEN_URL = "overview.menu.openUrl";
+  private static final String K_MENU_COPY_SHORTCODE = "overview.menu.copyShortcode";
+  private static final String K_MENU_DELETE = "overview.menu.delete";
+
+  private static final String K_GRID_COL_SHORTCODE = "overview.grid.column.shortcode";
+  private static final String K_GRID_COL_URL = "overview.grid.column.url";
+  private static final String K_GRID_COL_CREATED = "overview.grid.column.created";
+  private static final String K_GRID_COL_ACTIVE = "overview.grid.column.active";
+  private static final String K_GRID_COL_EXPIRES = "overview.grid.column.expires";
+  private static final String K_GRID_COL_ACTIONS = "overview.grid.column.actions";
+
+  private static final String K_ACTIVE_TOOLTIP_ACTIVATE = "overview.active.tooltip.activate";
+  private static final String K_ACTIVE_TOOLTIP_DEACTIVATE = "overview.active.tooltip.deactivate";
+
+  private static final String K_COPY_SHORTURL_TOOLTIP = "overview.shortcode.copy.tooltip";
+
+  private static final String K_DELETE_TITLE = "overview.delete.title";
+  private static final String K_DELETE_QUESTION_PREFIX = "overview.delete.question.prefix";
+  private static final String K_DELETE_QUESTION_SUFFIX = "overview.delete.question.suffix";
+
+  private static final String K_COMMON_DELETE = "common.delete";
+  private static final String K_COMMON_CANCEL = "common.cancel";
+
   private final URLShortenerClient urlShortenerClient = UrlShortenerClientFactory.newInstance();
   private final ColumnVisibilityClient columnVisibilityClient = ColumnVisibilityClientFactory.newInstance();
   private final ColumnVisibilityService columnVisibilityService =
@@ -88,13 +132,14 @@ public class OverviewView
   private final Button btnSettings = new Button(new Icon(VaadinIcon.COG));
   private final SearchBar searchBar = new SearchBar(this);
 
-  private final Button prevBtn = new Button("‹ Prev");
-  private final Button nextBtn = new Button("Next ›");
+  // NOTE: no text in field initializer (i18n happens later)
+  private final Button prevBtn = new Button();
+  private final Button nextBtn = new Button();
   private final Text pageInfo = new Text("");
 
-  private final Button btnExport = new Button("Export", new Icon(VaadinIcon.DOWNLOAD));
+  private final Button btnExport = new Button(new Icon(VaadinIcon.DOWNLOAD));
   private final Anchor exportAnchor = initAnchor();
-  private final Button btnImport = new Button("Import", new Icon(VaadinIcon.UPLOAD));
+  private final Button btnImport = new Button(new Icon(VaadinIcon.UPLOAD));
 
   private Integer currentPage = 1;
   private Integer totalCount = 0;
@@ -109,12 +154,12 @@ public class OverviewView
     setPadding(true);
     setSpacing(true);
 
-    add(new H2("URL Shortener – Overview"));
+    // headline is translated in applyI18n()
+    add(new H2(tr(K_OVERVIEW_H2, "URL Shortener – Overview")));
 
     initDataProvider();
 
     btnExport.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-    btnExport.getElement().setAttribute("title", "Export current result set as ZIP");
     btnExport.addClickListener(_ -> triggerExportDownload());
 
     btnImport.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -141,6 +186,7 @@ public class OverviewView
     add(container, bulkBar, grid);
 
     configureGrid();
+    applyI18n();      // <- central place for all UI text
     addListeners();
     addShortCuts();
 
@@ -153,25 +199,47 @@ public class OverviewView
     }
   }
 
-  private Anchor initAnchor() {
-    DownloadHandler downloadHandler = DownloadHandler.fromInputStream(event -> {
-          int chunkSize = Optional.ofNullable(searchBar.getPageSize()).orElse(500);
-          chunkSize = Math.max(1, Math.min(500, chunkSize));
-          UrlMappingListRequest filter = searchBar.buildFilter(1, chunkSize);
-          URLShortenerClient.ExportZipDownload download = urlShortenerClient.exportAllAsZipDownload(filter);
-          return new DownloadResponse(download.inputStreamFactory().get(), download.filename(), APPLICATION_ZIP, -1);
-        }).whenStart(() -> Notification.show("Download started", 3000, Notification.Position.BOTTOM_START))
-        .whenComplete(success -> {
-          if (success) {
-            Notification.show("Download completed", 3000, Notification.Position.BOTTOM_START)
-                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-          } else {
-            Notification.show("Download failed", 3000, Notification.Position.BOTTOM_START)
-                .addThemeVariants(NotificationVariant.LUMO_ERROR);
-          }
-        });
+  private void applyI18n() {
+    prevBtn.setText(tr(K_PAGING_PREV, "‹ Prev"));
+    nextBtn.setText(tr(K_PAGING_NEXT, "Next ›"));
 
-    var anchor = new Anchor(downloadHandler, "XXX_DOWNLOAD_XXX");
+    btnExport.setText(tr(K_EXPORT, "Export"));
+    btnExport.getElement().setAttribute("title", tr(K_EXPORT_TOOLTIP, "Export current result set as ZIP"));
+
+    // Anchor text is visible; keep it meaningful
+    exportAnchor.setText(tr(K_EXPORT_ANCHOR, "Download"));
+
+    btnImport.setText(tr(K_IMPORT, "Import"));
+
+    // initial paging string
+    refreshPageInfo();
+  }
+
+  private Anchor initAnchor() {
+    DownloadHandler downloadHandler =
+        DownloadHandler.fromInputStream(event -> {
+              int chunkSize = Optional.ofNullable(searchBar.getPageSize()).orElse(500);
+              chunkSize = Math.max(1, Math.min(500, chunkSize));
+              UrlMappingListRequest filter = searchBar.buildFilter(1, chunkSize);
+              URLShortenerClient.ExportZipDownload download = urlShortenerClient.exportAllAsZipDownload(filter);
+              return new DownloadResponse(download.inputStreamFactory().get(), download.filename(), APPLICATION_ZIP, -1);
+            })
+            .whenStart(() ->
+                           Notification.show(tr(K_DOWNLOAD_STARTED, "Download started"),
+                                             3000, Notification.Position.BOTTOM_START))
+            .whenComplete(success -> {
+              if (success) {
+                Notification.show(tr(K_DOWNLOAD_COMPLETED, "Download completed"),
+                                  3000, Notification.Position.BOTTOM_START)
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+              } else {
+                Notification.show(tr(K_DOWNLOAD_FAILED, "Download failed"),
+                                  3000, Notification.Position.BOTTOM_START)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+              }
+            });
+
+    var anchor = new Anchor(downloadHandler, "");
     anchor.getElement().setAttribute("download", true);
     anchor.addClassName(C_EXPORT_ANCHOR);
     return anchor;
@@ -200,7 +268,9 @@ public class OverviewView
 
       if (hasSelection) {
         int count = all.size();
-        String label = count == 1 ? "link selected" : "links selected";
+        String label = (count == 1)
+            ? tr(K_SELECTION_ONE, "link selected")
+            : tr(K_SELECTION_MANY, "links selected");
         bulkBar.selectionInfoText(count + " " + label);
       } else {
         bulkBar.selectionInfoText("");
@@ -271,8 +341,6 @@ public class OverviewView
     grid.addClassName(C_GRID);
 
     grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES, GridVariant.LUMO_COMPACT);
-    // height moved to CSS
-    // grid.setHeight("70vh");
 
     grid.setSelectionMode(Grid.SelectionMode.MULTI);
 
@@ -283,21 +351,33 @@ public class OverviewView
     configureColumExpires();
     configureColumActions();
 
+    // Set headers after columns exist
+    grid.getColumnByKey("shortcode").setHeader(tr(K_GRID_COL_SHORTCODE, "Shortcode"));
+    grid.getColumnByKey("url").setHeader(tr(K_GRID_COL_URL, "URL"));
+    grid.getColumnByKey("created").setHeader(tr(K_GRID_COL_CREATED, "Created"));
+    grid.getColumnByKey("active").setHeader(tr(K_GRID_COL_ACTIVE, "Active"));
+    grid.getColumnByKey("expires").setHeader(tr(K_GRID_COL_EXPIRES, "Expires"));
+    grid.getColumnByKey("actions").setHeader(tr(K_GRID_COL_ACTIONS, "Actions"));
+
     grid.addItemDoubleClickListener(ev -> openDetailsDialog(ev.getItem()));
     grid.getElement().addEventListener("keydown", _ -> {
       grid.getSelectedItems().stream().findFirst().ifPresent(this::openDetailsDialog);
     }).setFilter("event.key === 'Enter'");
 
     GridContextMenu<ShortUrlMapping> menu = new GridContextMenu<>(grid);
-    menu.addItem("Show details", e -> e.getItem().ifPresent(this::openDetailsDialog));
-    menu.addItem("Open URL", e -> e.getItem().ifPresent(m -> UI.getCurrent().getPage().open(m.originalUrl(), "_blank")));
-    menu.addItem("Copy shortcode", e -> e.getItem().ifPresent(m -> UiActions.copyToClipboard(m.shortCode())));
-    menu.addItem("Delete…", e -> e.getItem().ifPresent(m -> confirmDelete(m.shortCode())));
+    menu.addItem(tr(K_MENU_SHOW_DETAILS, "Show details"),
+                 e -> e.getItem().ifPresent(this::openDetailsDialog));
+    menu.addItem(tr(K_MENU_OPEN_URL, "Open URL"),
+                 e -> e.getItem().ifPresent(m -> UI.getCurrent().getPage().open(m.originalUrl(), "_blank")));
+    menu.addItem(tr(K_MENU_COPY_SHORTCODE, "Copy shortcode"),
+                 e -> e.getItem().ifPresent(m -> UiActions.copyToClipboard(m.shortCode())));
+    menu.addItem(tr(K_MENU_DELETE, "Delete…"),
+                 e -> e.getItem().ifPresent(m -> confirmDelete(m.shortCode())));
   }
 
   private void configureColumActions() {
     grid.addComponentColumn(this::buildGridRowActions)
-        .setHeader("Actions")
+        .setHeader("") // header will be set via key in configureGrid()
         .setKey("actions")
         .setAutoWidth(true)
         .setFlexGrow(0)
@@ -306,71 +386,80 @@ public class OverviewView
 
   private void configureColumExpires() {
     grid.addComponentColumn(m -> {
-      var statusText = computeStatusText(m.expiresAt());
-      var pill = new Span();
-      pill.setText(statusText.text());
-      pill.getElement().getThemeList().add("badge pill small");
-      pill.getElement().getThemeList().add(statusText.theme());
-      return pill;
-    }).setHeader("Expires").setKey("expires").setAutoWidth(true).setResizable(true).setFlexGrow(0);
+          var statusText = computeStatusText(m.expiresAt());
+          var pill = new Span();
+          pill.setText(statusText.text());
+          pill.getElement().getThemeList().add("badge pill small");
+          pill.getElement().getThemeList().add(statusText.theme());
+          return pill;
+        }).setHeader("") // header will be set via key in configureGrid()
+        .setKey("expires").setAutoWidth(true).setResizable(true).setFlexGrow(0);
   }
 
   private void configureColumActive() {
     grid.addComponentColumn(m -> {
-      Icon icon = m.active() ? VaadinIcon.CHECK_CIRCLE.create() : VaadinIcon.CLOSE_CIRCLE.create();
-      icon.addClassName(C_ACTIVE_ICON);
-      icon.addClassName(m.active() ? "is-active" : "is-inactive");
-      icon.getElement().setProperty("title", m.active() ? "Deactivate" : "Activate");
+          Icon icon = m.active() ? VaadinIcon.CHECK_CIRCLE.create() : VaadinIcon.CLOSE_CIRCLE.create();
+          icon.addClassName(C_ACTIVE_ICON);
+          icon.addClassName(m.active() ? "is-active" : "is-inactive");
 
-      icon.addClickListener(_ -> {
-        boolean newValue = !m.active();
-        try {
-          urlShortenerClient.toggleActive(m.shortCode(), newValue);
-          Notifications.statusUpdatedOK();
-          safeRefresh();
-        } catch (Exception ex) {
-          Notifications.statusUpdatedFailed(ex);
-        }
-      });
-      return icon;
-    }).setHeader("Active").setKey("active").setAutoWidth(true).setResizable(true).setSortable(true).setFlexGrow(0);
+          icon.getElement().setProperty("title",
+                                        m.active()
+                                            ? tr(K_ACTIVE_TOOLTIP_DEACTIVATE, "Deactivate")
+                                            : tr(K_ACTIVE_TOOLTIP_ACTIVATE, "Activate"));
+
+          icon.addClickListener(_ -> {
+            boolean newValue = !m.active();
+            try {
+              urlShortenerClient.toggleActive(m.shortCode(), newValue);
+              Notifications.statusUpdatedOK();
+              safeRefresh();
+            } catch (Exception ex) {
+              Notifications.statusUpdatedFailed(ex);
+            }
+          });
+          return icon;
+        }).setHeader("") // header will be set via key in configureGrid()
+        .setKey("active").setAutoWidth(true).setResizable(true).setSortable(true).setFlexGrow(0);
   }
 
   private void configureColumCreated() {
     grid.addColumn(m -> DATE_TIME_FMT.format(m.createdAt()))
-        .setHeader("Created").setKey("created").setAutoWidth(true).setResizable(true).setSortable(true).setFlexGrow(0);
+        .setHeader("") // header will be set via key in configureGrid()
+        .setKey("created").setAutoWidth(true).setResizable(true).setSortable(true).setFlexGrow(0);
   }
 
   private void configureColumUrl() {
     grid.addComponentColumn(m -> {
-      var a = new Anchor(m.originalUrl(), m.originalUrl());
-      a.addClassName(C_URL_ANCHOR);
-      a.setTarget("_blank");
-      a.getElement().setProperty("title", m.originalUrl());
-      return a;
-    }).setHeader("URL").setKey("url").setFlexGrow(1).setResizable(true);
+          var a = new Anchor(m.originalUrl(), m.originalUrl());
+          a.addClassName(C_URL_ANCHOR);
+          a.setTarget("_blank");
+          a.getElement().setProperty("title", m.originalUrl());
+          return a;
+        }).setHeader("") // header will be set via key in configureGrid()
+        .setKey("url").setFlexGrow(1).setResizable(true);
   }
 
   private void configureColumShortCode() {
     grid.addComponentColumn(m -> {
-      var code = new Span(m.shortCode());
-      code.addClassName(C_SHORTCODE);
+          var code = new Span(m.shortCode());
+          code.addClassName(C_SHORTCODE);
 
-      var copy = new Button(new Icon(VaadinIcon.COPY));
-      copy.addThemeVariants(LUMO_TERTIARY_INLINE);
-      copy.getElement().setProperty("title", "Copy ShortUrl");
-      copy.addClickListener(_ -> {
-        var url = SHORTCODE_BASE_URL + m.shortCode();
-        UiActions.copyToClipboard(url);
-        Notifications.shortCodeCopied();
-      });
+          var copy = new Button(new Icon(VaadinIcon.COPY));
+          copy.addThemeVariants(LUMO_TERTIARY_INLINE);
+          copy.getElement().setProperty("title", tr(K_COPY_SHORTURL_TOOLTIP, "Copy ShortUrl"));
+          copy.addClickListener(_ -> {
+            var url = SHORTCODE_BASE_URL + m.shortCode();
+            UiActions.copyToClipboard(url);
+            Notifications.shortCodeCopied();
+          });
 
-      var wrap = new HorizontalLayout(code, copy);
-      wrap.addClassName(C_SHORTCODE_WRAP);
-      wrap.setSpacing(true);
-      wrap.setPadding(false);
-      return wrap;
-    }).setHeader("Shortcode").setKey("shortcode").setAutoWidth(true).setFrozen(true).setResizable(true).setFlexGrow(0);
+          var wrap = new HorizontalLayout(code, copy);
+          wrap.addClassName(C_SHORTCODE_WRAP);
+          wrap.setSpacing(true);
+          wrap.setPadding(false);
+          return wrap;
+        }).setHeader("") // header will be set via key in configureGrid()
+        .setKey("shortcode").setAutoWidth(true).setFrozen(true).setResizable(true).setFlexGrow(0);
   }
 
   private void openDetailsDialog(ShortUrlMapping item) {
@@ -450,7 +539,15 @@ public class OverviewView
     int maxPage = Math.max(1, (int) Math.ceil((double) totalCount / size));
     currentPage = Math.min(Math.max(1, currentPage), maxPage);
 
-    pageInfo.setText("Page " + currentPage + " / " + maxPage + "   •   " + totalCount + " total");
+    // No param-i18n assumption here (keeps I18nSupport minimal)
+    String pageLabel = tr(K_PAGING_PAGE, "Page");
+    String totalLabel = tr(K_PAGING_TOTAL, "total");
+    //pageInfo.setText(pageLabel + " " + currentPage + " / " + maxPage + "   •   " + totalCount + " " + totalLabel);
+    pageInfo.setText(tr(
+        "overview.paging.info",
+        "Page {0} / {1} • {2} total",
+        currentPage, maxPage, totalCount
+    ));
 
     prevBtn.setEnabled(currentPage > 1);
     nextBtn.setEnabled(currentPage < maxPage);
@@ -463,10 +560,19 @@ public class OverviewView
 
   private void confirmDelete(String shortCode) {
     Dialog dialog = new Dialog();
-    dialog.setHeaderTitle("Confirm deletion");
-    dialog.add(new Text("Delete short link “" + shortCode + "”?"));
+    dialog.setHeaderTitle(tr(K_DELETE_TITLE, "Confirm deletion"));
 
-    Button confirm = new Button("Delete", _ -> {
+    String prefix = tr(K_DELETE_QUESTION_PREFIX, "Delete short link “");
+    String suffix = tr(K_DELETE_QUESTION_SUFFIX, "”?");
+    //dialog.add(new Text(prefix + shortCode + suffix));
+    dialog.add(new Text(tr(
+        "overview.delete.question",
+        "Delete short link “{0}”?",
+        shortCode
+    )));
+
+
+    Button confirm = new Button(tr(K_COMMON_DELETE, "Delete"), _ -> {
       try {
         boolean ok = urlShortenerClient.delete(shortCode);
         dialog.close();
@@ -482,7 +588,7 @@ public class OverviewView
     });
     confirm.addThemeVariants(ButtonVariant.LUMO_PRIMARY, LUMO_ERROR);
 
-    Button cancel = new Button("Cancel", _ -> dialog.close());
+    Button cancel = new Button(tr(K_COMMON_CANCEL, "Cancel"), _ -> dialog.close());
     dialog.add(new HorizontalLayout(confirm, cancel));
     dialog.open();
   }
