@@ -41,10 +41,11 @@ public class MainLayout
     extends AppLayout
     implements BeforeEnterObserver, HasLogger, I18nSupport {
 
-  private static final String C_APP_TITLE = "mainlayout__title";
-  private static final String C_HEADER_ROW = "mainlayout__header";
-  private static final String C_SPACER = "mainlayout__spacer";
-  private static final String C_RIGHT = "mainlayout__right";
+  private static final String C_MAINLAYOUT = "mainlayout";
+  private static final String C_APP_TITLE = "title";
+  private static final String C_HEADER_ROW = "header";
+  private static final String C_SPACER = "spacer";
+  private static final String C_RIGHT = "right";
 
   // i18n keys
   private static final String K_APP_TITLE = "main.appTitle";
@@ -61,6 +62,7 @@ public class MainLayout
 
   public MainLayout() {
     createHeader();
+    this.setClassName(C_MAINLAYOUT);
   }
 
   private void createHeader() {
@@ -91,7 +93,6 @@ public class MainLayout
       headerRow = new HorizontalLayout(toggle, appTitle, spacer, languageSwitch, storeIndicator, logoutButton);
     } else {
       headerRow = new HorizontalLayout(toggle, appTitle, spacer, languageSwitch, storeIndicator);
-
     }
 
     headerRow.addClassName(C_HEADER_ROW);

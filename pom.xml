@@ -29,13 +29,13 @@
         <module>urlshortener-ui</module>
     </modules>
 
-    <url>https://github.com/svenruppert/core-vaadin-project-template</url>
+    <url>https://github.com/svenruppert/url-shortener</url>
     <name>URL-Shortener</name>
     <description>The beginning of your OSS project</description>
     <scm>
-        <url>https://github.com/svenruppert/core-vaadin-project-template</url>
-        <connection>scm:git:https://github.com/svenruppert/core-vaadin-project-template.git</connection>
-        <developerConnection>scm:git:https://github.com/svenruppert/core-vaadin-project-template.git
+        <url>https://github.com/svenruppert/url-shortener</url>
+        <connection>scm:git:https://github.com/svenruppert/url-shortener.git</connection>
+        <developerConnection>scm:git:https://github.com/svenruppert/url-shortener.git
         </developerConnection>
         <tag>HEAD</tag>
     </scm>
@@ -52,7 +52,7 @@
     </developers>
     <issueManagement>
         <system>GitHub</system>
-        <url>https://github.com/svenruppert/core-vaadin-project-template/issues</url>
+        <url>https://github.com/svenruppert/url-shortener/issues</url>
     </issueManagement>
     <licenses>
         <license>
@@ -70,7 +70,7 @@
         <deploy-repo-url>https://repo.maven.apache.org/maven2/</deploy-repo-url>
         <deploy-repo-snapshots-url>https://repo.maven.apache.org/maven2/</deploy-repo-snapshots-url>
 
-        <jdk.version>24</jdk.version>
+        <jdk.version>26</jdk.version>
 
         <maven.compiler.release>${jdk.version}</maven.compiler.release>
         <maven.compiler.source>${jdk.version}</maven.compiler.source> <!--redundant, but IntelliJ doesn't-->
@@ -94,9 +94,9 @@
         <!--        Vaadin Flow Properties-->
         <failOnMissingWebXml>false</failOnMissingWebXml>
 
-        <vaadin.version>25.0.5</vaadin.version>
+        <vaadin.version>25.1.0-beta3</vaadin.version>
         <drivers.downloader.phase>pre-integration-test</drivers.downloader.phase>
-        <jetty.version>11.0.25</jetty.version>
+        <jetty.version>12.1.7</jetty.version>
         <warName>ROOT</warName>
         <restServiceName>urlshortener</restServiceName>
         <eclipse-store.version>3.1.0</eclipse-store.version>

@@ -13,7 +13,7 @@ import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
-import com.vaadin.flow.component.datepicker.DatePicker.DatePickerI18n;
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -160,7 +160,8 @@ public class DetailsDialog
 
     binder.forField(expiresField)
         .bind(
-            m -> m.expiresAt().map(i -> LocalDateTime.ofInstant(i, ZONE)).orElse(null),
+            m -> m.expiresAt()
+                .map(i -> LocalDateTime.ofInstant(i, ZONE)).orElse(null),
             (_, _) -> { }
         );
     binder.readBean(item);
@@ -255,11 +256,15 @@ public class DetailsDialog
   }
 
   private Component buildExpiresRow() {
-    expiresField.setStep(Duration.ofMinutes(1));
+    expiresField.setStep(Duration.ofMinutes(30));
     expiresField.setWidthFull();
     expiresField.setVisible(false);
     expiresField.setWeekNumbersVisible(true);
-    expiresField.setDatePickerI18n(new DatePickerI18n().setFirstDayOfWeek(1));
+    var datePickerI18n = new DatePicker.DatePickerI18n()
+        .setFirstDayOfWeek(1);
+    expiresField.setDatePickerI18n(datePickerI18n);
+    var dateTimePickerI18n = new DateTimePicker.DateTimePickerI18n();
+    expiresField.setI18n(dateTimePickerI18n);
 
     HorizontalLayout row = new HorizontalLayout(expiresField);
     row.addClassName(C_EXPIRES_ROW);

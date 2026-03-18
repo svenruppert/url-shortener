@@ -68,8 +68,8 @@ public class OverviewView
   // CSS classes
   private static final String C_ROOT = "overview-view";
   private static final String C_CONTAINER = "overview-view__container";
-  private static final String C_BOTTOMBAR = "overview-view__bottombar";
-  private static final String C_PAGINGBAR = "overview-view__pagingbar";
+  private static final String C_BOTTOM_BAR = "overview-view__bottombar";
+  private static final String C_PAGING_BAR = "overview-view__pagingbar";
   private static final String C_EXPORT_ANCHOR = "overview-view__export-anchor";
   private static final String C_GRID = "overview-view__grid";
   private static final String C_URL_ANCHOR = "overview-view__url";
@@ -83,8 +83,8 @@ public class OverviewView
 
   private static final String K_PAGING_PREV = "overview.paging.prev";
   private static final String K_PAGING_NEXT = "overview.paging.next";
-  private static final String K_PAGING_PAGE = "overview.paging.page";
-  private static final String K_PAGING_TOTAL = "overview.paging.total";
+//  private static final String K_PAGING_PAGE = "overview.paging.page";
+//  private static final String K_PAGING_TOTAL = "overview.paging.total";
 
   private static final String K_EXPORT = "overview.export";
   private static final String K_EXPORT_TOOLTIP = "overview.export.tooltip";
@@ -116,8 +116,8 @@ public class OverviewView
   private static final String K_COPY_SHORTURL_TOOLTIP = "overview.shortcode.copy.tooltip";
 
   private static final String K_DELETE_TITLE = "overview.delete.title";
-  private static final String K_DELETE_QUESTION_PREFIX = "overview.delete.question.prefix";
-  private static final String K_DELETE_QUESTION_SUFFIX = "overview.delete.question.suffix";
+//  private static final String K_DELETE_QUESTION_PREFIX = "overview.delete.question.prefix";
+//  private static final String K_DELETE_QUESTION_SUFFIX = "overview.delete.question.suffix";
 
   private static final String K_COMMON_DELETE = "common.delete";
   private static final String K_COMMON_CANCEL = "common.cancel";
@@ -168,11 +168,11 @@ public class OverviewView
     exportAnchor.addClassName(C_EXPORT_ANCHOR);
 
     var pagingBar = new HorizontalLayout(prevBtn, nextBtn, pageInfo, btnImport, btnExport, btnSettings);
-    pagingBar.addClassName(C_PAGINGBAR);
+    pagingBar.addClassName(C_PAGING_BAR);
     pagingBar.setDefaultVerticalComponentAlignment(CENTER);
 
     HorizontalLayout bottomBar = new HorizontalLayout(new Span(), pagingBar);
-    bottomBar.addClassName(C_BOTTOMBAR);
+    bottomBar.addClassName(C_BOTTOM_BAR);
     bottomBar.setWidthFull();
     bottomBar.expand(bottomBar.getComponentAt(0));
     bottomBar.setAlignItems(CENTER);
@@ -217,7 +217,7 @@ public class OverviewView
 
   private Anchor initAnchor() {
     DownloadHandler downloadHandler =
-        DownloadHandler.fromInputStream(event -> {
+        DownloadHandler.fromInputStream(_ -> {
               int chunkSize = Optional.ofNullable(searchBar.getPageSize()).orElse(500);
               chunkSize = Math.max(1, Math.min(500, chunkSize));
               UrlMappingListRequest filter = searchBar.buildFilter(1, chunkSize);
@@ -392,8 +392,12 @@ public class OverviewView
           pill.getElement().getThemeList().add("badge pill small");
           pill.getElement().getThemeList().add(statusText.theme());
           return pill;
-        }).setHeader("") // header will be set via key in configureGrid()
-        .setKey("expires").setAutoWidth(true).setResizable(true).setFlexGrow(0);
+        })
+        .setHeader("") // header will be set via key in configureGrid()
+        .setKey("expires")
+        .setAutoWidth(true)
+        .setResizable(true)
+        .setFlexGrow(0);
   }
 
   private void configureColumActive() {
@@ -458,8 +462,13 @@ public class OverviewView
           wrap.setSpacing(true);
           wrap.setPadding(false);
           return wrap;
-        }).setHeader("") // header will be set via key in configureGrid()
-        .setKey("shortcode").setAutoWidth(true).setFrozen(true).setResizable(true).setFlexGrow(0);
+        })
+        .setHeader("") // header will be set via key in configureGrid()
+        .setKey("shortcode")
+        .setAutoWidth(true)
+        .setFrozen(true)
+        .setResizable(true)
+        .setFlexGrow(0);
   }
 
   private void openDetailsDialog(ShortUrlMapping item) {
@@ -538,11 +547,6 @@ public class OverviewView
     int size = Optional.ofNullable(searchBar.getPageSize()).orElse(25);
     int maxPage = Math.max(1, (int) Math.ceil((double) totalCount / size));
     currentPage = Math.min(Math.max(1, currentPage), maxPage);
-
-    // No param-i18n assumption here (keeps I18nSupport minimal)
-    String pageLabel = tr(K_PAGING_PAGE, "Page");
-    String totalLabel = tr(K_PAGING_TOTAL, "total");
-    //pageInfo.setText(pageLabel + " " + currentPage + " / " + maxPage + "   •   " + totalCount + " " + totalLabel);
     pageInfo.setText(tr(
         "overview.paging.info",
         "Page {0} / {1} • {2} total",
@@ -561,10 +565,6 @@ public class OverviewView
   private void confirmDelete(String shortCode) {
     Dialog dialog = new Dialog();
     dialog.setHeaderTitle(tr(K_DELETE_TITLE, "Confirm deletion"));
-
-    String prefix = tr(K_DELETE_QUESTION_PREFIX, "Delete short link “");
-    String suffix = tr(K_DELETE_QUESTION_SUFFIX, "”?");
-    //dialog.add(new Text(prefix + shortCode + suffix));
     dialog.add(new Text(tr(
         "overview.delete.question",
         "Delete short link “{0}”?",
