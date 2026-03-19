@@ -8,8 +8,8 @@ import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.svenruppert.urlshortener.ui.vaadin.components.ColumnVisibilityDialog;
 import com.svenruppert.urlshortener.ui.vaadin.events.MappingCreatedOrChanged;
-import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
 import com.svenruppert.urlshortener.ui.vaadin.tools.*;
+import com.vaadin.flow.shared.Registration;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.imports.ImportDialog;
 import com.vaadin.flow.component.*;
@@ -83,8 +83,8 @@ public class OverviewView
 
   private static final String K_PAGING_PREV = "overview.paging.prev";
   private static final String K_PAGING_NEXT = "overview.paging.next";
-//  private static final String K_PAGING_PAGE = "overview.paging.page";
-//  private static final String K_PAGING_TOTAL = "overview.paging.total";
+  //  private static final String K_PAGING_PAGE = "overview.paging.page";
+  //  private static final String K_PAGING_TOTAL = "overview.paging.total";
 
   private static final String K_EXPORT = "overview.export";
   private static final String K_EXPORT_TOOLTIP = "overview.export.tooltip";
@@ -116,8 +116,8 @@ public class OverviewView
   private static final String K_COPY_SHORTURL_TOOLTIP = "overview.shortcode.copy.tooltip";
 
   private static final String K_DELETE_TITLE = "overview.delete.title";
-//  private static final String K_DELETE_QUESTION_PREFIX = "overview.delete.question.prefix";
-//  private static final String K_DELETE_QUESTION_SUFFIX = "overview.delete.question.suffix";
+  //  private static final String K_DELETE_QUESTION_PREFIX = "overview.delete.question.prefix";
+  //  private static final String K_DELETE_QUESTION_SUFFIX = "overview.delete.question.suffix";
 
   private static final String K_COMMON_DELETE = "common.delete";
   private static final String K_COMMON_CANCEL = "common.cancel";
@@ -144,7 +144,7 @@ public class OverviewView
   private Integer currentPage = 1;
   private Integer totalCount = 0;
   private CallbackDataProvider<ShortUrlMapping, Void> dataProvider;
-  private AutoCloseable subscription;
+  private Registration storeInfoSubscription;
   private volatile boolean suppressRefresh = false;
 
   public OverviewView() {
@@ -322,18 +322,22 @@ public class OverviewView
       throw new RuntimeException(e);
     }
 
-    subscription = StoreEvents.subscribe(_ -> getUI().ifPresent(ui -> ui.access(this::safeRefresh)));
+    // Bei StoreInfo-Änderungen (neue Mappings) Grid aktualisieren
+    StoreInfoService service = StoreInfoService.get();
+    storeInfoSubscription = service.register(attachEvent.getUI(), (info, state) -> {
+      // Nur bei tatsächlichen Daten und wenn verbunden refreshen
+      if (info != null && info.mappings() >= 0) {
+        safeRefresh();
+      }
+    });
   }
 
   @Override
   protected void onDetach(DetachEvent detachEvent) {
     super.onDetach(detachEvent);
-    if (subscription != null) {
-      try {
-        subscription.close();
-      } catch (Exception ignored) {
-      }
-      subscription = null;
+    if (storeInfoSubscription != null) {
+      storeInfoSubscription.remove();
+      storeInfoSubscription = null;
     }
   }
 

@@ -8,6 +8,8 @@ import com.svenruppert.urlshortener.api.handler.admin.StoreInfoHandler;
 import com.svenruppert.urlshortener.api.handler.admin.columns.ColumnVisibilityBulkHandler;
 import com.svenruppert.urlshortener.api.handler.admin.columns.ColumnVisibilityHandler;
 import com.svenruppert.urlshortener.api.handler.admin.columns.ColumnVisibilitySingleHandler;
+import com.svenruppert.urlshortener.api.handler.admin.sse.StoreInfoBroadcaster;
+import com.svenruppert.urlshortener.api.handler.admin.sse.StoreInfoSSEHandler;
 import com.svenruppert.urlshortener.api.handler.urlmapping.*;
 import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportApplyHandler;
 import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportConflictsListHandler;
@@ -34,6 +36,7 @@ public class ShortenerServer
 
   private HttpServer serverRedirect;
   private HttpServer serverAdmin;
+  private StoreInfoBroadcaster storeInfoBroadcaster;
 
   //TODO CLI Argumente - IP Address
   public static void main(String[] args)
@@ -112,6 +115,8 @@ public class ShortenerServer
 
     logger().info("Starting URL Shortener server (admin)... with params: host={}, port={}", ADMIN_SERVER_HOST, ADMIN_SERVER_PORT);
     this.serverAdmin = HttpServer.create(new InetSocketAddress(ADMIN_SERVER_HOST, ADMIN_SERVER_PORT), 0);
+    this.storeInfoBroadcaster = new StoreInfoBroadcaster(urlMappingStore, startedAt);
+
     serverAdmin.createContext(PATH_ADMIN_SHORTEN, new ShortenHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_LIST_COUNT, new ListCountHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
@@ -119,6 +124,9 @@ public class ShortenerServer
     serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_TOGGLE_ACTIVE, new ToggleActiveHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_STORE_INFO, new StoreInfoHandler(urlMappingStore, startedAt)).getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_ADMIN_STORE_INFO_SSE, new StoreInfoSSEHandler(storeInfoBroadcaster))
+        .getFilters().add(new BlockBrowserPreflightFilter());
+
 
     serverAdmin.createContext(PATH_ADMIN_IMPORT_VALIDATE, new ImportValidateHandler(urlMappingStore, importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_IMPORT_APPLY, new ImportApplyHandler(urlMappingStore, importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
@@ -152,6 +160,11 @@ public class ShortenerServer
   }
 
   public void shutdown() {
+
+    if (storeInfoBroadcaster != null) {
+      storeInfoBroadcaster.close();
+    }
+
     if (serverRedirect != null) {
       serverRedirect.stop(0);
       logger().info("URL Shortener server stopped (redirect)");

@@ -2,6 +2,7 @@ package com.svenruppert.urlshortener.ui.vaadin;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.vaadin.flow.component.page.AppShellConfigurator;
+import com.vaadin.flow.component.page.Push;
 import com.vaadin.flow.server.AppShellSettings;
 import com.vaadin.flow.server.PWA;
 import com.vaadin.flow.theme.Theme;
@@ -12,6 +13,7 @@ import com.vaadin.flow.theme.Theme;
  */
 @PWA(name = "An OpenSource URL Shortener", shortName = "URL Shortener")
 @Theme("my-theme")
+@Push
 public class AppShell
     implements AppShellConfigurator, HasLogger {
 

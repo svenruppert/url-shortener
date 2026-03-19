@@ -1,13 +1,13 @@
 package com.svenruppert.urlshortener.ui.vaadin.components;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
-import com.svenruppert.urlshortener.client.AdminClient;
+import com.svenruppert.urlshortener.client.StoreInfoSSEClient.ConnectionState;
 import com.svenruppert.urlshortener.core.StoreInfo;
-import com.svenruppert.urlshortener.ui.vaadin.events.StoreConnectionChanged;
-import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreMode;
 import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
+import com.svenruppert.urlshortener.ui.vaadin.tools.StoreInfoService;
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Span;
@@ -15,12 +15,15 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.shared.Registration;
 
 import java.util.Objects;
 
 /**
- * Zeigt an, ob die Anwendung aktuell InMemory oder EclipseStore verwendet.
- * Nutzt Farbcodierung (grün = persistent, blau = volatil, rot = Fehler).
+ * Displays whether the application is currently using InMemory or EclipseStore.
+ * Uses color coding (green = persistent, blue = volatile, red = error).
+ *
+ * <p>Receives updates via SSE through the StoreInfoService.
  */
 @CssImport("./styles/store-indicator.css")
 public class StoreIndicator
@@ -35,25 +38,28 @@ public class StoreIndicator
   private static final String STATE_ECLIPSE = "store-indicator--eclipse";
   private static final String STATE_MEMORY = "store-indicator--memory";
   private static final String STATE_DOWN = "store-indicator--unavailable";
+  private static final String STATE_CONNECTING = "store-indicator--connecting";
+
   // i18n keys
   private static final String NS = "storeIndicator";
   private static final String K_BADGE_ECLIPSE = NS + ".badge.eclipse";
   private static final String K_BADGE_MEMORY = NS + ".badge.memory";
   private static final String K_BADGE_UNAVAILABLE = NS + ".badge.unavailable";
-  private static final String K_DETAILS_ITEMS = NS + ".details.items"; // "· {0} items"
+  private static final String K_BADGE_CONNECTING = NS + ".badge.connecting";
+  private static final String K_BADGE_RECONNECTING = NS + ".badge.reconnecting";
+  private static final String K_DETAILS_ITEMS = NS + ".details.items";
   private static final String K_TITLE_ECLIPSE = NS + ".title.eclipse";
   private static final String K_TITLE_MEMORY = NS + ".title.memory";
   private static final String K_TITLE_UNAVAILABLE = NS + ".title.unavailable";
-  private final AdminClient adminClient;
+  private static final String K_TITLE_CONNECTING = NS + ".title.connecting";
+
   private final Icon dbIcon = VaadinIcon.DATABASE.create();
   private final Span badge = new Span();
   private final Span details = new Span();
-  private StoreMode lastMode = StoreMode.UNAVAILABLE;
 
-  public StoreIndicator(AdminClient adminClient) {
-    this.adminClient = adminClient;
+  private Registration serviceRegistration;
 
-    // --- Layoutgrundlage ---
+  public StoreIndicator() {
     setAlignItems(FlexComponent.Alignment.CENTER);
     setSpacing(true);
     setPadding(false);
@@ -64,47 +70,90 @@ public class StoreIndicator
     details.addClassName(CLASS_DETAILS);
 
     add(dbIcon, badge, details);
+
+    // Initial state
     applyState(StoreMode.UNAVAILABLE);
     applyTexts(StoreMode.UNAVAILABLE, 0);
   }
 
   @Override
   protected void onAttach(AttachEvent attachEvent) {
-    refreshOnce();
+    super.onAttach(attachEvent);
+
     UI ui = attachEvent.getUI();
-    ui.setPollInterval(10000); // alle 10 Sekunden aktualisieren
-    ui.addPollListener(_ -> refreshOnce());
+    StoreInfoService service = StoreInfoService.get();
+
+    // Register with service for updates
+    serviceRegistration = service.register(ui, this::updateDisplay);
+
+    logger().debug("StoreIndicator attached, registered with the service");
+  }
+
+  @Override
+  protected void onDetach(DetachEvent detachEvent) {
+    super.onDetach(detachEvent);
+
+    if (serviceRegistration != null) {
+      serviceRegistration.remove();
+      serviceRegistration = null;
+    }
+
+    logger().debug("StoreIndicator detached");
   }
 
   /**
-   * Holt die StoreInfo und aktualisiert das UI.
+   * Updates the display based on StoreInfo and ConnectionState.
+   * ConnectionState takes priority when not CONNECTED.
    */
-  public void refreshOnce() {
-    getUI().ifPresent(ui -> ui.access(() -> {
-      try {
-        StoreInfo info = adminClient.getStoreInfo();
-        boolean persistent = "EclipseStore".equalsIgnoreCase(info.mode());
+  private void updateDisplay(StoreInfo info, ConnectionState state) {
+    if (state == null) {
+      state = ConnectionState.DISCONNECTED;
+    }
 
-        var newMode = persistent ? StoreMode.ECLIPSE_STORE : StoreMode.IN_MEMORY;
-
-        applyTexts(newMode, info.mappings());
-        applyState(newMode);
-
-        if (newMode != lastMode) {
-          lastMode = newMode;
-          StoreEvents.publish(new StoreConnectionChanged(newMode, info.mappings()));
-        }
-
-      } catch (Exception e) {
+    switch (state) {
+      case CONNECTING -> {
+        logger().info("updateDisplay - CONNECTING");
+        badge.setText(tr(K_BADGE_CONNECTING, "Connecting..."));
+        details.setText("");
+        getElement().setAttribute("title", tr(K_TITLE_CONNECTING, "Connection is being established"));
+        applyConnectingState();
+      }
+      case RECONNECTING -> {
+        logger().info("updateDisplay - RECONNECTING");
+        badge.setText(tr(K_BADGE_RECONNECTING, "Reconnecting..."));
+        details.setText("");
+        getElement().setAttribute("title", tr(K_TITLE_CONNECTING, "Connection is being restored"));
+        applyConnectingState();
+      }
+      case DISCONNECTED -> {
+        logger().info("updateDisplay - DISCONNECTED");
         applyTexts(StoreMode.UNAVAILABLE, 0);
         applyState(StoreMode.UNAVAILABLE);
-
-        if (lastMode != StoreMode.UNAVAILABLE) {
-          lastMode = StoreMode.UNAVAILABLE;
-          StoreEvents.publish(new StoreConnectionChanged(StoreMode.UNAVAILABLE, 0));
+      }
+      case CONNECTED -> {
+        logger().info("updateDisplay - CONNECTED info {}", info);
+        // Only show StoreInfo when CONNECTED
+        if (info != null) {
+          StoreMode mode = parseMode(info.mode());
+          applyTexts(mode, info.mappings());
+          applyState(mode);
         }
       }
-    }));
+      default -> {
+        logger().info("updateDisplay - DEFAULT");
+      }
+    }
+  }
+
+  private StoreMode parseMode(String modeString) {
+    if (modeString == null) {
+      return StoreMode.UNAVAILABLE;
+    }
+    return switch (modeString.toLowerCase()) {
+      case "eclipsestore" -> StoreMode.ECLIPSE_STORE;
+      case "inmemory" -> StoreMode.IN_MEMORY;
+      default -> StoreMode.UNAVAILABLE;
+    };
   }
 
   private void applyTexts(StoreMode mode, long mappings) {
@@ -130,15 +179,19 @@ public class StoreIndicator
   }
 
   private void applyState(StoreMode mode) {
-    // nur die drei Zustandsklassen managen
-    removeClassNames(STATE_ECLIPSE, STATE_MEMORY, STATE_DOWN);
+    removeClassNames(STATE_ECLIPSE, STATE_MEMORY, STATE_DOWN, STATE_CONNECTING);
 
     if (Objects.requireNonNull(mode) == StoreMode.ECLIPSE_STORE) {
       addClassName(STATE_ECLIPSE);
     } else if (mode == StoreMode.IN_MEMORY) {
       addClassName(STATE_MEMORY);
-    } else if (mode == StoreMode.UNAVAILABLE) {
+    } else {
       addClassName(STATE_DOWN);
     }
+  }
+
+  private void applyConnectingState() {
+    removeClassNames(STATE_ECLIPSE, STATE_MEMORY, STATE_DOWN, STATE_CONNECTING);
+    addClassName(STATE_CONNECTING);
   }
 }

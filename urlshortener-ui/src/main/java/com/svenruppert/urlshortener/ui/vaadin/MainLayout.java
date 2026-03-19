@@ -4,7 +4,6 @@ import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.ui.vaadin.components.StoreIndicator;
 import com.svenruppert.urlshortener.ui.vaadin.security.LoginConfig;
 import com.svenruppert.urlshortener.ui.vaadin.security.SessionAuth;
-import com.svenruppert.urlshortener.ui.vaadin.tools.AdminClientFactory;
 import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.svenruppert.urlshortener.ui.vaadin.tools.LocaleSelection;
 import com.svenruppert.urlshortener.ui.vaadin.views.AboutView;
@@ -75,8 +74,7 @@ public class MainLayout
 
     DrawerToggle toggle = new DrawerToggle();
 
-    var adminClient = AdminClientFactory.newInstance();
-    var storeIndicator = new StoreIndicator(adminClient);
+    var storeIndicator = new StoreIndicator();
     storeIndicator.addClassName(C_RIGHT); // push to right
 
     HorizontalLayout headerRow;

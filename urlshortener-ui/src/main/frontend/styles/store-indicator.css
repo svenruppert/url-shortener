@@ -54,3 +54,23 @@
 .store-indicator.store-indicator--unavailable .store-indicator__icon {
     color: var(--lumo-error-color);
 }
+
+/* Connecting / Reconnecting = orange mit Puls-Animation */
+.store-indicator.store-indicator--connecting .store-indicator__badge {
+    background-color: var(--lumo-warning-color-10pct, rgba(255, 170, 0, 0.1));
+    color: var(--lumo-warning-text-color, #6b5700);
+    animation: store-indicator-pulse 1.5s ease-in-out infinite;
+}
+.store-indicator.store-indicator--connecting .store-indicator__icon {
+    color: var(--lumo-warning-color, #f0a000);
+    animation: store-indicator-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes store-indicator-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}

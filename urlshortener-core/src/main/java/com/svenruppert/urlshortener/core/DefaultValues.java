@@ -25,6 +25,7 @@ public final class DefaultValues {
   public static final String PATH_REDIRECT = "/";
 
   public static final String PATH_PREFIX = "/api";
+
   public static final String PATH_ADMIN_SHORTEN = PATH_PREFIX + "/shorten";
   public static final String PATH_ADMIN_EDIT = PATH_PREFIX + "/edit";
   public static final String PATH_ADMIN_DELETE = PATH_PREFIX + "/delete";
@@ -45,6 +46,7 @@ public final class DefaultValues {
 
 
   public static final String PATH_ADMIN_STORE_INFO = PATH_PREFIX + "/store/info";
+  public static final String PATH_ADMIN_STORE_INFO_SSE = PATH_PREFIX + "/store/info/sse";
 
   public static final String PATH_ADMIN_PREFERENCES_COLUMNS = PATH_PREFIX + "/admin/preferences/columns";
   public static final String PATH_ADMIN_PREFERENCES_COLUMNS_EDIT = PATH_PREFIX + "/admin/preferences/columns/edit";
