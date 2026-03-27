@@ -319,6 +319,35 @@ public class URLShortenerClient implements HasLogger {
     return parseItemsAsMappings(json);
   }
 
+  /**
+   * Gets a single mapping by its exact shortCode.
+   *
+   * @param shortCode the short code to look up
+   * @return Optional containing the mapping if found, empty otherwise
+   * @throws IOException if the request fails
+   * @throws IllegalArgumentException if shortCode is null or blank
+   */
+  public java.util.Optional<ShortUrlMapping> getMapping(String shortCode) throws IOException {
+    if (shortCode == null || shortCode.isBlank()) {
+      throw new IllegalArgumentException("shortCode must not be null/blank");
+    }
+    logger().info("getMapping - shortCode: {}", shortCode);
+
+    // Use list with exact codePart filter
+    UrlMappingListRequest request = UrlMappingListRequest.builder()
+        .codePart(shortCode)
+        .page(1)
+        .size(10)
+        .build();
+
+    List<ShortUrlMapping> results = list(request);
+
+    // Find exact match (codePart is a contains filter, so we need exact match)
+    return results.stream()
+        .filter(m -> shortCode.equals(m.shortCode()))
+        .findFirst();
+  }
+
   public String importValidateRaw(byte[] zipBytes) throws IOException {
     if (zipBytes == null || zipBytes.length == 0) {
       throw new IllegalArgumentException("zipBytes is null/empty");

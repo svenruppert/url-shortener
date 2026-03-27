@@ -30,7 +30,7 @@
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
-            <version>5.0.0</version>
+            <version>6.1.0</version>
             <scope>provided</scope>
         </dependency>
         <!--Vaadin Flow Dependencies-->
@@ -42,14 +42,19 @@
             <exclusions>
                 <exclusion>
                     <groupId>com.vaadin</groupId>
-                    <artifactId>hilla-dev</artifactId>
+                    <artifactId>vaadin-dev</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>com.vaadin</groupId>
-                    <artifactId>hilla</artifactId>
+                    <artifactId>vaadin-dev-server</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.vaadin</groupId>-->
+<!--            <artifactId>vaadin-dev-server</artifactId>-->
+<!--        </dependency>-->
+
 
         <dependency>
             <groupId>com.svenruppert.urlshortener</groupId>
@@ -98,12 +103,16 @@
                     <execution>
                         <goals>
                             <goal>prepare-frontend</goal>
+                            <goal>build-frontend</goal>
                         </goals>
+                        <phase>compile</phase>
                     </execution>
                 </executions>
+
                 <configuration>
                     <pnpmEnable>true</pnpmEnable>
                 </configuration>
+
             </plugin>
 
             <plugin>
@@ -139,6 +148,7 @@
                             <artifactId>vaadin-dev-server</artifactId>
                         </exclusion>
                     </exclusions>
+
                 </dependency>
             </dependencies>
             <build>

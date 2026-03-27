@@ -1,4 +1,4 @@
-package com.svenruppert.urlshortener.ui.vaadin.views.overview;
+package com.svenruppert.urlshortener.ui.vaadin.components;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
@@ -22,17 +22,24 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.timepicker.TimePicker;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Optional;
+import java.util.function.Consumer;
 
-import static com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView.VALUE_CHANGE_TIMEOUT;
 import static com.vaadin.flow.data.value.ValueChangeMode.LAZY;
 
+/**
+ * Reusable search/filter bar component.
+ * Can be configured to show/hide various elements depending on context.
+ */
 @CssImport("./styles/search-bar.css")
 public class SearchBar
     extends Composite<HorizontalLayout>
     implements HasLogger, HasRefreshGuard, I18nSupport {
+
+  public static final int VALUE_CHANGE_TIMEOUT = 400;
 
   // CSS classes
   private static final String C_ROOT = "search-bar";
@@ -53,7 +60,7 @@ public class SearchBar
   private static final String C_SORTBY = "search-bar__sortby";
   private static final String C_DIR = "search-bar__dir";
 
-  // i18n keys (Overview-leading)
+  // i18n keys
   private static final String K_SCOPE_LABEL = "overview.search.scope.label";
   private static final String K_SCOPE_URL = "overview.search.scope.url";
   private static final String K_SCOPE_SHORTCODE = "overview.search.scope.shortcode";
@@ -96,6 +103,7 @@ public class SearchBar
   private static final String SCOPE_URL = "url";
   private static final String SCOPE_SHORTCODE = "shortcode";
 
+  // UI components
   private final TextField globalSearch = new TextField();
   private final ComboBox<String> searchScope = new ComboBox<>();
   private final TextField codePart = new TextField();
@@ -110,12 +118,18 @@ public class SearchBar
   private final Select<ActiveState> activeState = new Select<>();
   private final Button resetBtn = new Button(new Icon(VaadinIcon.ROTATE_LEFT));
 
-  private final OverviewView guardOwner;
   private Details advanced;
+  private HorizontalLayout topBar;
 
-  public SearchBar(OverviewView guardOwner) {
-    this.guardOwner = guardOwner;
+  // Callbacks
+  private Consumer<Void> onFilterChange;
+  private Consumer<Integer> onPageSizeChange;
+  private Consumer<Void> onReset;
 
+  // State
+  private boolean refreshSuppressed = false;
+
+  public SearchBar() {
     container().addClassName(C_ROOT);
     container().add(buildSearchBar());
 
@@ -133,7 +147,6 @@ public class SearchBar
     globalSearch.setPlaceholder(tr(K_GLOBAL_PLACEHOLDER, "Search all…"));
 
     searchScope.setLabel(tr(K_SCOPE_LABEL, "Search in"));
-    // item labels are translated, values are technical and stable
     searchScope.setItemLabelGenerator(v -> SCOPE_SHORTCODE.equals(v)
         ? tr(K_SCOPE_SHORTCODE, "Shortcode")
         : tr(K_SCOPE_URL, "URL"));
@@ -167,7 +180,6 @@ public class SearchBar
     sortBy.setPlaceholder(tr(K_SORTBY_PLACEHOLDER, "Sort by"));
     dir.setPlaceholder(tr(K_DIR_PLACEHOLDER, "Direction"));
 
-    // show translated labels for sortBy + dir while keeping technical values
     sortBy.setItemLabelGenerator(v -> switch (v) {
       case "createdAt" -> tr(K_SORTBY_ITEM_CREATED, "Created");
       case "shortCode" -> tr(K_SORTBY_ITEM_SHORTCODE, "Shortcode");
@@ -180,7 +192,6 @@ public class SearchBar
         ? tr(K_DIR_ITEM_ASC, "Ascending")
         : tr(K_DIR_ITEM_DESC, "Descending"));
 
-    // advanced container title
     if (advanced != null) {
       advanced.setSummaryText(tr(K_ADVANCED, "Advanced filters"));
     }
@@ -209,7 +220,7 @@ public class SearchBar
 
     resetBtn.addClassName(C_RESET);
 
-    HorizontalLayout topBar = new HorizontalLayout(globalSearch, searchScope, pageSize, activeState, resetBtn);
+    topBar = new HorizontalLayout(globalSearch, searchScope, pageSize, activeState, resetBtn);
     topBar.addClassName(C_TOP);
     topBar.setWidthFull();
     topBar.setSpacing(true);
@@ -218,11 +229,11 @@ public class SearchBar
     // --- Advanced block ---
     codePart.setValueChangeMode(LAZY);
     codePart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
-    codePart.addValueChangeListener(_ -> safeRefresh());
+    codePart.addValueChangeListener(_ -> fireFilterChange());
 
     urlPart.setValueChangeMode(LAZY);
     urlPart.setValueChangeTimeout(VALUE_CHANGE_TIMEOUT);
-    urlPart.addValueChangeListener(_ -> safeRefresh());
+    urlPart.addValueChangeListener(_ -> fireFilterChange());
 
     sortBy.addClassName(C_SORTBY);
     sortBy.setItems("createdAt", "shortCode", "originalUrl", "expiresAt");
@@ -285,10 +296,7 @@ public class SearchBar
   }
 
   private void addListeners() {
-    activeState.addValueChangeListener(_ -> {
-      guardOwner.setCurrentPage(1);
-      safeRefresh();
-    });
+    activeState.addValueChangeListener(_ -> fireFilterChange());
 
     globalSearch.addValueChangeListener(e -> {
       var v = Optional.ofNullable(e.getValue()).orElse("");
@@ -299,6 +307,7 @@ public class SearchBar
         urlPart.setValue(v);
         codePart.clear();
       }
+      fireFilterChange();
     });
 
     searchScope.addValueChangeListener(_ -> {
@@ -310,12 +319,14 @@ public class SearchBar
         urlPart.setValue(v);
         codePart.clear();
       }
+      fireFilterChange();
     });
 
     pageSize.addValueChangeListener(e -> {
-      guardOwner.setCurrentPage(1);
-      guardOwner.setGridPageSize(e.getValue());
-      safeRefresh();
+      if (onPageSizeChange != null) {
+        onPageSizeChange.accept(e.getValue());
+      }
+      fireFilterChange();
     });
 
     advanced.addOpenedChangeListener(ev -> {
@@ -330,7 +341,9 @@ public class SearchBar
     resetBtn.addClickListener(_ -> {
       try (var _ = withRefreshGuard(true)) {
         resetElements();
-        guardOwner.setCurrentPage(1);
+        if (onReset != null) {
+          onReset.accept(null);
+        }
       } catch (Exception e) {
         logger().warn("resetBtn.addClickListener failed {}", e.getMessage());
       }
@@ -339,6 +352,8 @@ public class SearchBar
 
   private void addShortCuts() {
     var current = UI.getCurrent();
+    if (current == null) return;
+
     current.addShortcutListener(_ -> {
       if (globalSearch.isEnabled()) globalSearch.focus();
     }, Key.KEY_K, KeyModifier.CONTROL);
@@ -387,6 +402,71 @@ public class SearchBar
     }
   }
 
+  private void fireFilterChange() {
+    if (!refreshSuppressed && onFilterChange != null) {
+      onFilterChange.accept(null);
+    }
+  }
+
+  // ============================================================================
+  // Public API - Callbacks
+  // ============================================================================
+
+  public void setOnFilterChange(Consumer<Void> callback) {
+    this.onFilterChange = callback;
+  }
+
+  public void setOnPageSizeChange(Consumer<Integer> callback) {
+    this.onPageSizeChange = callback;
+  }
+
+  public void setOnReset(Consumer<Void> callback) {
+    this.onReset = callback;
+  }
+
+  // ============================================================================
+  // Public API - Hide/Show components
+  // ============================================================================
+
+  /**
+   * Hides the active state filter (used in statistics view).
+   */
+  public void hideActiveState() {
+    activeState.setVisible(false);
+  }
+
+  /**
+   * Hides the search scope selector.
+   */
+  public void hideSearchScope() {
+    searchScope.setVisible(false);
+  }
+
+  /**
+   * Hides the page size field.
+   */
+  public void hidePageSize() {
+    pageSize.setVisible(false);
+  }
+
+  /**
+   * Hides the advanced filters section entirely.
+   */
+  public void hideAdvanced() {
+    advanced.setVisible(false);
+  }
+
+  /**
+   * Hides the global search field.
+   */
+  public void hideGlobalSearch() {
+    globalSearch.setVisible(false);
+  }
+
+  // ============================================================================
+  // Public API - Build filter request
+  // ============================================================================
+
   public UrlMappingListRequest buildFilter(Integer page, Integer size) {
     UrlMappingListRequest.Builder b = UrlMappingListRequest.builder();
 
@@ -422,6 +502,10 @@ public class SearchBar
 
     return b.build();
   }
+
+  // ============================================================================
+  // Public API - Getters/Setters
+  // ============================================================================
 
   public void resetElements() {
     globalSearch.clear();
@@ -460,18 +544,50 @@ public class SearchBar
     dir.setValue(value);
   }
 
+  public String getSearchText() {
+    return Optional.ofNullable(globalSearch.getValue()).orElse("").trim();
+  }
+
+  public String getCodePart() {
+    return Optional.ofNullable(codePart.getValue()).orElse("").trim();
+  }
+
+  public String getUrlPart() {
+    return Optional.ofNullable(urlPart.getValue()).orElse("").trim();
+  }
+
+  public LocalDate getFromDate() {
+    return fromDate.getValue();
+  }
+
+  public void setFromDate(LocalDate date) {
+    fromDate.setValue(date);
+  }
+
+  public LocalDate getToDate() {
+    return toDate.getValue();
+  }
+
+  public void setToDate(LocalDate date) {
+    toDate.setValue(date);
+  }
+
+  // ============================================================================
+  // HasRefreshGuard implementation
+  // ============================================================================
+
   @Override
   public boolean isRefreshSuppressed() {
-    return guardOwner.isRefreshSuppressed();
+    return refreshSuppressed;
   }
 
   @Override
   public void setRefreshSuppressed(boolean suppressed) {
-    guardOwner.setRefreshSuppressed(suppressed);
+    this.refreshSuppressed = suppressed;
   }
 
   @Override
   public void safeRefresh() {
-    guardOwner.safeRefresh();
+    fireFilterChange();
   }
 }

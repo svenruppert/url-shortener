@@ -12,6 +12,7 @@ import com.svenruppert.urlshortener.ui.vaadin.views.CreateView;
 import com.svenruppert.urlshortener.ui.vaadin.views.YoutubeView;
 import com.svenruppert.urlshortener.ui.vaadin.views.login.LoginView;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
+import com.svenruppert.urlshortener.ui.vaadin.views.statistics.StatisticsView;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
@@ -53,6 +54,7 @@ public class MainLayout
 
   private static final String K_NAV_OVERVIEW = "nav.overview";
   private static final String K_NAV_CREATE = "nav.create";
+  private static final String K_NAV_STATISTICS = "nav.statistics";
   private static final String K_NAV_YOUTUBE = "nav.youtube";
   private static final String K_NAV_ABOUT = "nav.about";
 
@@ -117,6 +119,7 @@ public class MainLayout
     sideNav.addItem(
         new SideNavItem(tr(K_NAV_OVERVIEW, "Overview"), "/" + OverviewView.PATH, DASHBOARD.create()),
         new SideNavItem(tr(K_NAV_CREATE, "Create"), "/" + CreateView.PATH, DASHBOARD.create()),
+        new SideNavItem(tr(K_NAV_STATISTICS, "Statistics"), "/" + StatisticsView.PATH, CHART.create()),
         new SideNavItem(tr(K_NAV_YOUTUBE, "Youtube"), "/" + YoutubeView.PATH, CART.create()),
         new SideNavItem(tr(K_NAV_ABOUT, "About"), "/" + AboutView.PATH, USER_HEART.create())
     );

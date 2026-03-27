@@ -46,11 +46,11 @@ public class ColumnVisibilitySingleHandler
     try {
       req = fromJson(body, ColumnDeleteRequest.class);
     } catch (Exception e) {
-      writeJson(ex, BAD_REQUEST, "Invalid JSON: " + e.getMessage());
+      writeJson(ex, BAD_REQUEST, Map.of("error", "Invalid JSON: " + e.getMessage()));
       return;
     }
     if (isBlank(req.userId()) || isBlank(req.viewId()) || isBlank(req.columnKey())) {
-      writeJson(ex, BAD_REQUEST, "userId, viewId and columnKey required");
+      writeJson(ex, BAD_REQUEST, Map.of("error", "userId, viewId and columnKey required"));
       return;
     }
 
@@ -63,7 +63,7 @@ public class ColumnVisibilitySingleHandler
     logger().info("handleSingleEdit..");
     var req = fromJson(readBody(ex.getRequestBody()), ColumnSingleEditRequest.class);
     if (isBlank(req.userId()) || isBlank(req.viewId()) || isBlank(req.columnKey())) {
-      writeJson(ex, BAD_REQUEST, "userId, viewId and columnKey required");
+      writeJson(ex, BAD_REQUEST, Map.of("error", "userId, viewId and columnKey required"));
       return;
     }
     var visibility = Map.of(req.columnKey(), req.visible());

@@ -17,6 +17,11 @@ public final class JsonWriter
 
   public static void writeJson(HttpExchange ex, HttpStatus status, Object body)
       throws IOException {
+    if (body instanceof String stringBody && isJsonObjectOrArray(stringBody)) {
+      writeJsonRaw(ex, status, stringBody);
+      return;
+    }
+
     String json = JacksonJson.mapper().writeValueAsString(body);
     writeJsonRaw(ex, status, json);
   }
@@ -25,6 +30,22 @@ public final class JsonWriter
   public static void writeJson(HttpExchange ex, int statusCode, Object body)
       throws IOException {
     writeJson(ex, HttpStatus.fromCode(statusCode), body);
+  }
+
+  private static boolean isJsonObjectOrArray(String value) {
+    if (value == null) {
+      return false;
+    }
+    String trimmed = value.trim();
+    if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+      return false;
+    }
+    try {
+      JacksonJson.mapper().readTree(trimmed);
+      return true;
+    } catch (Exception ignored) {
+      return false;
+    }
   }
 
   public static void writeJsonRaw(HttpExchange ex, int statusCode, String rawJson)

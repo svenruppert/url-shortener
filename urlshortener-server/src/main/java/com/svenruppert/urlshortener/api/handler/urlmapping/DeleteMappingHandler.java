@@ -47,13 +47,13 @@ public final class DeleteMappingHandler
 
     var validated = AliasPolicy.validate(shortCode);
     if (!validated.valid()) {
-      logger().info("no valid shortcode/alias .. Abort ");
+      logger().info("Invalid shortCode/alias, aborting");
       writeJson(exchange, fromCode(400), INVALID_SHORT_CODE_ERROR_JSON);
       return;
     }
 
     try {
-      boolean removed = updater.delete(shortCode); // ggf. auf remove(...) umbenennen, falls deine API so heißt
+      boolean removed = updater.delete(shortCode);
       if (removed) {
         exchange.sendResponseHeaders(204, -1); // No Content
       } else {
