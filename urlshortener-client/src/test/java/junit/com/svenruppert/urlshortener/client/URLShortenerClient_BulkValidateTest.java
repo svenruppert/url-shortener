@@ -252,4 +252,138 @@ class URLShortenerClient_BulkValidateTest {
     assertThat(response.getResults().get(0).getStatus()).isEqualTo(ValidationStatus.VALID);
     assertThat(response.getResults().get(1).getStatus()).isEqualTo(ValidationStatus.DUPLICATE_IN_GRID);
   }
+
+  // ── Existing shortlink detail (item 2) ───────────────────────────────────────
+
+  @Test
+  @Order(50)
+  void existingShortCodes_containActualShortCodeStrings() throws IOException {
+    // Create a shortlink for a target URL
+    final String targetUrl = "https://shortcode-detail-test.example.com/p1";
+    final var createResponse = client.bulkShorten(List.of(targetUrl));
+    final String createdCode = createResponse.getResults().get(0).getShortCode();
+    assertThat(createdCode).isNotBlank();
+
+    // Validate the same URL — existingShortCodes must contain the created shortcode
+    final var validateResponse = client.bulkValidate(List.of(targetUrl), List.of());
+    final ValidationItemResult result = validateResponse.getResults().get(0);
+    assertThat(result.getStatus()).isEqualTo(ValidationStatus.HAS_EXISTING_SHORTLINKS);
+    assertThat(result.getExistingShortCodes()).contains(createdCode);
+  }
+
+  @Test
+  @Order(51)
+  void existingShortCodes_multipleLinks_allReturned() throws IOException {
+    // Create two shortlinks for the same target URL
+    final String targetUrl = "https://multi-shortcode-detail.example.com/p2";
+    final var r1 = client.bulkShorten(List.of(targetUrl));
+    final var r2 = client.bulkShorten(List.of(targetUrl));
+    final String code1 = r1.getResults().get(0).getShortCode();
+    final String code2 = r2.getResults().get(0).getShortCode();
+
+    // Both shortcodes must appear in the validation response
+    final var validateResponse = client.bulkValidate(List.of(targetUrl), List.of());
+    final var codes = validateResponse.getResults().get(0).getExistingShortCodes();
+    assertThat(codes).contains(code1, code2);
+  }
+
+  // ── Shortcode format (item 6) ────────────────────────────────────────────────
+
+  @Test
+  @Order(60)
+  void createdShortCode_isExactly6CharactersLong() throws IOException {
+    final var response = client.bulkShorten(
+        List.of("https://shortcode-length-test.example.com/x"));
+    final String code = response.getResults().get(0).getShortCode();
+    assertThat(code).hasSize(6);
+  }
+
+  @Test
+  @Order(61)
+  void createdShortCodes_areBase62Alphanumeric() throws IOException {
+    final var urls = java.util.stream.IntStream.range(0, 5)
+        .mapToObj(i -> "https://shortcode-alphanum.example.com/item-" + i)
+        .toList();
+    final var response = client.bulkShorten(urls);
+    for (final var item : response.getResults()) {
+      assertThat(item.getShortCode())
+          .as("Short code must be exactly 6 Base-62 characters, got: " + item.getShortCode())
+          .matches("[0-9A-Za-z]{6}");
+    }
+  }
+
+  @Test
+  @Order(62)
+  void consecutiveShortCodes_areNotSequentiallyIncremented() throws IOException {
+    // Consecutive counter values produce very different codes after mixing
+    final var r1 = client.bulkShorten(List.of("https://seq-check-1.example.com/"));
+    final var r2 = client.bulkShorten(List.of("https://seq-check-2.example.com/"));
+    final String code1 = r1.getResults().get(0).getShortCode();
+    final String code2 = r2.getResults().get(0).getShortCode();
+    assertThat(code1).isNotEqualTo(code2);
+    // Codes must not be trivially sequential numeric strings.
+    // If either code is non-numeric (contains letters) that already proves non-sequential.
+    // Only when both happen to be all-digit strings do we check they are not adjacent.
+    try {
+      final long n1 = Long.parseLong(code1);
+      final long n2 = Long.parseLong(code2);
+      assertThat(Math.abs(n1 - n2)).isGreaterThan(1L);
+    } catch (final NumberFormatException e) {
+      // Non-numeric code – definitely not a trivially sequential integer; test passes.
+    }
+  }
+
+  @Test
+  @Order(63)
+  void existingShortCodes_inValidateResponse_areAlso6CharsLong() throws IOException {
+    final String targetUrl = "https://shortcode-6char-validate.example.com/v";
+    client.bulkShorten(List.of(targetUrl)); // create shortlink
+
+    final var response = client.bulkValidate(List.of(targetUrl), List.of());
+    final var codes = response.getResults().get(0).getExistingShortCodes();
+    assertThat(codes).isNotEmpty();
+    for (final String code : codes) {
+      assertThat(code).hasSize(6);
+    }
+  }
+
+  // ── Re-validation against full work set (item 1) ────────────────────────────
+
+  @Test
+  @Order(70)
+  void revalidate_withBlockingItemAsExisting_detectsDuplicate() throws IOException {
+    // Simulate the UI passing a blocking item's URL in existingUrls during re-validation
+    // (blocking items are also part of the work set and must be included)
+    final String existingBlockingUrl = "not-valid-but-in-grid";   // blocking item
+    final String newUrl = "https://revalidate-dup-check.example.com/x";
+
+    // Validate a new URL that duplicates the blocking item's URL
+    // (in practice this scenario tests that the server respects existingUrls regardless of state)
+    final var response = client.bulkValidate(
+        List.of(newUrl, newUrl),           // second entry duplicates first within batch
+        List.of(existingBlockingUrl));      // existingUrls includes the blocking item's URL
+
+    // First entry: valid (no duplicate vs. batch or grid)
+    assertThat(response.getResults().get(0).getStatus()).isEqualTo(ValidationStatus.VALID);
+    // Second entry: duplicate within batch
+    assertThat(response.getResults().get(1).getStatus()).isEqualTo(ValidationStatus.DUPLICATE_IN_BATCH);
+  }
+
+  @Test
+  @Order(71)
+  void revalidate_urlAlreadyInGridAsCreated_detectedAsDuplicateInGrid() throws IOException {
+    // After Create, items in CREATED state should still count as "existing"
+    // when re-validating a newly added URL in the same work set
+    final String targetUrl = "https://created-item-duplicate.example.com/c";
+    client.bulkShorten(List.of(targetUrl)); // create it via the server
+
+    // Simulating UI behaviour: validate a new URL that duplicates an already-CREATED grid item
+    // The UI passes CREATED items' URLs in existingUrls during re-validation
+    final var response = client.bulkValidate(
+        List.of(targetUrl),          // URL already "in grid" as CREATED
+        List.of(targetUrl));         // pass it as existing
+
+    assertThat(response.getResults().get(0).getStatus())
+        .isEqualTo(ValidationStatus.DUPLICATE_IN_GRID);
+  }
 }

@@ -16,6 +16,7 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.H2;
@@ -95,8 +96,12 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
   private static final String K_STATE_TOO_LONG      = "bulkCreate.state.tooLong";
   private static final String K_STATE_DUP_BATCH     = "bulkCreate.state.duplicateBatch";
   private static final String K_STATE_DUP_GRID      = "bulkCreate.state.duplicateGrid";
-  private static final String K_STATE_CREATED       = "bulkCreate.state.created";
-  private static final String K_STATE_FAILED        = "bulkCreate.state.createFailed";
+  private static final String K_STATE_CREATED          = "bulkCreate.state.created";
+  private static final String K_STATE_FAILED           = "bulkCreate.state.createFailed";
+  private static final String K_STATE_CONFIRMED        = "bulkCreate.state.confirmedExisting";
+  private static final String K_DIALOG_EXISTING_TITLE  = "bulkCreate.dialog.existingTitle";
+  private static final String K_DIALOG_EXISTING_CLOSE  = "bulkCreate.dialog.existingClose";
+  private static final String K_ACTION_CONFIRM_ANYWAY  = "bulkCreate.action.confirmAnyway";
 
   // ── Components ─────────────────────────────────────────────────────────────
 
@@ -216,13 +221,17 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
         .setFlexGrow(0)
         .setWidth("165px");
 
-    // Existing shortlinks — non-blocking info for HAS_EXISTING rows
+    // Existing shortlinks — clickable button that opens a detail + confirm dialog
     resultsGrid.addComponentColumn(item -> {
       final var codes = item.getExistingShortCodes();
       if (item.getState() == WorkItemState.HAS_EXISTING
           && codes != null
           && !codes.isEmpty()) {
-        return new Span(tr(K_HINT_HAS_EXISTING, "{0} existing shortlink(s)", codes.size()));
+        final var btn = new Button(
+            tr(K_HINT_HAS_EXISTING, "{0} shortlink(s)", codes.size()));
+        btn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+        btn.addClickListener(_ -> showExistingShortlinksDialog(item, codes));
+        return btn;
       }
       return new Span();
     })
@@ -273,8 +282,13 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
         theme = "badge success";
       }
       case HAS_EXISTING -> {
-        label = "\u26a0 " + tr(K_STATE_HAS_EXISTING, "Has Existing");
-        theme = "badge contrast";
+        if (item.isConfirmed()) {
+          label = "\u2713 " + tr(K_STATE_CONFIRMED, "Confirmed");
+          theme = "badge success";
+        } else {
+          label = "\u26a0 " + tr(K_STATE_HAS_EXISTING, "Has Existing");
+          theme = "badge contrast";
+        }
       }
       case INVALID_URL -> {
         label = "\u2717 " + tr(K_STATE_INVALID_URL, "Invalid URL");
@@ -343,25 +357,30 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
   // ── Primary button state machine ───────────────────────────────────────────
 
   /**
-   * Updates the primary button label, style, and enabled state based on the
-   * current state of the textarea and the work set:
+   * Updates the primary button label, style, and enabled state.
    *
    * <ul>
-   *   <li><b>Validate</b> (PRIMARY) – textarea has content <em>or</em> grid has blocking rows.
-   *   <li><b>Create</b>   (SUCCESS) – textarea is empty <em>and</em> every grid row is creatable
-   *       <em>and</em> at least one creatable row exists.
+   *   <li><b>Validate</b> (PRIMARY) – textarea has content <em>or</em> grid has blocking rows.</li>
+   *   <li><b>Create</b>   (SUCCESS, grayed) – no blocking rows, but unconfirmed HAS_EXISTING items
+   *       remain. The button is shown but disabled until the user confirms via the grid dialog.</li>
+   *   <li><b>Create</b>   (SUCCESS, enabled) – textarea empty, no blocking, no unconfirmed
+   *       warnings, at least one item ready to create.</li>
    * </ul>
    */
   private void updatePrimaryButton() {
     final boolean textAreaHasContent = !parseInputLines().isEmpty();
-    final boolean hasBlocking  = workItems.stream().anyMatch(w -> w.getState().isBlocking());
-    final boolean hasCreatable = workItems.stream().anyMatch(w -> w.getState().isCreatable());
+    final boolean hasBlocking     = workItems.stream().anyMatch(w -> w.getState().isBlocking());
+    final boolean hasUnconfirmed  = workItems.stream()
+        .anyMatch(w -> w.getState() == WorkItemState.HAS_EXISTING && !w.isConfirmed());
+    final boolean hasReadyToCreate = workItems.stream().anyMatch(this::isReadyToCreate);
 
-    if (!textAreaHasContent && !hasBlocking && hasCreatable) {
+    if (!textAreaHasContent && !hasBlocking) {
+      // No more validation work in textarea/grid → switch to Create mode
       primaryButton.setText(tr(K_BTN_CREATE, "Create Links"));
       primaryButton.removeThemeVariants(ButtonVariant.LUMO_PRIMARY);
       primaryButton.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
-      primaryButton.setEnabled(true);
+      // Enabled only when all HAS_EXISTING items are confirmed AND at least one is ready
+      primaryButton.setEnabled(!hasUnconfirmed && hasReadyToCreate);
     } else {
       primaryButton.setText(tr(K_BTN_VALIDATE, "Validate"));
       primaryButton.removeThemeVariants(ButtonVariant.LUMO_SUCCESS);
@@ -372,14 +391,24 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
 
   private void onPrimaryButtonClick() {
     final boolean textAreaHasContent = !parseInputLines().isEmpty();
-    final boolean hasBlocking  = workItems.stream().anyMatch(w -> w.getState().isBlocking());
-    final boolean hasCreatable = workItems.stream().anyMatch(w -> w.getState().isCreatable());
+    final boolean hasBlocking = workItems.stream().anyMatch(w -> w.getState().isBlocking());
 
-    if (!textAreaHasContent && !hasBlocking && hasCreatable) {
+    if (!textAreaHasContent && !hasBlocking) {
       doCreate();
     } else {
       doValidate();
     }
+  }
+
+  // ── isReadyToCreate helper ─────────────────────────────────────────────────
+
+  /**
+   * A work item is ready to create if it is VALID, or if it is HAS_EXISTING and
+   * the user has explicitly confirmed the warning via the existing-links dialog.
+   */
+  private boolean isReadyToCreate(WorkItem w) {
+    return w.getState() == WorkItemState.VALID
+        || (w.getState() == WorkItemState.HAS_EXISTING && w.isConfirmed());
   }
 
   // ── Validate ───────────────────────────────────────────────────────────────
@@ -387,7 +416,7 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
   private void doValidate() {
     final List<String> newUrls = parseInputLines();
 
-    // Blocking grid rows can be re-validated when the textarea is empty
+    // Blocking grid rows are included in the re-validation run
     final List<WorkItem> blockingItems = workItems.stream()
         .filter(w -> w.getState().isBlocking())
         .toList();
@@ -412,9 +441,11 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
       urlsToValidate.subList(BulkShortenRequest.MAX_URLS, urlsToValidate.size()).clear();
     }
 
-    // Already-creatable grid items are passed as "existing" for duplicate detection
+    // Items not being re-validated represent the full established work set for
+    // DUPLICATE_IN_GRID detection — includes VALID, HAS_EXISTING, CREATED, CREATE_FAILED
+    final java.util.Set<WorkItem> toRevalidateSet = new java.util.HashSet<>(blockingItems);
     final List<String> existingUrls = workItems.stream()
-        .filter(w -> w.getState().isCreatable())
+        .filter(w -> !toRevalidateSet.contains(w) && !w.getUrl().isBlank())
         .map(WorkItem::getUrl)
         .toList();
 
@@ -450,7 +481,7 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
 
   private void doCreate() {
     final List<WorkItem> creatableItems = workItems.stream()
-        .filter(w -> w.getState().isCreatable())
+        .filter(this::isReadyToCreate)
         .toList();
 
     if (creatableItems.isEmpty()) {
@@ -502,14 +533,19 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
 
   /**
    * Re-validates a single grid item after inline editing.
-   * Passes all other creatable items as "existing" for duplicate detection.
+   *
+   * <p>All other work-set items (regardless of their current state) are passed as
+   * {@code existingUrls} so that duplicate-in-grid detection is consistent with a
+   * full Validate run. The item's confirmation flag is reset because a URL change
+   * invalidates any previously given confirmation.
    */
   private void revalidateItem(WorkItem item) {
     if (item.getUrl().isBlank()) {
       return;
     }
+    // Pass the complete remaining work set (all states) for consistent duplicate detection
     final List<String> existingUrls = workItems.stream()
-        .filter(w -> w != item && w.getState().isCreatable())
+        .filter(w -> w != item && !w.getUrl().isBlank())
         .map(WorkItem::getUrl)
         .toList();
 
@@ -520,12 +556,53 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
       item.setState(WorkItem.mapValidationStatus(r.getStatus()));
       item.setExistingShortCodes(r.getExistingShortCodes());
       item.setMessage(r.getErrorMessage());
+      item.setConfirmed(false); // URL changed → previous confirmation no longer applies
       refreshGrid();
       notify(tr(K_TOAST_REVALIDATED, "URL re-validated"), r.isCreatable());
     } catch (Exception e) {
       logger().error("Re-validation of single item failed", e);
       notify("Error: " + e.getMessage(), false);
     }
+  }
+
+  // ── Existing shortlinks detail + confirm dialog ────────────────────────────
+
+  /**
+   * Opens a dialog listing the shortcodes that already point to the item's URL.
+   * The dialog also provides an explicit "Confirm — create anyway" action so the
+   * user can consciously proceed despite the warning.
+   */
+  private void showExistingShortlinksDialog(WorkItem item, List<String> shortCodes) {
+    final var dialog = new Dialog();
+    dialog.setHeaderTitle(tr(K_DIALOG_EXISTING_TITLE, "Existing Shortlinks"));
+
+    final var content = new VerticalLayout();
+    content.setPadding(false);
+    content.setSpacing(false);
+    for (final String code : shortCodes) {
+      final String fullUrl =
+          com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL + code;
+      final var link = new Anchor(fullUrl, fullUrl);
+      link.setTarget("_blank");
+      content.add(link);
+    }
+    dialog.add(content);
+
+    final var closeBtn = new Button(
+        tr(K_DIALOG_EXISTING_CLOSE, "Close"), _ -> dialog.close());
+    closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+    final var confirmBtn = new Button(
+        tr(K_ACTION_CONFIRM_ANYWAY, "Confirm \u2013 create anyway"));
+    confirmBtn.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
+    confirmBtn.addClickListener(_ -> {
+      item.setConfirmed(true);
+      dialog.close();
+      refreshGrid();
+    });
+
+    dialog.getFooter().add(closeBtn, confirmBtn);
+    dialog.open();
   }
 
   // ── Remove item ────────────────────────────────────────────────────────────
@@ -734,6 +811,11 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
     private String message;
     private String createdShortUrl;
     private String createdShortCode;
+    /**
+     * {@code true} when the user has explicitly confirmed a HAS_EXISTING warning
+     * via the existing-links dialog. Resets to {@code false} on re-validation.
+     */
+    private boolean confirmed = false;
 
     WorkItem() {
     }
@@ -816,6 +898,14 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
 
     public void setCreatedShortCode(String createdShortCode) {
       this.createdShortCode = createdShortCode;
+    }
+
+    public boolean isConfirmed() {
+      return confirmed;
+    }
+
+    public void setConfirmed(boolean confirmed) {
+      this.confirmed = confirmed;
     }
   }
 }
