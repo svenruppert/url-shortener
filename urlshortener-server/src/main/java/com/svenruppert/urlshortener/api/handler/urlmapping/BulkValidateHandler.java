@@ -9,6 +9,7 @@ import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
 import com.svenruppert.urlshortener.api.utils.SuccessResponses;
 import com.svenruppert.urlshortener.core.urlmapping.BulkValidateRequest;
 import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse;
+import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse.ExistingShortlinkInfo;
 import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse.ValidationItemResult;
 import com.svenruppert.urlshortener.core.validation.UrlValidator;
 
@@ -79,8 +80,8 @@ public class BulkValidateHandler implements HttpHandler, HasLogger {
         return;
       }
 
-      // Build reverse-lookup: normalizedUrl → list<shortCode> (loaded once for the whole request)
-      final Map<String, List<String>> existingByUrl = buildExistingUrlIndex();
+      // Build reverse-lookup: normalizedUrl → list<ExistingShortlinkInfo> (loaded once for the whole request)
+      final Map<String, List<ExistingShortlinkInfo>> existingByUrl = buildExistingUrlIndex();
 
       // URLs currently in the UI work set (for DUPLICATE_IN_GRID detection)
       final Set<String> gridUrls = req.getExistingUrls() == null
@@ -127,6 +128,16 @@ public class BulkValidateHandler implements HttpHandler, HasLogger {
           continue;
         }
 
+        // ── protocol-variant duplicate in grid (http↔https of same URL) ─────
+        final String counterpartUrl = swapProtocol(url);
+        if (counterpartUrl != null && gridUrls.contains(counterpartUrl)) {
+          results.add(ValidationItemResult.duplicateInGrid(i, url,
+              "URL already in work set as its " + (url.startsWith("https://") ? "http" : "https")
+                  + " counterpart: " + counterpartUrl));
+          seenInBatch.add(url);
+          continue;
+        }
+
         // ── duplicate in batch ────────────────────────────────────────────────
         if (seenInBatch.contains(url)) {
           results.add(ValidationItemResult.duplicateInBatch(i, url));
@@ -135,7 +146,7 @@ public class BulkValidateHandler implements HttpHandler, HasLogger {
         seenInBatch.add(url);
 
         // ── existing shortlinks check ─────────────────────────────────────────
-        final List<String> existing = existingByUrl.getOrDefault(url, List.of());
+        final List<ExistingShortlinkInfo> existing = existingByUrl.getOrDefault(url, List.of());
         if (!existing.isEmpty()) {
           results.add(ValidationItemResult.hasExisting(i, url, url, existing));
         } else {
@@ -162,17 +173,39 @@ public class BulkValidateHandler implements HttpHandler, HasLogger {
   /**
    * Loads all mappings once and indexes them by their {@code originalUrl}.
    * This gives O(1) per-URL lookup during the validation loop.
+   * Also adds protocol-variant entries (http↔https) marked with {@code protocolVariant=true}.
    */
-  private Map<String, List<String>> buildExistingUrlIndex() {
-    final Map<String, List<String>> index = new HashMap<>();
+  private Map<String, List<ExistingShortlinkInfo>> buildExistingUrlIndex() {
+    final Map<String, List<ExistingShortlinkInfo>> index = new HashMap<>();
     try {
       for (var mapping : store.findAll()) {
-        index.computeIfAbsent(mapping.originalUrl(), _ -> new ArrayList<>())
-            .add(mapping.shortCode());
+        final ExistingShortlinkInfo info = new ExistingShortlinkInfo(
+            mapping.shortCode(), mapping.active(), mapping.getExpiresAt(), false);
+        index.computeIfAbsent(mapping.originalUrl(), _ -> new ArrayList<>()).add(info);
+
+        final String counterpart = swapProtocol(mapping.originalUrl());
+        if (counterpart != null) {
+          final ExistingShortlinkInfo variantInfo = new ExistingShortlinkInfo(
+              mapping.shortCode(), mapping.active(), mapping.getExpiresAt(), true);
+          index.computeIfAbsent(counterpart, _ -> new ArrayList<>()).add(variantInfo);
+        }
       }
     } catch (Exception e) {
       logger().warn("Could not load existing mappings for duplicate-check; proceeding without", e);
     }
     return index;
+  }
+
+  private static String swapProtocol(String url) {
+    if (url == null) {
+      return null;
+    }
+    if (url.startsWith("https://")) {
+      return "http://" + url.substring(8);
+    }
+    if (url.startsWith("http://")) {
+      return "https://" + url.substring(7);
+    }
+    return null;
   }
 }

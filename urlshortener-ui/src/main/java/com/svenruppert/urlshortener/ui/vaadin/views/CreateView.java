@@ -11,7 +11,7 @@ import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
-import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.html.H2;
@@ -20,7 +20,6 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.splitlayout.SplitLayout;
 import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.component.timepicker.TimePicker;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.data.binder.ValidationResult;
 import com.vaadin.flow.data.binder.ValueContext;
@@ -56,12 +55,8 @@ public class CreateView extends VerticalLayout implements HasLogger, I18nSupport
 
   private static final String K_FIELD_URL = "create.field.url";
   private static final String K_FIELD_EXPIRES_DATE = "create.field.expiresDate";
-  private static final String K_FIELD_EXPIRES_TIME = "create.field.expiresTime";
   private static final String K_FIELD_NO_EXPIRY = "create.field.noExpiry";
   private static final String K_FIELD_ACTIVE = "create.field.active";
-
-  private static final String K_PH_DATE = "create.placeholder.date";
-  private static final String K_PH_TIME = "create.placeholder.time";
 
   private static final String K_BTN_SAVE = "common.save";
   private static final String K_BTN_RESET = "common.reset";
@@ -77,8 +72,7 @@ public class CreateView extends VerticalLayout implements HasLogger, I18nSupport
   private final Button saveAllButton = new Button();
   private final Button resetButton = new Button();
 
-  private final DatePicker expiresDate = new DatePicker();
-  private final TimePicker expiresTime = new TimePicker();
+  private final DateTimePicker expiresDateTime = new DateTimePicker();
   private final Checkbox noExpiry = new Checkbox();
   private final Checkbox cbActive = new Checkbox();
 
@@ -92,6 +86,14 @@ public class CreateView extends VerticalLayout implements HasLogger, I18nSupport
     applyI18n();
 
     urlField.setWidthFull();
+    urlField.addValueChangeListener(ev -> {
+      final String v = ev.getValue();
+      if (v != null && v.startsWith("http://")) {
+        urlField.setHelperText("⚠ Insecure HTTP – data transmitted unencrypted");
+      } else {
+        urlField.setHelperText(null);
+      }
+    });
     saveAllButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     resetButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
@@ -99,7 +101,7 @@ public class CreateView extends VerticalLayout implements HasLogger, I18nSupport
 
     FormLayout form = new FormLayout();
     form.addClassName(C_FORM);
-    form.add(urlField, noExpiry, cbActive, expiresDate, expiresTime);
+    form.add(urlField, noExpiry, cbActive, expiresDateTime);
     form.setResponsiveSteps(
         new FormLayout.ResponsiveStep("0", 1),
         new FormLayout.ResponsiveStep("900px", 2)
@@ -209,42 +211,32 @@ public class CreateView extends VerticalLayout implements HasLogger, I18nSupport
     saveAllButton.setText(tr(K_BTN_SAVE, "Save"));
     resetButton.setText(tr(K_BTN_RESET, "Reset"));
 
-    expiresDate.setLabel(tr(K_FIELD_EXPIRES_DATE, "Expires (date)"));
-    expiresTime.setLabel(tr(K_FIELD_EXPIRES_TIME, "Expires (time)"));
+    expiresDateTime.setLabel(tr(K_FIELD_EXPIRES_DATE, "Expires (date)"));
     noExpiry.setLabel(tr(K_FIELD_NO_EXPIRY, "No expiry"));
     cbActive.setLabel(tr(K_FIELD_ACTIVE, "Active"));
-
-    expiresDate.setPlaceholder(tr(K_PH_DATE, "dd.MM.yyyy"));
-    expiresTime.setPlaceholder(tr(K_PH_TIME, "HH:mm"));
   }
 
   private void configureExpiryFields() {
-    expiresDate.setClearButtonVisible(true);
-    expiresTime.setStep(Duration.ofMinutes(1));
-
-    expiresTime.setEnabled(false);
-    expiresDate.addValueChangeListener(ev -> {
-      boolean hasDate = ev.getValue() != null;
-      expiresTime.setEnabled(hasDate && !noExpiry.getValue());
-    });
-
+    expiresDateTime.setStep(java.time.Duration.ofMinutes(30));
+    expiresDateTime.setWeekNumbersVisible(true);
     noExpiry.addValueChangeListener(ev -> {
       boolean disabled = ev.getValue();
-      expiresDate.setEnabled(!disabled);
-      expiresTime.setEnabled(!disabled && expiresDate.getValue() != null);
+      expiresDateTime.setEnabled(!disabled);
       if (disabled) {
-        expiresDate.clear();
-        expiresTime.clear();
+        expiresDateTime.clear();
       }
     });
   }
 
   private Optional<Instant> computeExpiresAt() {
-    if (Boolean.TRUE.equals(noExpiry.getValue())) return Optional.empty();
-    LocalDate d = expiresDate.getValue();
-    LocalTime t = expiresTime.getValue();
-    if (d == null || t == null) return Optional.empty();
-    return Optional.of(ZonedDateTime.of(d, t, ZONE).toInstant());
+    if (Boolean.TRUE.equals(noExpiry.getValue())) {
+      return Optional.empty();
+    }
+    final java.time.LocalDateTime ldt = expiresDateTime.getValue();
+    if (ldt == null) {
+      return Optional.empty();
+    }
+    return Optional.of(ldt.atZone(ZONE).toInstant());
   }
 
   private boolean validateExpiryInFuture() {
@@ -259,8 +251,7 @@ public class CreateView extends VerticalLayout implements HasLogger, I18nSupport
   private void clearFormAll(Binder<ShortenRequest> binder) {
     urlField.clear();
     noExpiry.clear();
-    expiresDate.clear();
-    expiresTime.clear();
+    expiresDateTime.clear();
     binder.setBean(new ShortenRequest(null, null, null, null));
     urlField.setInvalid(false);
   }

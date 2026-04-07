@@ -370,6 +370,7 @@ public class URLShortenerClient implements HasLogger {
     URI uri = serverBaseAdmin.resolve(relativePath);
 
     String body = requestJson(uri, "POST", null, OK.code());
+    logger().info("importApply - body {}", body);
     return fromJson(body, ImportResult.class);
   }
 

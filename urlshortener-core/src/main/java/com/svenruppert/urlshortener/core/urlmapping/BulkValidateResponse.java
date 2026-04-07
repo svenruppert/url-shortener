@@ -3,6 +3,7 @@ package com.svenruppert.urlshortener.core.urlmapping;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -86,6 +87,7 @@ public final class BulkValidateResponse {
     private ValidationStatus status;
     /** Shortcodes of existing mappings that already point to this URL. Empty when none. */
     private List<String> existingShortCodes;
+    private List<ExistingShortlinkInfo> existingShortlinkInfos;
     private String errorMessage;
 
     public ValidationItemResult() {
@@ -102,19 +104,23 @@ public final class BulkValidateResponse {
       r.normalizedUrl = normalizedUrl;
       r.status = ValidationStatus.VALID;
       r.existingShortCodes = List.of();
+      r.existingShortlinkInfos = List.of();
       return r;
     }
 
     public static ValidationItemResult hasExisting(int index,
                                                    String originalUrl,
                                                    String normalizedUrl,
-                                                   List<String> existingShortCodes) {
+                                                   List<ExistingShortlinkInfo> existingInfos) {
       var r = new ValidationItemResult();
       r.index = index;
       r.originalUrl = originalUrl;
       r.normalizedUrl = normalizedUrl;
       r.status = ValidationStatus.HAS_EXISTING_SHORTLINKS;
-      r.existingShortCodes = List.copyOf(existingShortCodes);
+      r.existingShortlinkInfos = List.copyOf(existingInfos);
+      r.existingShortCodes = existingInfos.stream()
+          .map(ExistingShortlinkInfo::getShortCode)
+          .toList();
       return r;
     }
 
@@ -126,6 +132,7 @@ public final class BulkValidateResponse {
       r.status = ValidationStatus.EMPTY;
       r.errorMessage = "URL must not be blank";
       r.existingShortCodes = List.of();
+      r.existingShortlinkInfos = List.of();
       return r;
     }
 
@@ -139,6 +146,7 @@ public final class BulkValidateResponse {
       r.status = ValidationStatus.INVALID_URL;
       r.errorMessage = errorMessage;
       r.existingShortCodes = List.of();
+      r.existingShortlinkInfos = List.of();
       return r;
     }
 
@@ -151,6 +159,7 @@ public final class BulkValidateResponse {
       r.errorMessage = "URL exceeds maximum length of "
           + BulkValidateRequest.MAX_URL_LENGTH + " characters";
       r.existingShortCodes = List.of();
+      r.existingShortlinkInfos = List.of();
       return r;
     }
 
@@ -162,6 +171,7 @@ public final class BulkValidateResponse {
       r.status = ValidationStatus.DUPLICATE_IN_BATCH;
       r.errorMessage = "Duplicate URL within the submitted batch";
       r.existingShortCodes = List.of();
+      r.existingShortlinkInfos = List.of();
       return r;
     }
 
@@ -173,6 +183,15 @@ public final class BulkValidateResponse {
       r.status = ValidationStatus.DUPLICATE_IN_GRID;
       r.errorMessage = "URL already present in the work set";
       r.existingShortCodes = List.of();
+      r.existingShortlinkInfos = List.of();
+      return r;
+    }
+
+    public static ValidationItemResult duplicateInGrid(int index,
+                                                       String originalUrl,
+                                                       String customMessage) {
+      var r = duplicateInGrid(index, originalUrl);
+      r.errorMessage = customMessage;
       return r;
     }
 
@@ -232,12 +251,86 @@ public final class BulkValidateResponse {
       this.existingShortCodes = existingShortCodes;
     }
 
+    public List<ExistingShortlinkInfo> getExistingShortlinkInfos() {
+      return existingShortlinkInfos;
+    }
+
+    public void setExistingShortlinkInfos(List<ExistingShortlinkInfo> existingShortlinkInfos) {
+      this.existingShortlinkInfos = existingShortlinkInfos;
+    }
+
     public String getErrorMessage() {
       return errorMessage;
     }
 
     public void setErrorMessage(String errorMessage) {
       this.errorMessage = errorMessage;
+    }
+  }
+
+  // ── Enriched info about one existing shortlink ────────────────────────────────
+
+  /**
+   * Enriched information about an existing shortlink that already targets the validated URL.
+   * <p>Also used to surface <em>protocol-variant</em> matches: when the store has a mapping for
+   * {@code http://example.com} and the submitted URL is {@code https://example.com} (or vice-versa),
+   * {@link #isProtocolVariant()} returns {@code true}.
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static final class ExistingShortlinkInfo {
+
+    private String shortCode;
+    private boolean active;
+    /** {@code null} means no expiry date. */
+    private Instant expiresAt;
+    /**
+     * {@code true} when this shortlink targets the http↔https counterpart of the validated URL.
+     */
+    private boolean protocolVariant;
+
+    public ExistingShortlinkInfo() {
+    }
+
+    public ExistingShortlinkInfo(String shortCode,
+                                 boolean active,
+                                 Instant expiresAt,
+                                 boolean protocolVariant) {
+      this.shortCode = shortCode;
+      this.active = active;
+      this.expiresAt = expiresAt;
+      this.protocolVariant = protocolVariant;
+    }
+
+    public String getShortCode() {
+      return shortCode;
+    }
+
+    public void setShortCode(String shortCode) {
+      this.shortCode = shortCode;
+    }
+
+    public boolean isActive() {
+      return active;
+    }
+
+    public void setActive(boolean active) {
+      this.active = active;
+    }
+
+    public Instant getExpiresAt() {
+      return expiresAt;
+    }
+
+    public void setExpiresAt(Instant expiresAt) {
+      this.expiresAt = expiresAt;
+    }
+
+    public boolean isProtocolVariant() {
+      return protocolVariant;
+    }
+
+    public void setProtocolVariant(boolean protocolVariant) {
+      this.protocolVariant = protocolVariant;
     }
   }
 }

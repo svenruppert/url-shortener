@@ -6,28 +6,32 @@ import com.svenruppert.urlshortener.core.urlmapping.BulkShortenRequest;
 import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse;
 import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse.BulkShortenItemResult;
 import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse;
+import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse.ExistingShortlinkInfo;
 import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse.ValidationItemResult;
 import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse.ValidationStatus;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
+import com.svenruppert.urlshortener.ui.vaadin.tools.UiLinks;
 import com.svenruppert.urlshortener.ui.vaadin.tools.UrlShortenerClientFactory;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
-import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.component.timepicker.TimePicker;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.router.Route;
 
@@ -62,7 +66,6 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
   private static final String K_LABEL_URLS          = "bulkCreate.field.urls";
   private static final String K_PH_URLS             = "bulkCreate.field.urls.placeholder";
   private static final String K_LABEL_EXPIRES_DATE  = "bulkCreate.field.expiresDate";
-  private static final String K_LABEL_EXPIRES_TIME  = "bulkCreate.field.expiresTime";
   private static final String K_LABEL_ACTIVE        = "bulkCreate.field.active";
   private static final String K_BTN_VALIDATE        = "bulkCreate.btn.validate";
   private static final String K_BTN_CREATE          = "bulkCreate.btn.create";
@@ -102,16 +105,18 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
   private static final String K_DIALOG_EXISTING_TITLE  = "bulkCreate.dialog.existingTitle";
   private static final String K_DIALOG_EXISTING_CLOSE  = "bulkCreate.dialog.existingClose";
   private static final String K_ACTION_CONFIRM_ANYWAY  = "bulkCreate.action.confirmAnyway";
+  private static final String K_TOOLTIP_HTTP_UNSAFE   = "common.url.insecureHttp";
+  private static final String K_HINT_VALIDATE_FIRST   = "bulkCreate.hint.validateFirst";
+  private static final String K_HINT_PROTOCOL_VARIANT = "bulkCreate.hint.protocolVariant";
 
   // ── Components ─────────────────────────────────────────────────────────────
 
   private final URLShortenerClient client = UrlShortenerClientFactory.newInstance();
   private static final ZoneId ZONE = ZoneId.systemDefault();
 
-  private final TextArea   urlsArea          = new TextArea();
-  private final DatePicker expiresDate       = new DatePicker();
-  private final TimePicker expiresTime       = new TimePicker();
-  private final Checkbox   cbActive          = new Checkbox(true);
+  private final TextArea       urlsArea        = new TextArea();
+  private final DateTimePicker expiresDateTime = new DateTimePicker();
+  private final Checkbox       cbActive        = new Checkbox(true);
   private final Span       previewLabel      = new Span();
   private final Button     primaryButton     = new Button();
   private final Button     resetButton       = new Button();
@@ -140,12 +145,9 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
     urlsArea.addValueChangeListener(_ -> updatePreview());
 
     // Expiry options
-    expiresDate.setLabel(tr(K_LABEL_EXPIRES_DATE, "Default expiry date (optional)"));
-    expiresDate.setClearButtonVisible(true);
-    expiresTime.setLabel(tr(K_LABEL_EXPIRES_TIME, "Time"));
-    expiresTime.setStep(Duration.ofMinutes(1));
-    expiresTime.setEnabled(false);
-    expiresDate.addValueChangeListener(ev -> expiresTime.setEnabled(ev.getValue() != null));
+    expiresDateTime.setLabel(tr(K_LABEL_EXPIRES_DATE, "Default expiry date (optional)"));
+    expiresDateTime.setStep(Duration.ofMinutes(30));
+    expiresDateTime.setWeekNumbersVisible(true);
     cbActive.setLabel(tr(K_LABEL_ACTIVE, "Active"));
 
     // Preview line
@@ -171,7 +173,7 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
     retryFailedButton.setVisible(false);
     retryFailedButton.addClickListener(_ -> retryFailed());
 
-    var optionsRow = new HorizontalLayout(expiresDate, expiresTime, cbActive);
+    var optionsRow = new HorizontalLayout(expiresDateTime, cbActive);
     optionsRow.setAlignItems(Alignment.END);
 
     var actionRow = new HorizontalLayout(
@@ -196,8 +198,14 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
         .setFlexGrow(0)
         .setWidth("55px");
 
-    // URL column — supports inline editor
-    final var urlCol = resultsGrid.addColumn(WorkItem::getUrl)
+    // URL column — supports inline editor; HTTP links get a warning icon
+    final var urlCol = resultsGrid.addComponentColumn(item -> {
+      final String url = item.getUrl();
+      if (url != null && url.startsWith("http://")) {
+        return UiLinks.httpAwareLink(url, url);
+      }
+      return new com.vaadin.flow.component.html.Span(url != null ? url : "");
+    })
         .setHeader(tr(K_COL_URL, "Original URL"))
         .setFlexGrow(3)
         .setResizable(true);
@@ -329,8 +337,8 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
     row.setSpacing(false);
     row.getStyle().set("gap", "4px");
 
-    // ✎ – open inline editor for this row
-    final var editBtn = new Button("\u270e");
+    // Edit button — same icon as Overview row actions
+    final var editBtn = new Button(new Icon(VaadinIcon.EDIT));
     editBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
     editBtn.getElement().setProperty("title",
         tr(K_ACTION_EDIT_TT, "Correct URL inline"));
@@ -342,8 +350,8 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
       editor.editItem(item);
     });
 
-    // × – remove this row from work set
-    final var removeBtn = new Button("\u00d7");
+    // Delete button — same icon as Overview row actions
+    final var removeBtn = new Button(new Icon(VaadinIcon.TRASH));
     removeBtn.addThemeVariants(
         ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
     removeBtn.getElement().setProperty("title",
@@ -374,17 +382,21 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
         .anyMatch(w -> w.getState() == WorkItemState.HAS_EXISTING && !w.isConfirmed());
     final boolean hasReadyToCreate = workItems.stream().anyMatch(this::isReadyToCreate);
 
-    if (!textAreaHasContent && !hasBlocking) {
-      // No more validation work in textarea/grid → switch to Create mode
+    final boolean workSetEmpty = workItems.isEmpty();
+
+    if (!textAreaHasContent && !hasBlocking && !workSetEmpty) {
+      // Work set has items, no blocking errors, textarea cleared → switch to Create mode
       primaryButton.setText(tr(K_BTN_CREATE, "Create Links"));
       primaryButton.removeThemeVariants(ButtonVariant.LUMO_PRIMARY);
       primaryButton.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
       // Enabled only when all HAS_EXISTING items are confirmed AND at least one is ready
       primaryButton.setEnabled(!hasUnconfirmed && hasReadyToCreate);
     } else {
+      // Default: Validate mode (also covers initial empty state)
       primaryButton.setText(tr(K_BTN_VALIDATE, "Validate"));
       primaryButton.removeThemeVariants(ButtonVariant.LUMO_SUCCESS);
       primaryButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+      // Enabled when there is something to validate (textarea content or blocking grid rows)
       primaryButton.setEnabled(textAreaHasContent || hasBlocking);
     }
   }
@@ -555,6 +567,7 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
       final ValidationItemResult r = response.getResults().get(0);
       item.setState(WorkItem.mapValidationStatus(r.getStatus()));
       item.setExistingShortCodes(r.getExistingShortCodes());
+      item.setExistingShortlinkInfos(r.getExistingShortlinkInfos());
       item.setMessage(r.getErrorMessage());
       item.setConfirmed(false); // URL changed → previous confirmation no longer applies
       refreshGrid();
@@ -578,14 +591,62 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
 
     final var content = new VerticalLayout();
     content.setPadding(false);
-    content.setSpacing(false);
-    for (final String code : shortCodes) {
-      final String fullUrl =
-          com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL + code;
-      final var link = new Anchor(fullUrl, fullUrl);
-      link.setTarget("_blank");
-      content.add(link);
+    content.setSpacing(true);
+    content.setWidth("420px");
+
+    final List<ExistingShortlinkInfo> infos = item.getExistingShortlinkInfos();
+
+    if (!infos.isEmpty()) {
+      // Enriched display: show active/expiry status + protocol variant warning
+      for (final ExistingShortlinkInfo info : infos) {
+        final String fullUrl =
+            com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL + info.getShortCode();
+
+        final var linkRow = new HorizontalLayout();
+        linkRow.setSpacing(false);
+        linkRow.getStyle().set("gap", "8px");
+        linkRow.setAlignItems(Alignment.CENTER);
+
+        // Link (HTTP-aware)
+        final var linkComp = UiLinks.httpAwareLink(fullUrl, info.getShortCode());
+        linkRow.add(linkComp);
+
+        // Active badge
+        final var activeBadge = new Span(info.isActive() ? "\u2713 Active" : "\u2717 Inactive");
+        activeBadge.getElement().getThemeList().add("badge pill small");
+        activeBadge.getElement().getThemeList().add(info.isActive() ? "success" : "error");
+        linkRow.add(activeBadge);
+
+        // Expiry badge
+        final var expiryStatus = com.svenruppert.urlshortener.ui.vaadin.components.ExpiryBadgeFactory
+            .computeStatusText(java.util.Optional.ofNullable(info.getExpiresAt()));
+        final var expiryBadge = new Span(expiryStatus.text());
+        expiryBadge.getElement().getThemeList().add("badge pill small");
+        expiryBadge.getElement().getThemeList().add(expiryStatus.theme());
+        linkRow.add(expiryBadge);
+
+        // Protocol variant warning
+        if (info.isProtocolVariant()) {
+          final var variantBadge = new Span("\u26a0 Protocol variant");
+          variantBadge.getElement().getThemeList().add("badge pill small error");
+          variantBadge.getElement().setProperty("title",
+              "This shortlink targets the http/https counterpart of your URL");
+          linkRow.add(variantBadge);
+        }
+
+        content.add(linkRow);
+      }
+    } else {
+      // Fallback: just show links (no enriched info available)
+      for (final String code : shortCodes) {
+        final String fullUrl =
+            com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL + code;
+        final var link = new Anchor(fullUrl, fullUrl);
+        link.setTarget("_blank");
+        content.add(link);
+      }
     }
+
     dialog.add(content);
 
     final var closeBtn = new Button(
@@ -677,8 +738,7 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
 
   private void reset() {
     urlsArea.clear();
-    expiresDate.clear();
-    expiresTime.clear();
+    expiresDateTime.clear();
     cbActive.setValue(true);
     previewLabel.setText("");
     workItems.clear();
@@ -737,14 +797,11 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
   }
 
   private Optional<Instant> computeExpiresAt() {
-    final LocalDate d = expiresDate.getValue();
-    final LocalTime t = expiresTime.getValue() != null
-        ? expiresTime.getValue()
-        : LocalTime.MIDNIGHT;
-    if (d == null) {
+    final LocalDateTime ldt = expiresDateTime.getValue();
+    if (ldt == null) {
       return Optional.empty();
     }
-    return Optional.of(ZonedDateTime.of(d, t, ZONE).toInstant());
+    return Optional.of(ldt.atZone(ZONE).toInstant());
   }
 
   private void notify(String message, boolean success) {
@@ -808,6 +865,7 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
     private String url;
     private WorkItemState state;
     private List<String> existingShortCodes = List.of();
+    private List<ExistingShortlinkInfo> existingShortlinkInfos = List.of();
     private String message;
     private String createdShortUrl;
     private String createdShortCode;
@@ -830,6 +888,9 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
       item.state = mapValidationStatus(r.getStatus());
       item.existingShortCodes = r.getExistingShortCodes() != null
           ? r.getExistingShortCodes()
+          : List.of();
+      item.existingShortlinkInfos = r.getExistingShortlinkInfos() != null
+          ? r.getExistingShortlinkInfos()
           : List.of();
       item.message = r.getErrorMessage();
       return item;
@@ -874,6 +935,16 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
 
     public void setExistingShortCodes(List<String> existingShortCodes) {
       this.existingShortCodes = existingShortCodes != null ? existingShortCodes : List.of();
+    }
+
+    public List<ExistingShortlinkInfo> getExistingShortlinkInfos() {
+      return existingShortlinkInfos;
+    }
+
+    public void setExistingShortlinkInfos(List<ExistingShortlinkInfo> existingShortlinkInfos) {
+      this.existingShortlinkInfos = existingShortlinkInfos != null
+          ? existingShortlinkInfos
+          : List.of();
     }
 
     public String getMessage() {

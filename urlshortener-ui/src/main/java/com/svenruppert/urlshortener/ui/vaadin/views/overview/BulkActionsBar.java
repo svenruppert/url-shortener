@@ -9,7 +9,7 @@ import com.vaadin.flow.component.Composite;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
@@ -18,14 +18,11 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
-import com.vaadin.flow.component.timepicker.TimePicker;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.Optional;
 import java.util.Set;
 
 import static com.vaadin.flow.component.button.ButtonVariant.LUMO_ERROR;
@@ -53,7 +50,6 @@ public class BulkActionsBar
 
   private static final String K_DLG_SET_EXPIRY_TITLE = "overview.bulk.expiry.set.title";
   private static final String K_DLG_SET_EXPIRY_DATE = "overview.bulk.expiry.set.date";
-  private static final String K_DLG_SET_EXPIRY_TIME = "overview.bulk.expiry.set.time";
   private static final String K_DLG_SET_EXPIRY_APPLY = "overview.bulk.expiry.set.apply";
 
   private static final String K_DLG_CLEAR_EXPIRY_TITLE = "overview.bulk.expiry.clear.title";
@@ -254,24 +250,20 @@ public class BulkActionsBar
         selected.size()
     ));
 
-    DatePicker date = new DatePicker(tr(K_DLG_SET_EXPIRY_DATE, "Date"));
-    TimePicker time = new TimePicker(tr(K_DLG_SET_EXPIRY_TIME, "Time"));
-    time.setStep(Duration.ofMinutes(15));
+    final var expiresField = new DateTimePicker(tr(K_DLG_SET_EXPIRY_DATE, "Date"));
+    expiresField.setStep(Duration.ofMinutes(30));
+    expiresField.setWeekNumbersVisible(true);
 
-    HorizontalLayout body = new HorizontalLayout(date, time);
-    body.setAlignItems(FlexComponent.Alignment.END);
-    dialog.add(body);
+    dialog.add(expiresField);
 
     Button cancel = new Button(tr(K_COMMON_CANCEL, "Cancel"), _ -> dialog.close());
     Button apply = new Button(tr(K_DLG_SET_EXPIRY_APPLY, "Apply"), _ -> {
-      if (date.getValue() == null) {
+      if (expiresField.getValue() == null) {
         Notifications.noDateSelected();
         return;
       }
 
-      var localTime = Optional.ofNullable(time.getValue())
-          .orElse(java.time.LocalTime.of(0, 0));
-      var zdt = ZonedDateTime.of(date.getValue(), localTime, ZoneId.systemDefault());
+      final var zdt = expiresField.getValue().atZone(ZoneId.systemDefault());
       Instant expiresAt = zdt.toInstant();
 
       int success = 0;
