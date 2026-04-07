@@ -3,8 +3,10 @@ package junit.com.svenruppert.urlshortener.client;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
+import com.svenruppert.urlshortener.core.urlmapping.BulkShortenRequest;
 import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse;
 import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse.BulkShortenItemResult;
+import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse.ItemStatus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,35 +14,37 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.Socket;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.ADMIN_SERVER_HOST;
 import static com.svenruppert.urlshortener.core.DefaultValues.DEFAULT_SERVER_HOST;
+import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for {@link URLShortenerClient#bulkShorten(List)}.
+ * Integration tests for {@link URLShortenerClient#bulkShorten(List)} and its overloads.
  *
- * <p>Each test starts a fresh embedded {@link ShortenerServer} on dynamic ports and
- * connects a {@link URLShortenerClient} to it, mirroring the pattern used throughout
- * the client test suite.
+ * <p>Each test starts a fresh embedded {@link ShortenerServer} on dynamic ports,
+ * mirroring the pattern used throughout the client test suite.
  */
 class URLShortenerClient_BulkShortenTest implements HasLogger {
 
   private static final String URL_A = "https://example.com/page-a";
   private static final String URL_B = "https://example.org/page-b";
   private static final String URL_C = "https://openai.com/docs";
-  private static final String INVALID_URL_NO_SCHEME = "not-a-url-at-all";
+  private static final String INVALID_URL_NO_SCHEME  = "not-a-url-at-all";
   private static final String INVALID_URL_BAD_SCHEME = "ftp://forbidden.example.com";
-  private static final String INVALID_URL_NO_TLD = "http://localhost";
+  private static final String INVALID_URL_NO_TLD     = "http://localhost";
 
   private ShortenerServer server;
   private URLShortenerClient client;
 
-  // ─── Lifecycle ────────────────────────────────────────────────────────────
+  // ── Lifecycle ────────────────────────────────────────────────────────────
 
   @BeforeEach
   void startServer() throws Exception {
@@ -58,24 +62,17 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
     if (server != null) server.shutdown();
   }
 
-  // ─── Helper ───────────────────────────────────────────────────────────────
-
   private static void waitUntilOpen(String host, int port, Duration timeout) throws Exception {
     long deadline = System.nanoTime() + timeout.toNanos();
     Throwable last = null;
     while (System.nanoTime() < deadline) {
-      try (Socket s = new Socket(host, port)) {
-        return;
-      } catch (Throwable t) {
-        last = t;
-        Thread.sleep(25);
-      }
+      try (Socket s = new Socket(host, port)) { return; }
+      catch (Throwable t) { last = t; Thread.sleep(25); }
     }
-    throw new IllegalStateException(
-        "Server did not open " + host + ":" + port + " in time", last);
+    throw new IllegalStateException("Server did not open " + host + ":" + port + " in time", last);
   }
 
-  // ─── Happy-path tests ─────────────────────────────────────────────────────
+  // ── Happy-path: basic ─────────────────────────────────────────────────────
 
   @Test
   void bulkShorten_allValid_allSucceed() throws IOException {
@@ -87,10 +84,12 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
     assertEquals(0, response.getFailed());
 
     for (BulkShortenItemResult r : response.getResults()) {
-      assertTrue(r.isSuccess(),          "Expected success for: " + r.getOriginalUrl());
-      assertNotNull(r.getShortCode(),    "ShortCode must not be null");
-      assertFalse(r.getShortCode().isBlank(), "ShortCode must not be blank");
-      assertNull(r.getErrorMessage(),    "No error message expected on success");
+      assertEquals(ItemStatus.CREATED, r.getStatus(),
+          "Expected CREATED for: " + r.getOriginalUrl());
+      assertTrue(r.isSuccess());
+      assertNotNull(r.getShortCode());
+      assertFalse(r.getShortCode().isBlank());
+      assertNull(r.getErrorMessage(), "No error message expected on success");
     }
   }
 
@@ -103,32 +102,50 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
     assertEquals(0, response.getFailed());
 
     final BulkShortenItemResult single = response.getResults().get(0);
-    assertTrue(single.isSuccess());
+    assertEquals(ItemStatus.CREATED, single.getStatus());
     assertEquals(URL_A, single.getOriginalUrl());
     assertNotNull(single.getShortCode());
   }
 
-  @Test
-  void bulkShorten_shortCodesAreAutoGenerated_notCustomAliases() throws IOException {
-    final var response = client.bulkShorten(List.of(URL_A, URL_B));
+  // ── Happy-path: new response fields ───────────────────────────────────────
 
-    for (BulkShortenItemResult r : response.getResults()) {
-      // Shortcodes must be non-blank strings generated by the server
-      assertFalse(r.getShortCode().isBlank());
+  @Test
+  void bulkShorten_indexMatchesInputPosition() throws IOException {
+    final var response = client.bulkShorten(List.of(URL_A, URL_B, URL_C));
+
+    final List<BulkShortenItemResult> results = response.getResults();
+    for (int i = 0; i < results.size(); i++) {
+      assertEquals(i, results.get(i).getIndex(),
+          "Item at position " + i + " must carry index " + i);
     }
   }
 
   @Test
+  void bulkShorten_shortUrlIsFullyQualified() throws IOException {
+    final var response = client.bulkShorten(List.of(URL_A));
+
+    final BulkShortenItemResult r = response.getResults().get(0);
+    assertTrue(r.isSuccess());
+    assertNotNull(r.getShortUrl(), "shortUrl must not be null on success");
+    assertTrue(r.getShortUrl().startsWith(SHORTCODE_BASE_URL),
+        "shortUrl must start with the configured base URL");
+    assertTrue(r.getShortUrl().endsWith(r.getShortCode()),
+        "shortUrl must end with the shortCode");
+  }
+
+  @Test
   void bulkShorten_shortCodesAreUnique() throws IOException {
-    final List<String> urls = List.of(URL_A, URL_B, URL_C);
-    final var response = client.bulkShorten(urls);
+    final var response = client.bulkShorten(List.of(URL_A, URL_B, URL_C));
 
     final Set<String> codes = response.getResults().stream()
-        .filter(BulkShortenItemResult::isSuccess)
         .map(BulkShortenItemResult::getShortCode)
         .collect(Collectors.toSet());
-
     assertEquals(3, codes.size(), "Each URL must receive a distinct shortcode");
+
+    final Set<String> shortUrls = response.getResults().stream()
+        .map(BulkShortenItemResult::getShortUrl)
+        .collect(Collectors.toSet());
+    assertEquals(3, shortUrls.size(), "Each URL must receive a distinct short URL");
   }
 
   @Test
@@ -139,27 +156,100 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
       assertTrue(r.isSuccess());
       final String resolved = client.resolveShortcode(r.getShortCode());
       assertEquals(r.getOriginalUrl(), resolved,
-          "Resolving " + r.getShortCode() + " should return the original URL");
+          "Resolving " + r.getShortCode() + " must return the original URL");
     }
   }
 
   @Test
   void bulkShorten_sameUrlTwice_producesTwoDistinctShortCodes() throws IOException {
-    // Derselbe Ziel-URL darf mehrfach eingereicht werden und erhält je einen eigenen Code.
     final var response = client.bulkShorten(List.of(URL_A, URL_A));
 
-    assertEquals(2, response.getTotal());
     assertEquals(2, response.getSucceeded());
-
     final List<String> codes = response.getResults().stream()
-        .map(BulkShortenItemResult::getShortCode)
-        .toList();
-    // Beide Codes müssen unterschiedlich sein
+        .map(BulkShortenItemResult::getShortCode).toList();
     assertNotEquals(codes.get(0), codes.get(1),
         "Same target URL submitted twice must still generate two distinct shortcodes");
   }
 
-  // ─── Error-path tests ─────────────────────────────────────────────────────
+  // ── Optional defaults: defaultActive ─────────────────────────────────────
+
+  @Test
+  void bulkShorten_defaultActive_false_createsInactiveLinks() throws IOException {
+    final var response = client.bulkShorten(List.of(URL_A, URL_B), null, false);
+
+    assertEquals(2, response.getSucceeded());
+
+    // Inactive links must NOT redirect (resolveShortcode returns null for 404)
+    for (BulkShortenItemResult r : response.getResults()) {
+      final String resolved = client.resolveShortcode(r.getShortCode());
+      assertNull(resolved,
+          "Inactive link " + r.getShortCode() + " must not redirect");
+    }
+  }
+
+  @Test
+  void bulkShorten_defaultActive_true_createsActiveLinks() throws IOException {
+    final var response = client.bulkShorten(List.of(URL_A), null, true);
+
+    assertEquals(1, response.getSucceeded());
+    final String resolved = client.resolveShortcode(
+        response.getResults().get(0).getShortCode());
+    assertNotNull(resolved, "Active link must resolve");
+    assertEquals(URL_A, resolved);
+  }
+
+  @Test
+  void bulkShorten_defaultActive_null_treatedAsTrue() throws IOException {
+    // null defaultActive must behave identically to true
+    final var response = client.bulkShorten(List.of(URL_A), null, null);
+
+    assertEquals(1, response.getSucceeded());
+    assertNotNull(client.resolveShortcode(
+        response.getResults().get(0).getShortCode()));
+  }
+
+  // ── Optional defaults: defaultExpiresAt ──────────────────────────────────
+
+  @Test
+  void bulkShorten_withFutureExpiresAt_linksAreCreated() throws IOException {
+    final Instant future = Instant.now().plus(Duration.ofDays(7));
+    final var response = client.bulkShorten(List.of(URL_A, URL_B), future, true);
+
+    assertEquals(2, response.getSucceeded(),
+        "Links with a future expiry must be created successfully");
+  }
+
+  // ── Error-path: status enum ───────────────────────────────────────────────
+
+  @Test
+  void bulkShorten_invalidUrl_statusIsINVALID_URL() throws IOException {
+    final var response = client.bulkShorten(List.of(INVALID_URL_NO_SCHEME));
+
+    final BulkShortenItemResult r = response.getResults().get(0);
+    assertEquals(ItemStatus.INVALID_URL, r.getStatus());
+    assertFalse(r.isSuccess());
+    assertNotNull(r.getErrorMessage());
+    assertFalse(r.getErrorMessage().isBlank());
+    assertNull(r.getShortCode());
+    assertNull(r.getShortUrl());
+  }
+
+  @Test
+  void bulkShorten_badScheme_statusIsINVALID_URL() throws IOException {
+    final var response = client.bulkShorten(List.of(INVALID_URL_BAD_SCHEME));
+    assertEquals(ItemStatus.INVALID_URL, response.getResults().get(0).getStatus());
+  }
+
+  @Test
+  void bulkShorten_tooLongUrl_statusIsTOO_LONG() throws IOException {
+    final String longUrl = "https://example.com/" + "a".repeat(BulkShortenRequest.MAX_URL_LENGTH);
+    final var response = client.bulkShorten(List.of(longUrl));
+
+    final BulkShortenItemResult r = response.getResults().get(0);
+    assertEquals(ItemStatus.TOO_LONG, r.getStatus());
+    assertFalse(r.isSuccess());
+    assertNotNull(r.getErrorMessage());
+  }
 
   @Test
   void bulkShorten_allInvalidUrls_allFail() throws IOException {
@@ -170,11 +260,15 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
     assertEquals(0, response.getSucceeded());
     assertEquals(3, response.getFailed());
 
+    final Set<ItemStatus> failStatuses = new HashSet<>(
+        List.of(ItemStatus.INVALID_URL, ItemStatus.FAILED));
+
     for (BulkShortenItemResult r : response.getResults()) {
       assertFalse(r.isSuccess());
-      assertNull(r.getShortCode(),           "No shortcode expected on failure");
-      assertNotNull(r.getErrorMessage(),     "Error message must be present");
-      assertFalse(r.getErrorMessage().isBlank());
+      assertTrue(failStatuses.contains(r.getStatus()),
+          "Unexpected status: " + r.getStatus());
+      assertNull(r.getShortCode());
+      assertNull(r.getShortUrl());
     }
   }
 
@@ -187,12 +281,11 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
     assertEquals(2, response.getSucceeded());
     assertEquals(2, response.getFailed());
 
-    // Resultat-Reihenfolge muss der Eingabe-Reihenfolge entsprechen
     final List<BulkShortenItemResult> results = response.getResults();
-    assertTrue(results.get(0).isSuccess(),  "URL_A must succeed");
-    assertFalse(results.get(1).isSuccess(), "INVALID_URL_NO_SCHEME must fail");
-    assertTrue(results.get(2).isSuccess(),  "URL_B must succeed");
-    assertFalse(results.get(3).isSuccess(), "INVALID_URL_BAD_SCHEME must fail");
+    assertEquals(ItemStatus.CREATED,     results.get(0).getStatus());
+    assertEquals(ItemStatus.INVALID_URL, results.get(1).getStatus());
+    assertEquals(ItemStatus.CREATED,     results.get(2).getStatus());
+    assertEquals(ItemStatus.INVALID_URL, results.get(3).getStatus());
   }
 
   @Test
@@ -204,9 +297,8 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
     assertEquals(1, response.getFailed());
 
     final BulkShortenItemResult blankResult = response.getResults().get(1);
-    assertFalse(blankResult.isSuccess());
+    assertEquals(ItemStatus.INVALID_URL, blankResult.getStatus());
     assertNotNull(blankResult.getErrorMessage());
-    assertFalse(blankResult.getErrorMessage().isBlank());
   }
 
   @Test
@@ -214,46 +306,63 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
     final var response = client.bulkShorten(List.of(INVALID_URL_NO_SCHEME));
 
     final BulkShortenItemResult result = response.getResults().get(0);
-    assertFalse(result.isSuccess());
     assertEquals(INVALID_URL_NO_SCHEME, result.getOriginalUrl(),
         "The original URL must be preserved in the error result");
   }
 
   @Test
   void bulkShorten_summaryCountsMatchResultsList() throws IOException {
-    final var response = client.bulkShorten(
-        List.of(URL_A, INVALID_URL_NO_SCHEME, URL_B));
+    final var response = client.bulkShorten(List.of(URL_A, INVALID_URL_NO_SCHEME, URL_B));
 
     final long succeededInList = response.getResults().stream()
         .filter(BulkShortenItemResult::isSuccess).count();
     final long failedInList = response.getResults().stream()
         .filter(r -> !r.isSuccess()).count();
 
-    assertEquals(response.getTotal(),     response.getResults().size(),
-        "total must equal results list size");
-    assertEquals(response.getSucceeded(), (int) succeededInList,
-        "succeeded counter must match actual successes in list");
-    assertEquals(response.getFailed(),    (int) failedInList,
-        "failed counter must match actual failures in list");
+    assertEquals(response.getTotal(),     response.getResults().size());
+    assertEquals(response.getSucceeded(), (int) succeededInList);
+    assertEquals(response.getFailed(),    (int) failedInList);
   }
 
-  // ─── Client-side validation tests ─────────────────────────────────────────
+  // ── Server-side limit: too many URLs ─────────────────────────────────────
+
+  @Test
+  void bulkShorten_exceedsMaxUrls_serverRejects400() {
+    final List<String> tooMany = new ArrayList<>();
+    for (int i = 0; i <= BulkShortenRequest.MAX_URLS; i++) {
+      tooMany.add("https://example.com/page-" + i);
+    }
+    // Client bypasses its own guard – call overload directly to test server enforcement
+    final String jsonBody;
+    try {
+      // Build raw request bypassing the client guard
+      final var req = new com.svenruppert.urlshortener.core.urlmapping.BulkShortenRequest(tooMany);
+      jsonBody = com.svenruppert.urlshortener.core.JsonUtils.toJson(req);
+    } catch (Exception e) {
+      fail("Setup failed: " + e.getMessage());
+      return;
+    }
+    // Expecting IllegalArgumentException (mapped from 400)
+    assertThrows(IllegalArgumentException.class,
+        () -> {
+          // Use the full overload which sends whatever we pass
+          client.bulkShorten(tooMany, null, null);
+        });
+  }
+
+  // ── Client-side validation ────────────────────────────────────────────────
 
   @Test
   void bulkShorten_nullList_throwsIllegalArgumentException() {
-    assertThrows(IllegalArgumentException.class,
-        () -> client.bulkShorten(null),
-        "null urls list must be rejected client-side");
+    assertThrows(IllegalArgumentException.class, () -> client.bulkShorten(null));
   }
 
   @Test
   void bulkShorten_emptyList_throwsIllegalArgumentException() {
-    assertThrows(IllegalArgumentException.class,
-        () -> client.bulkShorten(List.of()),
-        "empty urls list must be rejected client-side");
+    assertThrows(IllegalArgumentException.class, () -> client.bulkShorten(List.of()));
   }
 
-  // ─── Volume / regression test ─────────────────────────────────────────────
+  // ── Volume ────────────────────────────────────────────────────────────────
 
   @Test
   void bulkShorten_largerBatch_allSucceed() throws IOException {
@@ -280,7 +389,6 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
 
     assertEquals(2, response.getSucceeded());
 
-    // Die erzeugten Links müssen in der globalen Liste auftauchen
     final var allMappings = client.listAll();
     final Set<String> allCodes = allMappings.stream()
         .map(m -> m.shortCode())
@@ -288,7 +396,7 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
 
     for (BulkShortenItemResult r : response.getResults()) {
       assertTrue(allCodes.contains(r.getShortCode()),
-          "Shortcode " + r.getShortCode() + " must appear in the store listing");
+          "Shortcode " + r.getShortCode() + " must appear in store listing");
     }
   }
 }

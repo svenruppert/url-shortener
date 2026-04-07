@@ -122,6 +122,7 @@ public class ShortenerServer
 
     logger().info("Starting URL Shortener server (admin) with parameters: host={}, port={}", ADMIN_SERVER_HOST, ADMIN_SERVER_PORT);
     this.serverAdmin = HttpServer.create(new InetSocketAddress(ADMIN_SERVER_HOST, ADMIN_SERVER_PORT), 0);
+    serverAdmin.createContext(PATH_ADMIN_VALIDATE_BULK, new BulkValidateHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_SHORTEN_BULK, new BulkShortenHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_SHORTEN, new ShortenHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
     serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());

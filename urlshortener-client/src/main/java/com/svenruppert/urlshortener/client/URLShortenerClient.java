@@ -7,6 +7,8 @@ import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.urlmapping.BulkShortenRequest;
 import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse;
+import com.svenruppert.urlshortener.core.urlmapping.BulkValidateRequest;
+import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
 import com.svenruppert.urlshortener.core.urlmapping.ToggleActive.ToggleActiveRequest;
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
@@ -562,12 +564,35 @@ public class URLShortenerClient implements HasLogger {
     }
   }
 
+  /**
+   * Creates short links for the given URLs in a single server round-trip.
+   *
+   * @param urls non-null, non-empty list of target URLs (max {@value BulkShortenRequest#MAX_URLS})
+   * @return server response with per-item results, counters, and the full short URL for every
+   *         successfully created link
+   * @throws IllegalArgumentException if {@code urls} is null, empty, or the server rejects the
+   *                                  request with 400
+   * @throws IOException              on network or unexpected HTTP errors
+   */
   public BulkShortenResponse bulkShorten(List<String> urls) throws IOException {
+    return bulkShorten(urls, null, null);
+  }
+
+  /**
+   * Creates short links for the given URLs using optional shared defaults.
+   *
+   * @param urls             non-null, non-empty list of target URLs
+   * @param defaultExpiresAt optional expiry timestamp applied to every link; {@code null} = no expiry
+   * @param defaultActive    optional active flag for every link; {@code null} defaults to {@code true}
+   */
+  public BulkShortenResponse bulkShorten(List<String> urls,
+                                         java.time.Instant defaultExpiresAt,
+                                         Boolean defaultActive) throws IOException {
     if (urls == null || urls.isEmpty()) {
       throw new IllegalArgumentException("urls must not be null or empty");
     }
-    logger().info("bulkShorten - {} URLs", urls.size());
-    final String jsonBody = toJson(new BulkShortenRequest(urls));
+    logger().info("bulkShorten - {} URLs, expiresAt={}, active={}", urls.size(), defaultExpiresAt, defaultActive);
+    final String jsonBody = toJson(new BulkShortenRequest(urls, defaultExpiresAt, defaultActive));
     final URI uri = serverBaseAdmin.resolve(PATH_ADMIN_SHORTEN_BULK);
     final Response resp = postJson(uri, jsonBody);
     logger().info("bulkShorten - response code {}", resp.code());
@@ -578,6 +603,38 @@ public class URLShortenerClient implements HasLogger {
       throw new IllegalArgumentException("Bad request: " + resp.body());
     }
     throw new IOException("Unexpected HTTP " + resp.code() + " for POST " + uri + " body=" + resp.body());
+  }
+
+  /**
+   * Validates a batch of URLs without creating any shortlinks.
+   *
+   * @param newUrls      non-null, non-empty list of URLs to validate
+   * @param existingUrls URLs currently in the UI work set (for DUPLICATE_IN_GRID detection);
+   *                     may be {@code null} or empty
+   * @return validation response with per-item results
+   * @throws IllegalArgumentException if {@code newUrls} is null/empty or the server returns 400
+   * @throws IOException              on network or unexpected HTTP errors
+   */
+  public BulkValidateResponse bulkValidate(List<String> newUrls,
+                                           List<String> existingUrls) throws IOException {
+    if (newUrls == null || newUrls.isEmpty()) {
+      throw new IllegalArgumentException("newUrls must not be null or empty");
+    }
+    logger().info("bulkValidate - {} new URLs, {} existing",
+        newUrls.size(), existingUrls != null ? existingUrls.size() : 0);
+    final String jsonBody = toJson(
+        new BulkValidateRequest(newUrls, existingUrls != null ? existingUrls : List.of()));
+    final URI uri = serverBaseAdmin.resolve(PATH_ADMIN_VALIDATE_BULK);
+    final Response resp = postJson(uri, jsonBody);
+    logger().info("bulkValidate - response code {}", resp.code());
+    if (resp.code() == 200) {
+      return fromJson(resp.body(), BulkValidateResponse.class);
+    }
+    if (resp.code() == 400) {
+      throw new IllegalArgumentException("Bad request: " + resp.body());
+    }
+    throw new IOException(
+        "Unexpected HTTP " + resp.code() + " for POST " + uri + " body=" + resp.body());
   }
 
   public ShortUrlMapping createMapping(String url) throws IOException {
