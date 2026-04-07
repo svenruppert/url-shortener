@@ -26,6 +26,7 @@ public final class DefaultValues {
 
   public static final String PATH_PREFIX = "/api";
   public static final String PATH_ADMIN_SHORTEN = PATH_PREFIX + "/shorten";
+  public static final String PATH_ADMIN_SHORTEN_BULK = PATH_PREFIX + "/shorten/bulk";
   public static final String PATH_ADMIN_EDIT = PATH_PREFIX + "/edit";
   public static final String PATH_ADMIN_DELETE = PATH_PREFIX + "/delete";
   public static final String PATH_ADMIN_TOGGLE_ACTIVE = PATH_PREFIX + "/toggleActive";

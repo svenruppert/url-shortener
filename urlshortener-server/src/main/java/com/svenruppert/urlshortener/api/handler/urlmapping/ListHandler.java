@@ -252,8 +252,7 @@ public class ListHandler
         "originalUrl", m.originalUrl(),
         "createdAt", m.createdAt().toString(),
         "expiresAt", m.expiresAt().map(Instant::toString).orElse(""),
-        "active", m.active() + "",
-        "status", expired ? "expired" : "active"
+        "active", m.active() + ""
     );
   }
 }

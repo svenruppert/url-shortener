@@ -1,4 +1,3 @@
-
 __MACOSX
 .DS_Store
 
@@ -39,4 +38,5 @@ build/
 .vscode/
 
 ### Mac OS ###
-.DS_Store
+/urlshortener-ui/src/main/frontend/generated/
+/Archiv.zip

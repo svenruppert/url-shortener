@@ -5,13 +5,15 @@ import com.svenruppert.urlshortener.core.AliasPolicy;
 import com.svenruppert.urlshortener.core.JacksonJson;
 import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
+import com.svenruppert.urlshortener.core.urlmapping.BulkShortenRequest;
+import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
 import com.svenruppert.urlshortener.core.urlmapping.ToggleActive.ToggleActiveRequest;
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
 import com.svenruppert.urlshortener.core.urlmapping.imports.ImportResult;
 import com.svenruppert.urlshortener.core.validation.UrlValidator;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -558,6 +560,24 @@ public class URLShortenerClient implements HasLogger {
     } finally {
       con.disconnect();
     }
+  }
+
+  public BulkShortenResponse bulkShorten(List<String> urls) throws IOException {
+    if (urls == null || urls.isEmpty()) {
+      throw new IllegalArgumentException("urls must not be null or empty");
+    }
+    logger().info("bulkShorten - {} URLs", urls.size());
+    final String jsonBody = toJson(new BulkShortenRequest(urls));
+    final URI uri = serverBaseAdmin.resolve(PATH_ADMIN_SHORTEN_BULK);
+    final Response resp = postJson(uri, jsonBody);
+    logger().info("bulkShorten - response code {}", resp.code());
+    if (resp.code() == 200) {
+      return fromJson(resp.body(), BulkShortenResponse.class);
+    }
+    if (resp.code() == 400) {
+      throw new IllegalArgumentException("Bad request: " + resp.body());
+    }
+    throw new IOException("Unexpected HTTP " + resp.code() + " for POST " + uri + " body=" + resp.body());
   }
 
   public ShortUrlMapping createMapping(String url) throws IOException {
