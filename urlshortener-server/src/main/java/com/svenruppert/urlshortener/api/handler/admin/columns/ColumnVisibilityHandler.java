@@ -38,7 +38,7 @@ public class ColumnVisibilityHandler
       }
     } catch (Exception e) {
       logger().error("Unhandled error in {}: {}", getClass().getSimpleName(), e.toString(), e);
-      writeJson(ex, INTERNAL_SERVER_ERROR, "Internal server error");
+      writeJson(ex, INTERNAL_SERVER_ERROR, Map.of("error", "Internal server error"));
     }
   }
 
@@ -47,7 +47,7 @@ public class ColumnVisibilityHandler
     logger().info("handleLoad..");
     var req = fromJson(readBody(ex.getRequestBody()), ColumnInfoRequest.class);
     if (isBlank(req.userId()) || isBlank(req.viewId())) {
-      writeJson(ex, BAD_REQUEST, "userId and viewId required");
+      writeJson(ex, BAD_REQUEST, Map.of("error", "userId and viewId required"));
       return;
     }
     var vis = store.load(req.userId(), req.viewId());

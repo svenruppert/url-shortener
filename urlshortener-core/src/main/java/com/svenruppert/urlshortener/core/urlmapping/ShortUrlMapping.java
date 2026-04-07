@@ -68,7 +68,7 @@ public final class ShortUrlMapping {
     return active;
   }
 
-  // --- COPY-WITH Methoden ---
+  // --- COPY-WITH methods ---
   public ShortUrlMapping withShortCode(String shortCode) {
     return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
   }

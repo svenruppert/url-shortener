@@ -94,7 +94,7 @@
         <!--        Vaadin Flow Properties-->
         <failOnMissingWebXml>false</failOnMissingWebXml>
 
-        <vaadin.version>25.1.0-beta3</vaadin.version>
+        <vaadin.version>25.1.0</vaadin.version>
         <drivers.downloader.phase>pre-integration-test</drivers.downloader.phase>
         <jetty.version>12.1.7</jetty.version>
         <warName>ROOT</warName>
@@ -190,13 +190,18 @@
 
             <dependency>
                 <groupId>tools.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
-                <version>3.0.3</version>
+                <artifactId>jackson-core</artifactId>
+                <version>3.1.0</version>
             </dependency>
             <dependency>
                 <groupId>tools.jackson.core</groupId>
-                <artifactId>jackson-core</artifactId>
-                <version>3.0.3</version>
+                <artifactId>jackson-databind</artifactId>
+                <version>3.1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>2.21</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

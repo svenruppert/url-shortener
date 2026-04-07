@@ -50,6 +50,15 @@ public final class DefaultValues {
   public static final String PATH_ADMIN_PREFERENCES_COLUMNS_EDIT = PATH_PREFIX + "/admin/preferences/columns/edit";
   public static final String PATH_ADMIN_PREFERENCES_COLUMNS_SINGLE = PATH_PREFIX + "/admin/preferences/columns/single";
 
+  // Statistics API paths
+  public static final String PATH_ADMIN_STATISTICS = PATH_PREFIX + "/statistics";
+  public static final String PATH_ADMIN_STATISTICS_COUNT = PATH_ADMIN_STATISTICS + "/count";
+  public static final String PATH_ADMIN_STATISTICS_TIMELINE = PATH_ADMIN_STATISTICS + "/timeline";
+  public static final String PATH_ADMIN_STATISTICS_HOURLY = PATH_ADMIN_STATISTICS + "/hourly";
+  public static final String PATH_ADMIN_STATISTICS_DAILY = PATH_ADMIN_STATISTICS + "/daily";
+  public static final String PATH_ADMIN_STATISTICS_CONFIG = PATH_ADMIN_STATISTICS + "/config";
+  public static final String PATH_ADMIN_STATISTICS_DEBUG = PATH_ADMIN_STATISTICS + "/debug";
+
 
   public static final String PATTERN_DATE_TIME = "yyyy.MM.dd HH:mm";
   public static final String PATTERN_DATE_TIME_EXPORT = "yyyy-MM-dd'T'HH-mm-ss'Z'";

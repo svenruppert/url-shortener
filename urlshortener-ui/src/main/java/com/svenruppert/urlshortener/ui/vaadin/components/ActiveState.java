@@ -1,4 +1,4 @@
-package com.svenruppert.urlshortener.ui.vaadin.views.overview;
+package com.svenruppert.urlshortener.ui.vaadin.components;
 
 public enum ActiveState {
   ACTIVE,
@@ -25,6 +25,4 @@ public enum ActiveState {
   public boolean isActive() {
     return this == ACTIVE;
   }
-
-
 }

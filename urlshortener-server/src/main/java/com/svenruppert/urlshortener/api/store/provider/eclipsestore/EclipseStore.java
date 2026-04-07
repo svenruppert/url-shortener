@@ -4,8 +4,10 @@ import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortCodeGenerator;
 import com.svenruppert.urlshortener.api.store.preferences.PreferencesStore;
 import com.svenruppert.urlshortener.api.store.provider.eclipsestore.patitions.EclipsePreferencesStore;
-import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
+import com.svenruppert.urlshortener.api.store.provider.eclipsestore.patitions.EclipseStatisticsStore;
 import com.svenruppert.urlshortener.api.store.provider.eclipsestore.patitions.EclipseUrlMappingStore;
+import com.svenruppert.urlshortener.api.store.statistics.StatisticsStore;
+import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 import org.eclipse.store.storage.embedded.types.EmbeddedStorage;
 import org.eclipse.store.storage.types.StorageManager;
 
@@ -20,7 +22,8 @@ public final class EclipseStore
   private final StorageManager storage;
 
   private final EclipseUrlMappingStore eclipseUrlMappingStore;
-  private final PreferencesStore preferencesStore;
+  private final EclipsePreferencesStore preferencesStore;
+  private final EclipseStatisticsStore statisticsStore;
 
 
   public EclipseStore(String storageDir,
@@ -39,17 +42,27 @@ public final class EclipseStore
 
     DataRoot r = dataRoot();
     if (r != null) {
-      logger().info("found existing DataRoot");
+      logger().info("Found existing DataRoot");
       var size = r.shortUrlMappings().size();
       logger().info("DataRoot Mappings contains {} elements", size);
+      // Ensure statistics fields are initialized (for backwards compatibility)
+      if (r.ensureStatisticsInitialized()) {
+        logger().info("Initialized missing statistics fields in existing DataRoot");
+        storage.store(r.redirectEvents());
+        storage.store(r.hourlyAggregates());
+        storage.store(r.dailyAggregates());
+        storage.store(r.statisticsConfig());
+        storage.storeRoot();
+      }
     } else {
-      logger().info("no DataRoot found creating a new one..");
+      logger().info("No DataRoot found, creating a new one...");
       storage.setRoot(new DataRoot());
       storage.storeRoot();
     }
 
     this.eclipseUrlMappingStore = new EclipseUrlMappingStore(storage, clock, generator);
     this.preferencesStore = new EclipsePreferencesStore(storage);
+    this.statisticsStore = new EclipseStatisticsStore(storage, clock);
   }
 
   public UrlMappingStore getUrlMappingStore() {
@@ -60,16 +73,31 @@ public final class EclipseStore
     return preferencesStore;
   }
 
+  public StatisticsStore getStatisticsStore() {
+    return statisticsStore;
+  }
+
+  /**
+   * Starts background processing threads for statistics.
+   * Should be called once during application startup.
+   */
+  public void start() {
+    logger().info("Starting EclipseStore services");
+    statisticsStore.start();
+  }
+
   private DataRoot dataRoot() {
     return (DataRoot) storage.root();
   }
 
 
-  /* ---------- intern ---------- */
+  /* ---------- internal ---------- */
 
   @Override
   public void close() {
     try {
+      logger().info("Closing EclipseStore");
+      statisticsStore.stop();
       storage.close();
     } catch (Exception e) {
       logger().warn("Storage close failed", e);

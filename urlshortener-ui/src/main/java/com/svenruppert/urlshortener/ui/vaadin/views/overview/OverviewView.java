@@ -7,11 +7,13 @@ import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
 import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.svenruppert.urlshortener.ui.vaadin.components.ColumnVisibilityDialog;
+import com.svenruppert.urlshortener.ui.vaadin.components.SearchBar;
 import com.svenruppert.urlshortener.ui.vaadin.events.MappingCreatedOrChanged;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
 import com.svenruppert.urlshortener.ui.vaadin.tools.*;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.imports.ImportDialog;
+import com.svenruppert.urlshortener.ui.vaadin.views.statistics.StatisticsDetailView;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -114,6 +116,7 @@ public class OverviewView
   private static final String K_ACTIVE_TOOLTIP_DEACTIVATE = "overview.active.tooltip.deactivate";
 
   private static final String K_COPY_SHORTURL_TOOLTIP = "overview.shortcode.copy.tooltip";
+  private static final String K_STATISTICS_TOOLTIP = "overview.statistics.tooltip";
 
   private static final String K_DELETE_TITLE = "overview.delete.title";
 //  private static final String K_DELETE_QUESTION_PREFIX = "overview.delete.question.prefix";
@@ -130,7 +133,7 @@ public class OverviewView
   private final Grid<ShortUrlMapping> grid = new Grid<>(ShortUrlMapping.class, false);
   private final BulkActionsBar bulkBar = new BulkActionsBar(urlShortenerClient, grid, this);
   private final Button btnSettings = new Button(new Icon(VaadinIcon.COG));
-  private final SearchBar searchBar = new SearchBar(this);
+  private final SearchBar searchBar = new SearchBar();
 
   // NOTE: no text in field initializer (i18n happens later)
   private final Button prevBtn = new Button();
@@ -194,6 +197,14 @@ public class OverviewView
       searchBar.setPageSize(25);
       searchBar.setSortBy("createdAt");
       searchBar.setDirValue("desc");
+
+      // Configure SearchBar callbacks
+      searchBar.setOnFilterChange(_ -> {
+        currentPage = 1;
+        safeRefresh();
+      });
+      searchBar.setOnPageSizeChange(this::setGridPageSize);
+      searchBar.setOnReset(_ -> currentPage = 1);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -490,7 +501,16 @@ public class OverviewView
     details.addThemeVariants(LUMO_TERTIARY_INLINE);
     details.addClickListener(_ -> openDetailsDialog(m));
 
-    var row = new HorizontalLayout(details, delete);
+    var statistics = new Button(new Icon(VaadinIcon.CHART));
+    statistics.addThemeVariants(LUMO_TERTIARY_INLINE);
+    statistics.getElement().setProperty("title", tr(K_STATISTICS_TOOLTIP, "View statistics"));
+    statistics.addClickListener(_ ->
+        statistics.getUI().ifPresent(ui ->
+            ui.navigate(StatisticsDetailView.class, m.shortCode())
+        )
+    );
+
+    var row = new HorizontalLayout(details, statistics, delete);
     row.addClassName(C_ROW_ACTIONS);
     row.setSpacing(true);
     return row;
