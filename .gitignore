@@ -40,3 +40,8 @@ build/
 ### Mac OS ###
 /urlshortener-ui/src/main/frontend/generated/
 /Archiv.zip
+/_backup/
+/_logs/
+/data/
+/.claude/
+/.ai/
