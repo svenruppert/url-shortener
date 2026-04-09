@@ -10,6 +10,30 @@ public final class ImportResult {
   public ImportResult() {
   }
 
+  public int getCreated() {
+    return created;
+  }
+
+  public void setCreated(int created) {
+    this.created = created;
+  }
+
+  public int getSkippedConflicts() {
+    return skippedConflicts;
+  }
+
+  public void setSkippedConflicts(int skippedConflicts) {
+    this.skippedConflicts = skippedConflicts;
+  }
+
+  public int getInvalid() {
+    return invalid;
+  }
+
+  public void setInvalid(int invalid) {
+    this.invalid = invalid;
+  }
+
   public ImportResult(
       int created,
       int skippedConflicts,

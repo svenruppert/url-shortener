@@ -1,15 +1,17 @@
 package com.svenruppert.urlshortener.core;
 
-import tools.jackson.core.JsonGenerator;
-import tools.jackson.core.JsonParser;
-import tools.jackson.core.StreamReadConstraints;
-import tools.jackson.core.StreamWriteConstraints;
-import tools.jackson.core.json.JsonFactory;
-import tools.jackson.databind.ObjectMapper;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 
 /**
  * Central Jackson configuration for the whole application.
@@ -17,7 +19,7 @@ import java.io.OutputStream;
  */
 public final class JacksonJson {
 
-  private static final ObjectMapper MAPPER = createMapper();
+  private static final ObjectMapper MAPPER = initMapper();
 
   private JacksonJson() {
     // utility class
@@ -31,14 +33,22 @@ public final class JacksonJson {
    * Convenience: serialize any value to JSON string.
    */
   public static String toJson(Object value) {
-    return MAPPER.writeValueAsString(value);
+    try {
+      return MAPPER.writeValueAsString(value);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to serialize value to JSON", e);
+    }
   }
 
   /**
    * Convenience: deserialize JSON string into a target type.
    */
   public static <T> T fromJson(String json, Class<T> type) {
-    return MAPPER.readValue(json, type);
+    try {
+      return MAPPER.readValue(json, type);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Failed to deserialize JSON payload", e);
+    }
   }
 
   /**
@@ -75,24 +85,21 @@ public final class JacksonJson {
     return MAPPER.createParser(in);
   }
 
-  private static ObjectMapper createMapper() {
-    // Optional: tighten / tune constraints for defensive parsing
-    // (values here are conservative defaults; adjust if you expect very large JSON).
-    StreamReadConstraints readConstraints = StreamReadConstraints.builder()
-        .maxStringLength(10_000_000)
-        .maxNumberLength(1_000)
-        .build();
+  private static ObjectMapper initMapper() {
+    try {
+      return createMapperWithOptionalConstraints();
+    } catch (Throwable ignored) {
+      // Never fail class initialization because of optional JSON tuning.
+      // This keeps API handlers functional even with slightly different runtime classpaths.
+      return new ObjectMapper();
+    }
+  }
 
-    StreamWriteConstraints writeConstraints = StreamWriteConstraints.builder()
-        .maxNestingDepth(1_000)
-        .build();
-
-    JsonFactory factory = JsonFactory.builder()
-        .streamReadConstraints(readConstraints)
-        .streamWriteConstraints(writeConstraints)
-        .build();
-
-    ObjectMapper mapper = new ObjectMapper(factory);
+  private static ObjectMapper createMapperWithOptionalConstraints() {
+    JsonFactory factory = createFactoryWithOptionalConstraints();
+    ObjectMapper mapper = (factory == null) ? new ObjectMapper() : new ObjectMapper(factory);
+    mapper.registerModule(new JavaTimeModule());
+    mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     // >>> Wichtig für Klassen mit "record-style" Accessors: shortCode(), originalUrl(), ...
     //    mapper.(
@@ -118,5 +125,37 @@ public final class JacksonJson {
     // mapper.enable(SerializationFeature.INDENT_OUTPUT);
 
     return mapper;
+  }
+
+  private static JsonFactory createFactoryWithOptionalConstraints() {
+    try {
+      Method factoryBuilderMethod = JsonFactory.class.getMethod("builder");
+      Object factoryBuilder = factoryBuilderMethod.invoke(null);
+
+      Class<?> readConstraintsClass = Class.forName("com.fasterxml.jackson.core.StreamReadConstraints");
+      Class<?> writeConstraintsClass = Class.forName("com.fasterxml.jackson.core.StreamWriteConstraints");
+
+      Method readBuilderMethod = readConstraintsClass.getMethod("builder");
+      Object readBuilder = readBuilderMethod.invoke(null);
+      readBuilder.getClass().getMethod("maxStringLength", int.class).invoke(readBuilder, 10_000_000);
+      readBuilder.getClass().getMethod("maxNumberLength", int.class).invoke(readBuilder, 1_000);
+      Object readConstraints = readBuilder.getClass().getMethod("build").invoke(readBuilder);
+
+      Method writeBuilderMethod = writeConstraintsClass.getMethod("builder");
+      Object writeBuilder = writeBuilderMethod.invoke(null);
+      writeBuilder.getClass().getMethod("maxNestingDepth", int.class).invoke(writeBuilder, 1_000);
+      Object writeConstraints = writeBuilder.getClass().getMethod("build").invoke(writeBuilder);
+
+      factoryBuilder.getClass()
+          .getMethod("streamReadConstraints", readConstraintsClass)
+          .invoke(factoryBuilder, readConstraints);
+      factoryBuilder.getClass()
+          .getMethod("streamWriteConstraints", writeConstraintsClass)
+          .invoke(factoryBuilder, writeConstraints);
+
+      return (JsonFactory) factoryBuilder.getClass().getMethod("build").invoke(factoryBuilder);
+    } catch (Throwable ignored) {
+      return null;
+    }
   }
 }

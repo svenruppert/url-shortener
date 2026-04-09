@@ -225,35 +225,28 @@ public class ListHandler
 
 
     int total = store.count(filter);          // Gesamtanzahl der Treffer
-    var now = Instant.now();
     var results = store.find(filter);         // Paged + Sorted
-    var items = results.stream().map(m -> toDto(m, now)).toList();
+    var items = results.stream().map(this::toDto).toList();
     return toJsonListingPaged("filtered", items.size(), items, page, size, total, sortBy.orElse(null), dir.orElse(null));
   }
 
   private String filterAndBuild(String mode, Predicate<ShortUrlMapping> predicate) {
-    final Instant now = Instant.now();
     final var data = store
         .findAll()
         .stream()
         .filter(predicate)
-        .map(m -> toDto(m, now))
+        .map(this::toDto)
         .toList();
     return JsonUtils.toJsonListing(mode, data.size(), data);
   }
 
-  private Map<String, String> toDto(ShortUrlMapping m, Instant now) {
-    boolean expired = m.
-        expiresAt()
-        .map(t -> t.isBefore(now))
-        .orElse(false);
+  private Map<String, String> toDto(ShortUrlMapping m) {
     return Map.of(
         "shortCode", m.shortCode(),
         "originalUrl", m.originalUrl(),
         "createdAt", m.createdAt().toString(),
         "expiresAt", m.expiresAt().map(Instant::toString).orElse(""),
-        "active", m.active() + "",
-        "status", expired ? "expired" : "active"
+        "active", m.active() + ""
     );
   }
 }

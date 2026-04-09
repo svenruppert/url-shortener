@@ -8,7 +8,7 @@
     <parent>
         <groupId>com.svenruppert</groupId>
         <artifactId>dependencies</artifactId>
-        <version>06.00.15</version>
+        <version>06.00.16</version>
     </parent>
 
     <groupId>com.svenruppert.urlshortener</groupId>
@@ -80,7 +80,7 @@
         <maven.compiler.testSource>${jdk.version}</maven.compiler.testSource>
         <maven.compiler.testTarget>${jdk.version}</maven.compiler.testTarget>
 
-        <minimum-maven.version>3.9.9</minimum-maven.version>
+        <minimum-maven.version>3.9.14</minimum-maven.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -94,12 +94,12 @@
         <!--        Vaadin Flow Properties-->
         <failOnMissingWebXml>false</failOnMissingWebXml>
 
-        <vaadin.version>25.1.0</vaadin.version>
+        <vaadin.version>25.1.1</vaadin.version>
         <drivers.downloader.phase>pre-integration-test</drivers.downloader.phase>
         <jetty.version>12.1.7</jetty.version>
         <warName>ROOT</warName>
         <restServiceName>urlshortener</restServiceName>
-        <eclipse-store.version>3.1.0</eclipse-store.version>
+        <eclipse-store.version>4.0.1</eclipse-store.version>
     </properties>
 
     <repositories>
@@ -189,19 +189,24 @@
             </dependency>
 
             <dependency>
-                <groupId>tools.jackson.core</groupId>
+                <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-core</artifactId>
-                <version>3.1.0</version>
+                <version>2.21.0</version>
             </dependency>
             <dependency>
-                <groupId>tools.jackson.core</groupId>
+                <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
-                <version>3.1.0</version>
+                <version>2.21.0</version>
             </dependency>
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-annotations</artifactId>
                 <version>2.21</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>2.21.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

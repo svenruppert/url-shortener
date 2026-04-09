@@ -375,6 +375,7 @@ public final class ImportDialog
 
     try {
       ImportResult res = client.importApply(stagingId);
+      logger().info("importApply response ->|{}|<-", res);
       onImportApplied.run();
       close();
 

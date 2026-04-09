@@ -11,6 +11,7 @@ import com.svenruppert.urlshortener.ui.vaadin.components.SearchBar;
 import com.svenruppert.urlshortener.ui.vaadin.events.MappingCreatedOrChanged;
 import com.svenruppert.urlshortener.ui.vaadin.events.StoreEvents;
 import com.svenruppert.urlshortener.ui.vaadin.tools.*;
+import com.svenruppert.urlshortener.ui.vaadin.tools.UiLinks;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.imports.ImportDialog;
 import com.svenruppert.urlshortener.ui.vaadin.views.statistics.StatisticsDetailView;
@@ -445,11 +446,9 @@ public class OverviewView
 
   private void configureColumUrl() {
     grid.addComponentColumn(m -> {
-          var a = new Anchor(m.originalUrl(), m.originalUrl());
-          a.addClassName(C_URL_ANCHOR);
-          a.setTarget("_blank");
-          a.getElement().setProperty("title", m.originalUrl());
-          return a;
+          final var component = UiLinks.httpAwareLink(m.originalUrl(), m.originalUrl());
+          component.getElement().getClassList().add(C_URL_ANCHOR);
+          return component;
         }).setHeader("") // header will be set via key in configureGrid()
         .setKey("url").setFlexGrow(1).setResizable(true);
   }
