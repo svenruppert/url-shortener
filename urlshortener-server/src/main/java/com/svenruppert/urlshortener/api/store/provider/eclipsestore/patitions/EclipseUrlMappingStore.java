@@ -43,6 +43,13 @@ public class EclipseUrlMappingStore
   }
 
   @Override
+  public Result<ShortUrlMapping> createMapping(Instant createdAt, String shortCode, String originalUrl, Instant expiredAt, Boolean active) {
+    logger().info("createMapping - createdAt: {} - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", createdAt, shortCode, originalUrl, expiredAt, active);
+    var originalOrDefaultActive = active != null ? active : true;
+    return creator.create(createdAt, shortCode, originalUrl, expiredAt, originalOrDefaultActive);
+  }
+
+  @Override
   public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt, Boolean active) {
     logger().info("createMapping - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", shortCode, originalUrl, expiredAt, active);
     var originalOrDefaultActive = active != null ? active : true;
@@ -63,21 +70,28 @@ public class EclipseUrlMappingStore
       storage.store(dataRoot().shortUrlMappings());
       return Result.success(shortUrlMapping);
     } else {
-      logger().info("editMapping - shortCode {} does not exists", shortCode);
-      return Result.failure("editMapping - shortCode '" + shortCode + "' does not exists");
+      logger().info("editMapping - shortCode {} does not exist", shortCode);
+      return Result.failure("editMapping - shortCode '" + shortCode + "' does not exist");
     }
   }
 
   @Override
   public boolean delete(String shortCode) {
-    logger().info("delete '{}'", shortCode);
+    logger().info("Deleting shortCode '{}'", shortCode);
     var normalized = normalize(shortCode);
-    logger().info("delete - normalized for deletion '{}'", normalized);
+    logger().info("Normalized shortCode for deletion: '{}'", normalized);
     var removed = dataRoot().shortUrlMappings().remove(normalized) != null;
-    logger().info("delete - mapping removed from store {} ", removed);
+    logger().info("Mapping removed from store: {}", removed);
     if (removed) {
       storage.store(dataRoot().shortUrlMappings());
-      logger().info("delete - changes persisted in store");
+      logger().info("URL mapping changes persisted");
+
+      // Cascade delete: remove all statistics for this shortCode
+      dataRoot().removeStatisticsForShortCode(normalized);
+      storage.store(dataRoot().redirectEvents());
+      storage.store(dataRoot().hourlyAggregates());
+      storage.store(dataRoot().dailyAggregates());
+      logger().info("Statistics data removed for shortCode '{}'", normalized);
     }
     return removed;
   }
@@ -95,7 +109,7 @@ public class EclipseUrlMappingStore
       logger().info("toggleActive - changes persisted in store");
       return Result.success(new ToggleActive.ToggleActiveResponse(shortCode, updatedUrlMapping.active()));
     } else {
-      return Result.failure("shortCode " + shortCode + "not found");
+      return Result.failure("shortCode " + shortCode + " not found");
     }
   }
 
@@ -147,7 +161,7 @@ public class EclipseUrlMappingStore
   public int countAll() {
     return dataRoot().shortUrlMappings().size();
   }
-  /* ---------- intern ---------- */
+  /* ---------- internal ---------- */
 
   private void storeMappingAndPersist(ShortUrlMapping m) {
     var dataRoot = dataRoot();

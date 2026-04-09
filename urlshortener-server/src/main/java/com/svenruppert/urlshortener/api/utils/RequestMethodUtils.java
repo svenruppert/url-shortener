@@ -8,7 +8,6 @@ import java.util.Objects;
 
 import static com.svenruppert.dependencies.core.net.HttpStatus.METHOD_NOT_ALLOWED;
 import static com.svenruppert.dependencies.core.net.HttpStatus.NO_CONTENT;
-import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
 
 
 /**
@@ -30,10 +29,12 @@ public final class RequestMethodUtils
    */
   public static boolean requireGet(HttpExchange exchange)
       throws IOException {
-    HasLogger.staticLogger().info("handle ... {} ", exchange.getRequestMethod());
+    HasLogger.staticLogger().debug("handle ... {} ", exchange.getRequestMethod());
     Objects.requireNonNull(exchange, "exchange");
     if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-      writeJson(exchange, METHOD_NOT_ALLOWED, "Only GET is allowed for this endpoint.");
+      ErrorResponses.withStatus(exchange, METHOD_NOT_ALLOWED,
+                                "Only GET is allowed for this endpoint.");
+
       return false;
     }
     return true;
@@ -84,12 +85,33 @@ public final class RequestMethodUtils
     return requireWithOptions(exchange, "PATCH");
   }
 
+
+  /**
+   * Allows GET or HEAD requests.
+   * Any other method is rejected with HTTP 405 (Method Not Allowed).
+   */
+  public static boolean requireGetOrHead(HttpExchange exchange)
+      throws IOException {
+    HasLogger.staticLogger().debug("handle ... {} ", exchange.getRequestMethod());
+    Objects.requireNonNull(exchange, "exchange");
+
+    String method = exchange.getRequestMethod();
+    if (!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method)) {
+      // keep behaviour consistent with requireGet: return a JSON error
+      ErrorResponses.withStatus(exchange, METHOD_NOT_ALLOWED,
+                                "Only GET or HEAD is allowed for this endpoint.");
+
+      return false;
+    }
+    return true;
+  }
+
   // ======== internal helper ========
 
   private static boolean requireWithOptions(HttpExchange exchange,
                                             String allowedPrimary)
       throws IOException {
-    HasLogger.staticLogger().info("handle requireWithOptions ... {} ", exchange.getRequestMethod());
+    HasLogger.staticLogger().debug("handle requireWithOptions ... {} ", exchange.getRequestMethod());
 
     Objects.requireNonNull(exchange, "exchange");
     String method = exchange.getRequestMethod();
@@ -102,11 +124,29 @@ public final class RequestMethodUtils
 
     if (!allowedPrimary.equalsIgnoreCase(method)) {
       exchange.getResponseHeaders().add("Allow", allowedPrimary + ", OPTIONS");
-      writeJson(exchange, METHOD_NOT_ALLOWED,
-                "Only " + allowedPrimary + " or OPTIONS are permitted for this endpoint.");
+      ErrorResponses.withStatus(
+          exchange,
+          METHOD_NOT_ALLOWED,
+          "Only " + allowedPrimary + " or OPTIONS are permitted for this endpoint."
+      );
+
       return false;
     }
 
     return true;
   }
+
+  public static void allow(HttpExchange ex, String allow)
+      throws IOException {
+    ex.getResponseHeaders().add("Allow", allow);
+    ex.sendResponseHeaders(NO_CONTENT.code(), -1);
+  }
+
+  public static void methodNotAllowed(HttpExchange ex, String allow)
+      throws IOException {
+    ex.getResponseHeaders().add("Allow", allow);
+    ErrorResponses.withStatus(ex, METHOD_NOT_ALLOWED, "Method not allowed");
+  }
+
+
 }

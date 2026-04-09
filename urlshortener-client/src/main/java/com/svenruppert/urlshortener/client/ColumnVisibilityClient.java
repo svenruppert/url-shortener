@@ -1,6 +1,7 @@
 package com.svenruppert.urlshortener.client;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.dependencies.core.net.HttpStatus;
 import com.svenruppert.urlshortener.core.prefs.ColumnDeleteRequest;
 import com.svenruppert.urlshortener.core.prefs.ColumnEditRequest;
 import com.svenruppert.urlshortener.core.prefs.ColumnInfoRequest;
@@ -26,10 +27,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Client for server-side column visibility preferences.
  * <p>
  * Endpoints:
- * - POST   /admin/preferences/columns         -> load
- * - DELETE /admin/preferences/columns         -> delete all (for a view)
- * - PUT    /admin/preferences/columns/edit    -> bulk edit
- * - PUT    /admin/preferences/columns/single  -> single edit
+ * - POST /admin/preferences/columns -> load
+ * - DELETE /admin/preferences/columns -> delete all (for a view)
+ * - PUT /admin/preferences/columns/edit -> bulk edit
+ * - PUT /admin/preferences/columns/single -> single edit
  */
 public final class ColumnVisibilityClient
     implements HasLogger {
@@ -118,7 +119,7 @@ public final class ColumnVisibilityClient
         .build();
     logger().info("editBulk - req(URI) {}", req.uri());
     var resp = http.send(req, HttpResponse.BodyHandlers.ofString(UTF_8));
-    if (resp.statusCode() != 200) {
+    if (resp.statusCode() != HttpStatus.NO_CONTENT.code()) {
       throw new IOException("Unexpected HTTP " + resp.statusCode() + " on bulk edit: " + resp.body());
     }
   }

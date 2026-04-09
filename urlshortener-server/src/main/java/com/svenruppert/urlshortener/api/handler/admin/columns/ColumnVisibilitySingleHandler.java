@@ -13,8 +13,10 @@ import java.util.Map;
 import static com.svenruppert.dependencies.core.net.HttpStatus.*;
 import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
 import static com.svenruppert.urlshortener.api.utils.RequestBodyUtils.readBody;
+import static com.svenruppert.urlshortener.api.utils.RequestMethodUtils.allow;
+import static com.svenruppert.urlshortener.api.utils.RequestMethodUtils.methodNotAllowed;
 import static com.svenruppert.urlshortener.core.JsonUtils.fromJson;
-import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
+import static com.svenruppert.urlshortener.core.StringUtils.isBlank;
 
 public class ColumnVisibilitySingleHandler
     implements HttpHandler, HasLogger {
@@ -25,32 +27,30 @@ public class ColumnVisibilitySingleHandler
     this.store = store;
   }
 
-  private static boolean isBlank(String s) {
-    return s == null || s.isBlank();
-  }
 
   @Override
   public void handle(HttpExchange ex)
       throws IOException {
     switch (ex.getRequestMethod()) {
       case "PUT" -> handleSingleEdit(ex);
-      case "DELETE"  -> handleSingleDelete(ex);
+      case "DELETE" -> handleSingleDelete(ex);
       case "OPTIONS" -> allow(ex, "PUT, OPTIONS");
       default -> methodNotAllowed(ex, "PUT, OPTIONS");
     }
   }
 
-  private void handleSingleDelete(HttpExchange ex) throws IOException {
+  private void handleSingleDelete(HttpExchange ex)
+      throws IOException {
     final var body = readBody(ex.getRequestBody());
     final ColumnDeleteRequest req;
     try {
       req = fromJson(body, ColumnDeleteRequest.class);
     } catch (Exception e) {
-      writeJson(ex, BAD_REQUEST, "Invalid JSON: " + e.getMessage());
+      writeJson(ex, BAD_REQUEST, Map.of("error", "Invalid JSON: " + e.getMessage()));
       return;
     }
     if (isBlank(req.userId()) || isBlank(req.viewId()) || isBlank(req.columnKey())) {
-      writeJson(ex, BAD_REQUEST, "userId, viewId and columnKey required");
+      writeJson(ex, BAD_REQUEST, Map.of("error", "userId, viewId and columnKey required"));
       return;
     }
 
@@ -63,24 +63,14 @@ public class ColumnVisibilitySingleHandler
     logger().info("handleSingleEdit..");
     var req = fromJson(readBody(ex.getRequestBody()), ColumnSingleEditRequest.class);
     if (isBlank(req.userId()) || isBlank(req.viewId()) || isBlank(req.columnKey())) {
-      writeJson(ex, BAD_REQUEST, "userId, viewId and columnKey required");
+      writeJson(ex, BAD_REQUEST, Map.of("error", "userId, viewId and columnKey required"));
       return;
     }
     var visibility = Map.of(req.columnKey(), req.visible());
     logger().info("handleSingleEdit - visibility {}", visibility);
     store.saveColumnVisibilities(req.userId(), req.viewId(), visibility);
-    writeJson(ex, OK, toJson(Map.of("status", "ok")));
+    writeJson(ex, OK, Map.of("status", "ok"));
   }
 
-  private void allow(HttpExchange ex, String allow)
-      throws IOException {
-    ex.getResponseHeaders().add("Allow", allow);
-    ex.sendResponseHeaders(NO_CONTENT.code(), -1);
-  }
 
-  private void methodNotAllowed(HttpExchange ex, String allow)
-      throws IOException {
-    ex.getResponseHeaders().add("Allow", allow);
-    writeJson(ex, METHOD_NOT_ALLOWED, "Method not allowed");
-  }
 }

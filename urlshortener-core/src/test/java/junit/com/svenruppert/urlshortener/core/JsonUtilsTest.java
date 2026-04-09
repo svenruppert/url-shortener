@@ -3,6 +3,8 @@ package junit.com.svenruppert.urlshortener.core;
 
 import com.svenruppert.urlshortener.core.JsonUtils;
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.core.exc.StreamReadException;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -32,8 +34,8 @@ class JsonUtilsTest {
 
   @Test
   void parseInvalidJsonThrowsIOException() {
-    assertThrows(IOException.class, () -> JsonUtils.parseJson("\"not json\""));
-    assertThrows(IOException.class, () -> JsonUtils.parseJson("{missingColon}"));
+    assertThrows(MismatchedInputException.class, () -> JsonUtils.parseJson("\"not json\""));
+    assertThrows(StreamReadException.class, () -> JsonUtils.parseJson("{missingColon}"));
   }
 
   @Test

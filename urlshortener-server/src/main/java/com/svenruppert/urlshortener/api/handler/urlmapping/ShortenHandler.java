@@ -4,10 +4,11 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
-import com.svenruppert.dependencies.core.net.HttpStatus;
 import com.svenruppert.functional.model.Result;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
+import com.svenruppert.urlshortener.api.utils.ErrorResponses;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
+import com.svenruppert.urlshortener.api.utils.SuccessResponses;
 import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
@@ -15,11 +16,8 @@ import com.svenruppert.urlshortener.core.validation.UrlValidator;
 
 import java.io.IOException;
 
-import static com.svenruppert.dependencies.core.net.HttpStatus.*;
-import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
 import static com.svenruppert.urlshortener.api.utils.RequestBodyUtils.readBody;
 import static com.svenruppert.urlshortener.core.JsonUtils.fromJson;
-import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
 import static com.svenruppert.urlshortener.core.StringUtils.isNullOrBlank;
 
 /**
@@ -51,13 +49,13 @@ public class ShortenHandler
       final String body = readBody(ex.getRequestBody());
       ShortenRequest req = fromJson(body, ShortenRequest.class);
       if (isNullOrBlank(req.getUrl())) {
-        writeJson(ex, BAD_REQUEST, "Missing 'url'");
+        ErrorResponses.badRequest(ex, "Missing 'url'");
         return;
       }
 
       var result = UrlValidator.validate(req.getUrl());
       if (!result.valid()) {
-        writeJson(ex, HttpStatus.BAD_REQUEST, "{\"error\":\"" + result.message() + "\"}");
+        ErrorResponses.badRequest(ex, result.message());
         return;
       } else {
         logger().info("valid URL {}", req.getUrl());
@@ -83,7 +81,8 @@ public class ShortenHandler
               var code = parsed.get("code");
               var errorCode = Integer.parseInt(code);
               var message = parsed.get("message");
-              writeJson(ex, HttpStatus.fromCode(errorCode), message);
+              ErrorResponses.withStatus(ex, errorCode, message);
+
             } catch (IOException e) {
               throw new RuntimeException(e);
             }
@@ -93,18 +92,23 @@ public class ShortenHandler
             final Headers h = ex.getResponseHeaders();
             h.add("Location", "/r/" + mapping.shortCode());
             try {
-              writeJson(ex, fromCode(201), toJson(mapping));
+              SuccessResponses.withStatus(ex, 201, mapping);
             } catch (IOException e) {
               throw new RuntimeException(e);
             }
           });
       logger().info("hortenHandler .. try block .. done");
+    } catch (IllegalArgumentException e) {
+      // z.B. "Invalid JSON: ..." oder fachliche Validierung
+      logger().warn("bad request - {}", e.getMessage());
+      ErrorResponses.badRequest(ex, e.getMessage());
     } catch (Exception e) {
-      logger().warn("catch - {}", e.toString());
-      writeJson(ex, INTERNAL_SERVER_ERROR);
+      logger().error("internal error", e);
+      ErrorResponses.internalServerError(ex, "internal_error");
     } finally {
       logger().info("ShortenHandler .. finally");
-      ex.close();
+      // ex.close() entfernen
     }
+
   }
 }

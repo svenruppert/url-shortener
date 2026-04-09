@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
@@ -8,7 +8,7 @@
     <parent>
         <groupId>com.svenruppert</groupId>
         <artifactId>dependencies</artifactId>
-        <version>06.00.13</version>
+        <version>06.00.16</version>
     </parent>
 
     <groupId>com.svenruppert.urlshortener</groupId>
@@ -29,13 +29,13 @@
         <module>urlshortener-ui</module>
     </modules>
 
-    <url>https://github.com/svenruppert/core-vaadin-project-template</url>
+    <url>https://github.com/svenruppert/url-shortener</url>
     <name>URL-Shortener</name>
     <description>The beginning of your OSS project</description>
     <scm>
-        <url>https://github.com/svenruppert/core-vaadin-project-template</url>
-        <connection>scm:git:https://github.com/svenruppert/core-vaadin-project-template.git</connection>
-        <developerConnection>scm:git:https://github.com/svenruppert/core-vaadin-project-template.git
+        <url>https://github.com/svenruppert/url-shortener</url>
+        <connection>scm:git:https://github.com/svenruppert/url-shortener.git</connection>
+        <developerConnection>scm:git:https://github.com/svenruppert/url-shortener.git
         </developerConnection>
         <tag>HEAD</tag>
     </scm>
@@ -52,7 +52,7 @@
     </developers>
     <issueManagement>
         <system>GitHub</system>
-        <url>https://github.com/svenruppert/core-vaadin-project-template/issues</url>
+        <url>https://github.com/svenruppert/url-shortener/issues</url>
     </issueManagement>
     <licenses>
         <license>
@@ -70,7 +70,7 @@
         <deploy-repo-url>https://repo.maven.apache.org/maven2/</deploy-repo-url>
         <deploy-repo-snapshots-url>https://repo.maven.apache.org/maven2/</deploy-repo-snapshots-url>
 
-        <jdk.version>24</jdk.version>
+        <jdk.version>26</jdk.version>
 
         <maven.compiler.release>${jdk.version}</maven.compiler.release>
         <maven.compiler.source>${jdk.version}</maven.compiler.source> <!--redundant, but IntelliJ doesn't-->
@@ -80,7 +80,7 @@
         <maven.compiler.testSource>${jdk.version}</maven.compiler.testSource>
         <maven.compiler.testTarget>${jdk.version}</maven.compiler.testTarget>
 
-        <minimum-maven.version>3.9.9</minimum-maven.version>
+        <minimum-maven.version>3.9.14</minimum-maven.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -94,11 +94,12 @@
         <!--        Vaadin Flow Properties-->
         <failOnMissingWebXml>false</failOnMissingWebXml>
 
-        <vaadin.version>24.9.0</vaadin.version>
+        <vaadin.version>25.1.1</vaadin.version>
         <drivers.downloader.phase>pre-integration-test</drivers.downloader.phase>
-        <jetty.version>11.0.25</jetty.version>
+        <jetty.version>12.1.7</jetty.version>
         <warName>ROOT</warName>
         <restServiceName>urlshortener</restServiceName>
+        <eclipse-store.version>4.0.1</eclipse-store.version>
     </properties>
 
     <repositories>
@@ -179,12 +180,33 @@
             <dependency>
                 <groupId>org.eclipse.store</groupId>
                 <artifactId>storage-embedded</artifactId>
-                <version>3.0.1</version>
+                <version>${eclipse-store.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.serializer</groupId>
                 <artifactId>serializer</artifactId>
-                <version>3.0.1</version>
+                <version>${eclipse-store.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>2.21.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>2.21.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>2.21</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>2.21.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -306,9 +328,9 @@
 
                 </dependencies>
                 <configuration>
-                    <threads>2</threads>
+                    <threads>1</threads>
                     <outputFormats>
-                        <outputFormat>XML</outputFormat>
+<!--                        <outputFormat>XML</outputFormat>-->
                         <outputFormat>HTML</outputFormat>
                     </outputFormats>
                     <targetClasses>
@@ -438,46 +460,46 @@
                 </plugins>
             </build>
         </profile>
-<!--        <profile>-->
-<!--            <id>_shadejar</id>-->
-<!--            <build>-->
-<!--                <finalName>application</finalName>-->
-<!--                <plugins>-->
-<!--                    <plugin>-->
-<!--                        <groupId>org.apache.maven.plugins</groupId>-->
-<!--                        <artifactId>maven-shade-plugin</artifactId>-->
-<!--                        <configuration>-->
-<!--                            <transformers>-->
-<!--                                <transformer-->
-<!--                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">-->
-<!--                                    <mainClass>${app.main.class}-->
-<!--                                    </mainClass> &lt;!&ndash; Here you should put the main class of your application &ndash;&gt;-->
-<!--                                </transformer>-->
-<!--                            </transformers>-->
-<!--                            <filters>-->
-<!--                                <filter> &lt;!&ndash; This filter is needed to avoid a bug in the shade plugin &ndash;&gt;-->
-<!--                                    <artifact>*:*</artifact>-->
-<!--                                    <excludes>-->
-<!--                                        <exclude>META-INF/*.SF</exclude>-->
-<!--                                        <exclude>META-INF/*.DSA</exclude>-->
-<!--                                        <exclude>META-INF/*.RSA</exclude>-->
-<!--                                    </excludes>-->
-<!--                                </filter>-->
-<!--                            </filters>-->
-<!--                        </configuration>-->
-<!--                        <executions>-->
-<!--                            <execution>-->
-<!--                                <phase>package</phase>-->
-<!--                                <goals>-->
-<!--                                    <goal>shade</goal>-->
-<!--                                </goals>-->
-<!--                            </execution>-->
-<!--                        </executions>-->
-<!--                    </plugin>-->
-<!--                </plugins>-->
-<!--            </build>-->
+        <!--        <profile>-->
+        <!--            <id>_shadejar</id>-->
+        <!--            <build>-->
+        <!--                <finalName>application</finalName>-->
+        <!--                <plugins>-->
+        <!--                    <plugin>-->
+        <!--                        <groupId>org.apache.maven.plugins</groupId>-->
+        <!--                        <artifactId>maven-shade-plugin</artifactId>-->
+        <!--                        <configuration>-->
+        <!--                            <transformers>-->
+        <!--                                <transformer-->
+        <!--                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">-->
+        <!--                                    <mainClass>${app.main.class}-->
+        <!--                                    </mainClass> &lt;!&ndash; Here you should put the main class of your application &ndash;&gt;-->
+        <!--                                </transformer>-->
+        <!--                            </transformers>-->
+        <!--                            <filters>-->
+        <!--                                <filter> &lt;!&ndash; This filter is needed to avoid a bug in the shade plugin &ndash;&gt;-->
+        <!--                                    <artifact>*:*</artifact>-->
+        <!--                                    <excludes>-->
+        <!--                                        <exclude>META-INF/*.SF</exclude>-->
+        <!--                                        <exclude>META-INF/*.DSA</exclude>-->
+        <!--                                        <exclude>META-INF/*.RSA</exclude>-->
+        <!--                                    </excludes>-->
+        <!--                                </filter>-->
+        <!--                            </filters>-->
+        <!--                        </configuration>-->
+        <!--                        <executions>-->
+        <!--                            <execution>-->
+        <!--                                <phase>package</phase>-->
+        <!--                                <goals>-->
+        <!--                                    <goal>shade</goal>-->
+        <!--                                </goals>-->
+        <!--                            </execution>-->
+        <!--                        </executions>-->
+        <!--                    </plugin>-->
+        <!--                </plugins>-->
+        <!--            </build>-->
 
-<!--        </profile>-->
+        <!--        </profile>-->
 
 
     </profiles>

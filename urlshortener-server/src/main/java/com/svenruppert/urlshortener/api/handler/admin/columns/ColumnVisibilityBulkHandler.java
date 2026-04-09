@@ -4,6 +4,8 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.store.preferences.PreferencesStore;
+import com.svenruppert.urlshortener.api.utils.ErrorResponses;
+import com.svenruppert.urlshortener.api.utils.SuccessResponses;
 import com.svenruppert.urlshortener.core.prefs.ColumnEditRequest;
 
 import java.io.IOException;
@@ -11,11 +13,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.svenruppert.dependencies.core.net.HttpStatus.*;
-import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
 import static com.svenruppert.urlshortener.api.utils.RequestBodyUtils.readBody;
+import static com.svenruppert.urlshortener.api.utils.RequestMethodUtils.allow;
+import static com.svenruppert.urlshortener.api.utils.RequestMethodUtils.methodNotAllowed;
 import static com.svenruppert.urlshortener.core.JsonUtils.fromJson;
-import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
+import static com.svenruppert.urlshortener.core.StringUtils.isBlank;
 
 public class ColumnVisibilityBulkHandler
     implements HttpHandler, HasLogger {
@@ -24,10 +26,6 @@ public class ColumnVisibilityBulkHandler
 
   public ColumnVisibilityBulkHandler(PreferencesStore store) {
     this.store = store;
-  }
-
-  private static boolean isBlank(String s) {
-    return s == null || s.isBlank();
   }
 
   @Override
@@ -41,7 +39,7 @@ public class ColumnVisibilityBulkHandler
       }
     } catch (Exception e) {
       logger().error("Unhandled error in {}: {}", getClass().getSimpleName(), e.toString(), e);
-      writeJson(ex, INTERNAL_SERVER_ERROR, "Internal server error");
+      ErrorResponses.internalServerError(ex, "Internal server error");
     }
   }
 
@@ -56,7 +54,7 @@ public class ColumnVisibilityBulkHandler
     var hasNoChanges = req.changes() == null;
     logger().info("blankUserID: {} , blankViewId: {}, hasNoChanges: {}", blankUserID, blankViewId, hasNoChanges);
     if (blankUserID || blankViewId || hasNoChanges || req.changes().isEmpty()) {
-      writeJson(ex, BAD_REQUEST, "userId, viewId and non-empty changes required");
+      ErrorResponses.badRequest(ex, "userId, viewId and non-empty changes required");
       return;
     }
 
@@ -71,18 +69,9 @@ public class ColumnVisibilityBulkHandler
         ));
 
     store.saveColumnVisibilities(req.userId(), req.viewId(), merged);
-    writeJson(ex, OK, toJson(Map.of("status", "ok")));
+    SuccessResponses.noContent(ex);
+
   }
 
-  private void allow(HttpExchange ex, String allow)
-      throws IOException {
-    ex.getResponseHeaders().add("Allow", allow);
-    ex.sendResponseHeaders(NO_CONTENT.code(), -1);
-  }
 
-  private void methodNotAllowed(HttpExchange ex, String allow)
-      throws IOException {
-    ex.getResponseHeaders().add("Allow", allow);
-    writeJson(ex, METHOD_NOT_ALLOWED, "Method not allowed");
-  }
 }

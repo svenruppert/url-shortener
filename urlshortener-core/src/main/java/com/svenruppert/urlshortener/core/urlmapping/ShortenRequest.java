@@ -1,13 +1,19 @@
 package com.svenruppert.urlshortener.core.urlmapping;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import java.time.Instant;
 import java.util.Objects;
 
 public final class ShortenRequest {
   private String url;
+  @JsonAlias("alias")
   private String shortURL;
   private Instant expiresAt;
   private Boolean active;
+
+  public ShortenRequest() {
+  }
 
   public ShortenRequest(String url, String shortURL, Instant expiresAt, Boolean active) {
     this.url = url;

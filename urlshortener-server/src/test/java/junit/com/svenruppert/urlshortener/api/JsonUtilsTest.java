@@ -3,6 +3,7 @@ package junit.com.svenruppert.urlshortener.api;
 import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -39,7 +40,7 @@ class JsonUtilsTest {
     String json = "\"not a json object\"";
     ByteArrayInputStream input = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
-    assertThrows(IOException.class, () -> JsonUtils.parseJson(input));
+    assertThrows(MismatchedInputException.class, () -> JsonUtils.parseJson(input));
   }
 
   @Test

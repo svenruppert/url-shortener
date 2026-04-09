@@ -1,3 +1,6 @@
+__MACOSX
+.DS_Store
+
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -35,4 +38,10 @@ build/
 .vscode/
 
 ### Mac OS ###
-.DS_Store
+/urlshortener-ui/src/main/frontend/generated/
+/Archiv.zip
+/_backup/
+/_logs/
+/data/
+/.claude/
+/.ai/

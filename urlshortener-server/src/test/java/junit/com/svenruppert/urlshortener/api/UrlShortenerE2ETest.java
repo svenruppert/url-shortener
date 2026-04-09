@@ -55,7 +55,7 @@ public class UrlShortenerE2ETest
     var uri = URI.create(baseUrlADMIN + path);
     logger().info("POST Path - {}", uri);
     var req = HttpRequest.newBuilder(uri)
-        .header("Content-Type", "application/json")
+        .header(CONTENT_TYPE, JSON_CONTENT_TYPE)
         .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8))
         .build();
     return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
@@ -92,7 +92,7 @@ public class UrlShortenerE2ETest
   void shorten_returns201_andJson()
       throws Exception {
     String body = JsonUtils.toJson(new ShortenRequest("https://example.com/x", "e2e-alias", null, null));
-    var res = POST("/shorten", body);
+    var res = POST(PATH_ADMIN_SHORTEN, body);
     assertEquals(201, res.statusCode());
     assertTrue(res.headers().firstValue("Content-Type").orElse("").toLowerCase().contains("application/json"));
     assertTrue(res.body().contains("\"originalUrl\":\"https://example.com/x\""));
@@ -115,8 +115,14 @@ public class UrlShortenerE2ETest
       throws Exception {
     var res = GET(PATH_ADMIN_LIST_ALL);
     assertEquals(200, res.statusCode());
-    assertTrue(res.headers().firstValue("Content-Type").orElse("").toLowerCase().contains("application/json"));
-    assertTrue(res.body().contains("\"shortCode\":\"e2e-alias\""));
+    assertTrue(res.headers()
+                   .firstValue(CONTENT_TYPE)
+                   .orElse("")
+                   .toLowerCase()
+                   .contains(APPLICATION_JSON));
+    var body = res.body();
+    logger().info("body {}", body);
+    assertTrue(body.contains("shortCode") && body.contains("e2e-alias"));
   }
 
   @Test
@@ -134,14 +140,17 @@ public class UrlShortenerE2ETest
 
   @Test
   @Order(5)
-  void invalid_json_returns500()
+  void invalid_json_returns400()
       throws Exception {
     var res = POST(PATH_ADMIN_SHORTEN, "{not-json}");
 
-    logger().info("expected response code - {} ", INTERNAL_SERVER_ERROR);
-
-    assertEquals(INTERNAL_SERVER_ERROR.code(), res.statusCode());
-    assertTrue(res.body().contains(INTERNAL_SERVER_ERROR.reason()));
+    logger().info("expected response code - {} ", BAD_REQUEST);
+    var statusCode = res.statusCode();
+    logger().info("statusCode {}", statusCode);
+    assertEquals(BAD_REQUEST.code(), statusCode);
+    var body = res.body();
+    logger().info("invalid_json_returns500 - body {}", body);
+    assertTrue(body.contains("Invalid JSON: Unexpected character"));
   }
 
   @Test

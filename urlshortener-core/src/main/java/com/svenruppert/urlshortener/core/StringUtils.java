@@ -30,4 +30,8 @@ public class StringUtils {
 
     return bytes;
   }
+
+    public static boolean isBlank(String s) {
+      return s == null || s.isBlank();
+    }
 }

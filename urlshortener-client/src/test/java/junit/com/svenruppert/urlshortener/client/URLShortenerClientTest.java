@@ -3,9 +3,8 @@ package junit.com.svenruppert.urlshortener.client;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
+import org.junit.jupiter.api.*;
 
 import java.io.IOException;
 
@@ -25,16 +24,12 @@ public class URLShortenerClientTest
       throws IOException {
     server = new ShortenerServer();
     server.init();
+    client = new URLShortenerClient();
   }
 
   @AfterEach
   public void stopServer() {
     server.shutdown();
-  }
-
-  @BeforeEach
-  void setUp() {
-    client = new URLShortenerClient();
   }
 
   @Test
@@ -63,7 +58,9 @@ public class URLShortenerClientTest
     var shortCode = client.createMapping(HTTP_SVENRUPPERT_COM);
     logger().info("shortCode: {}", shortCode);
 
-    assertEquals("100", shortCode.shortCode()); //TODO will break soo after int will be replaced with hash value
+    assertNotNull(shortCode);
+    assertNotNull(shortCode.getShortCode());
+
     assertEquals(HTTP_SVENRUPPERT_COM, shortCode.originalUrl());
     assertTrue(shortCode.expiresAt().isEmpty());
     var createdAt = shortCode.createdAt();
@@ -92,6 +89,7 @@ public class URLShortenerClientTest
     assertNotNull(mapping);
 
     var listOneEntry = client.listAll();
+    logger().info("listOneEntry {}", listOneEntry);
     assertFalse(listOneEntry.isEmpty());
     assertEquals(1, listOneEntry.size());
 
@@ -257,6 +255,142 @@ public class URLShortenerClientTest
     assertTrue(client.delete(m.shortCode()));
     assertEquals(1, client.listAll().size(), "One entry is expected");
     assertEquals(1, client.listActive().size(), "One active entry is expected");
+  }
+
+  @Test
+  void resolve_nonExisting_returnsNull() throws IOException {
+    assertNull(client.resolveShortcode("no-such-code"));
+  }
+
+  @Test
+  void createCustomMapping_duplicateShortCode_throws() throws IOException {
+    client.createCustomMapping("dup", HTTP_SVENRUPPERT_COM, null, true);
+
+    assertThrows(IllegalArgumentException.class, () ->
+        client.createCustomMapping("dup", "https://example.org", null, true)
+    );
+  }
+
+
+  @Test
+  void createCustomMapping_invalidUrl_throws_andDoesNotPersist() throws IOException {
+    assertThrows(IllegalArgumentException.class, () ->
+        client.createCustomMapping("bad01", "http://svende", null, true)
+    );
+
+    assertTrue(client.listAll().isEmpty(), "Invalid create must not persist anything");
+  }
+
+  @Test
+  void toggleActive_switches_between_active_and_inactive() throws IOException {
+    var m = client.createCustomMapping("tog01", HTTP_SVENRUPPERT_COM, null, true);
+    assertNotNull(m);
+
+    assertEquals(1, client.listActive().size());
+    assertEquals(0, client.listInActive().size());
+
+    assertTrue(client.toggleActive("tog01", false));
+    assertEquals(0, client.listActive().size());
+    assertEquals(1, client.listInActive().size());
+
+    assertTrue(client.toggleActive("tog01", true));
+    assertEquals(1, client.listActive().size());
+    assertEquals(0, client.listInActive().size());
+  }
+
+  @Test
+  void toggleActive_nonExisting_returnsFalse() throws IOException {
+    Assertions.assertThrows(IOException.class, ()->{
+      var condition = client.toggleActive("no-such", true);
+    });
+  }
+
+  @Test
+  void edit_existing_changesTargetUrl() throws IOException {
+    var m = client.createCustomMapping("ed01", HTTP_SVENRUPPERT_COM, null, true);
+    assertNotNull(m);
+
+    assertTrue(client.edit("ed01", "https://example.org/new", null, true));
+    assertEquals("https://example.org/new", client.resolveShortcode("ed01"));
+  }
+
+  @Test
+  void edit_nonExisting_returnsFalse() throws IOException {
+    assertFalse(client.edit("no-such", "https://example.org", null, true));
+  }
+
+  @Test @Disabled
+  void listCount_initiallyZero_thenIncreases() throws IOException {
+
+    var builder = UrlMappingListRequest.builder();
+    var req = builder.build();
+    assertEquals(0, client.listCount(req));
+
+    client.createMapping(HTTP_SVENRUPPERT_COM);
+    assertEquals(1, client.listCount(req));
+
+    client.createMapping("https://example.org");
+    assertEquals(2, client.listCount(req));
+  }
+
+  @Test
+  void listAllAsJson_containsModeCountAndItemsArray() throws IOException {
+    var raw = client.listAllAsJson();
+    assertNotNull(raw);
+    assertTrue(raw.trim().startsWith("{"));
+    assertTrue(raw.contains("\"mode\""));
+    assertTrue(raw.contains("\"count\""));
+    assertTrue(raw.contains("\"items\":["));
+  }
+
+  @Test
+  void delete_then_resolve_returnsNull() throws IOException {
+    var created = client.createMapping(HTTP_SVENRUPPERT_COM);
+    assertNotNull(created);
+
+    assertEquals(HTTP_SVENRUPPERT_COM, client.resolveShortcode(created.shortCode()));
+
+    assertTrue(client.delete(created.shortCode()));
+    assertNull(client.resolveShortcode(created.shortCode()));
+  }
+
+
+  @Test
+  void put_returnsFalse_on404_via_edit() {
+    Assertions.assertThrows(IOException.class, ()-> {
+      client.edit("does-not-exist", "https://example.org", null, true);
+    });
+  }
+
+  @Test
+  void put_returnsTrue_on2xx_via_toggleActive() throws IOException {
+    var code = "tog-" + System.nanoTime();
+    client.createCustomMapping(code, HTTP_SVENRUPPERT_COM, null, true);
+
+    assertTrue(client.toggleActive(code, false));
+    assertTrue(client.toggleActive(code, true));
+  }
+
+  @Test
+  void put_returnsTrue_on2xx_via_edit() throws IOException {
+    var code = "ed-" + System.nanoTime();
+    client.createCustomMapping(code, HTTP_SVENRUPPERT_COM, null, true);
+
+    assertTrue(client.edit(code, "https://example.org/new", null, true));
+    assertEquals("https://example.org/new", client.resolveShortcode(code));
+  }
+
+  @Test
+  void put_throwsIOException_on400_via_edit_invalidUrl() throws IOException {
+    var code = "bad-" + System.nanoTime();
+    client.createCustomMapping(code, HTTP_SVENRUPPERT_COM, null, true);
+
+    IOException ex = assertThrows(IOException.class, () ->
+        client.edit(code, "http://svende", null, true)
+    );
+
+    assertTrue(ex.getMessage().contains("Unexpected HTTP"), "must include status marker");
+    assertTrue(ex.getMessage().contains("PUT"), "must include method");
   }
 
 

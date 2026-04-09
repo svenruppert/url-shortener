@@ -12,8 +12,10 @@ import java.util.Map;
 import static com.svenruppert.dependencies.core.net.HttpStatus.*;
 import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
 import static com.svenruppert.urlshortener.api.utils.RequestBodyUtils.readBody;
+import static com.svenruppert.urlshortener.api.utils.RequestMethodUtils.allow;
+import static com.svenruppert.urlshortener.api.utils.RequestMethodUtils.methodNotAllowed;
 import static com.svenruppert.urlshortener.core.JsonUtils.fromJson;
-import static com.svenruppert.urlshortener.core.JsonUtils.toJson;
+import static com.svenruppert.urlshortener.core.StringUtils.isBlank;
 
 public class ColumnVisibilityHandler
     implements HttpHandler, HasLogger {
@@ -22,10 +24,6 @@ public class ColumnVisibilityHandler
 
   public ColumnVisibilityHandler(PreferencesStore store) {
     this.store = store;
-  }
-
-  private static boolean isBlank(String s) {
-    return s == null || s.isBlank();
   }
 
   @Override
@@ -40,7 +38,7 @@ public class ColumnVisibilityHandler
       }
     } catch (Exception e) {
       logger().error("Unhandled error in {}: {}", getClass().getSimpleName(), e.toString(), e);
-      writeJson(ex, INTERNAL_SERVER_ERROR, "Internal server error");
+      writeJson(ex, INTERNAL_SERVER_ERROR, Map.of("error", "Internal server error"));
     }
   }
 
@@ -49,11 +47,12 @@ public class ColumnVisibilityHandler
     logger().info("handleLoad..");
     var req = fromJson(readBody(ex.getRequestBody()), ColumnInfoRequest.class);
     if (isBlank(req.userId()) || isBlank(req.viewId())) {
-      writeJson(ex, BAD_REQUEST, "userId and viewId required");
+      writeJson(ex, BAD_REQUEST, Map.of("error", "userId and viewId required"));
       return;
     }
     var vis = store.load(req.userId(), req.viewId());
-    writeJson(ex, OK, toJson(vis == null ? Map.of() : vis));
+    var map = vis == null ? Map.of() : vis;
+    writeJson(ex, OK, map);
   }
 
   private void handleDeleteAll(HttpExchange ex)
@@ -64,15 +63,5 @@ public class ColumnVisibilityHandler
     ex.sendResponseHeaders(NO_CONTENT.code(), -1);
   }
 
-  private void allow(HttpExchange ex, String allow)
-      throws IOException {
-    ex.getResponseHeaders().add("Allow", allow);
-    ex.sendResponseHeaders(NO_CONTENT.code(), -1);
-  }
 
-  private void methodNotAllowed(HttpExchange ex, String allow)
-      throws IOException {
-    ex.getResponseHeaders().add("Allow", allow);
-    writeJson(ex, METHOD_NOT_ALLOWED, "Method not allowed");
-  }
 }

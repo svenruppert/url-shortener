@@ -4,6 +4,7 @@ import com.svenruppert.urlshortener.ui.vaadin.MainLayout;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Composite;
 import com.vaadin.flow.component.Text;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -12,103 +13,72 @@ import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.Route;
+import org.jspecify.annotations.NonNull;
 
 @Route(value = AboutView.PATH, layout = MainLayout.class)
+@CssImport("./styles/about-view.css")
 public class AboutView
     extends Composite<Div> {
 
   public static final String PATH = "about";
 
+  private static final String C_ROOT = "about-root";
+  private static final String C_CONTAINER = "about-container";
+  private static final String C_HERO = "about-hero";
+  private static final String C_CARD = "about-card";
+  private static final String C_GRID = "about-grid";
+  private static final String C_LINK = "about-link";
+  private static final String C_IMG_ICON = "about-link__imgicon";
+  private static final String C_ICONROW = "about-iconrow";
+
   public AboutView() {
     Div root = getContent();
-    root.addClassName("about-root");
-    root.getStyle()
-        .set("display", "flex")
-        .set("justify-content", "center")
-        .set("padding", "var(--lumo-space-l)");
+    root.addClassName(C_ROOT);
 
     VerticalLayout container = new VerticalLayout();
+    container.addClassName(C_CONTAINER);
     container.setWidthFull();
-    container.setMaxWidth("980px");
     container.setSpacing(false);
     container.setPadding(false);
-    container.getStyle()
-        .set("border-radius", "var(--lumo-border-radius-l)")
-        .set("gap", "var(--lumo-space-l)");
 
+    // --- HERO ---
     VerticalLayout hero = new VerticalLayout();
+    hero.addClassName(C_HERO);
     hero.setPadding(true);
     hero.setSpacing(false);
     hero.setAlignItems(Alignment.START);
-    hero.addClassName("about-hero");
-    hero.getStyle()
-        .set("background", "linear-gradient(135deg, var(--lumo-primary-color-10pct), transparent)")
-        .set("border-radius", "var(--lumo-border-radius-l)")
-        .set("padding", "var(--lumo-space-xl)");
 
     Span versionBadge = new Span("Version 1.0.0");
     versionBadge.getElement().setAttribute("theme", "badge primary pill");
 
     H1 title = new H1("About");
-    title.getStyle()
-        .set("margin", "0")
-        .set("font-size", "var(--lumo-font-size-xxl)")
-        .set("line-height", "1.1");
-
     Paragraph subtitle = new Paragraph("Vaadin Flow Demo Application");
-    subtitle.getStyle().set("margin-top", "var(--lumo-space-xs)");
+    Paragraph description = new Paragraph(
+        "This demo showcases polished UI patterns with Vaadin Flow — cards, badges, icons, and a responsive layout."
+    );
 
     HorizontalLayout heroHeader = new HorizontalLayout(title, versionBadge);
     heroHeader.setAlignItems(Alignment.CENTER);
     heroHeader.setSpacing(true);
 
-    Paragraph description = new Paragraph(
-        "This demo showcases polished UI patterns with Vaadin Flow — cards, badges, icons, and a responsive layout."
-    );
-    description.getStyle().set("margin-top", "var(--lumo-space-m)");
-
     hero.add(heroHeader, subtitle, description);
 
+    // --- PROFILE CARD ---
     VerticalLayout profileCard = card();
-    profileCard.setWidthFull();
 
-    HorizontalLayout header = new HorizontalLayout();
-    header.setWidthFull();
-    header.setAlignItems(Alignment.CENTER);
-    header.setSpacing(true);
-
-    Image vaadinLogo = new Image("images/portrait-sven.jpg", "neosecIT Logo");
-    vaadinLogo.setWidth("72px");
-    vaadinLogo.getStyle()
-        .set("border-radius", "12px")
-        .set("box-shadow", "var(--lumo-box-shadow-s)");
-
-    VerticalLayout headerText = new VerticalLayout();
-    headerText.setSpacing(false);
-    headerText.setPadding(false);
-
-    H2 authorName = new H2("Sven Ruppert");
-    authorName.getStyle().set("margin", "0");
-
-    Span role = new Span("Developer Advocate • Java • Secure Coding");
-    role.getStyle().set("color", "var(--lumo-secondary-text-color)");
-
-    headerText.add(authorName, role);
-    header.add(vaadinLogo, headerText);
+    var header = getHorizontalLayout();
 
     Paragraph bio = new Paragraph(
         "Sven Ruppert has been involved in software development for more than 20 years. "
-            + "As a developer advocate, he is constantly exploring innovations in software engineering. "
             + "He speaks internationally at conferences and has authored numerous technical articles and books."
     );
-    bio.getStyle().set("margin-top", "var(--lumo-space-m)");
 
     HorizontalLayout badges = new HorizontalLayout();
     badges.setWrap(true);
     badges.setSpacing(true);
     badges.add(
         badge("Vaadin Flow"),
-        badge("Java 21–24"),
+        badge("Java 8-25"),
         badge("Security"),
         badge("RAG/AI"),
         badge("EclipseStore"),
@@ -119,38 +89,21 @@ public class AboutView
     links.setSpacing(true);
     links.setWrap(true);
 
-    Anchor website = themedLink(
-        "https://www.svenruppert.com",
-        "Website",
-        new Icon(VaadinIcon.GLOBE_WIRE)
+    links.add(
+        themedLink("https://www.svenruppert.com", "Website", new Icon(VaadinIcon.GLOBE_WIRE)),
+        themedLink("https://github.com/svenruppert", "GitHub", imgIcon("icons/github-mark.svg", "GitHub")),
+        themedLink("https://www.linkedin.com/in/sven-ruppert", "LinkedIn", imgIcon("icons/linkedin-mark.png", "LinkedIn"))
     );
-
-    Anchor github = themedLink(
-        "https://github.com/svenruppert",
-        "GitHub",
-        imgIcon("icons/github-mark.svg", "GitHub")
-    );
-
-    Anchor linkedin = themedLink(
-        "https://www.linkedin.com/in/sven-ruppert",
-        "LinkedIn",
-        imgIcon("icons/linkedin-mark.png", "LinkedIn")
-    );
-
-    links.add(website, github, linkedin);
 
     profileCard.add(header, bio, badges, new Hr(), links);
 
+    // --- PROJECT CARD ---
     VerticalLayout aboutCard = card();
-    aboutCard.setWidthFull();
 
     H3 projectTitle = new H3("About this Project");
-    projectTitle.getStyle().set("margin-top", "0");
-
     Paragraph projectText = new Paragraph(
         "This application demonstrates clean UI composition with Flow components, "
-            + "a soft visual hierarchy, and accessible defaults. The layout scales from mobile to desktop, "
-            + "while subtle shadows and rounded corners keep it modern."
+            + "a soft visual hierarchy, and accessible defaults."
     );
 
     UnorderedList featureList = new UnorderedList(
@@ -162,41 +115,48 @@ public class AboutView
 
     aboutCard.add(projectTitle, projectText, featureList);
 
+    // --- GRID ---
     FlexLayout grid = new FlexLayout(profileCard, aboutCard);
+    grid.addClassName(C_GRID);
     grid.setWidthFull();
     grid.setFlexWrap(FlexLayout.FlexWrap.WRAP);
-    grid.setJustifyContentMode(FlexLayout.JustifyContentMode.BETWEEN);
-    grid.getStyle().set("gap", "var(--lumo-space-l)");
-    profileCard.setFlexGrow(1.0, grid);
-    aboutCard.setFlexGrow(1.0, grid);
-    profileCard.setMinWidth("280px");
-    aboutCard.setMinWidth("280px");
 
-    // Footer / Meta
+    // --- FOOTER ---
     Div footer = new Div();
-    footer.getStyle()
-        .set("display", "flex")
-        .set("align-items", "center")
-        .set("gap", "var(--lumo-space-s)")
-        .set("color", "var(--lumo-secondary-text-color)");
-    footer.add(new Icon(VaadinIcon.INFO_CIRCLE_O), new Text("Demo UI built with Vaadin Flow & Lumo"));
+    footer.addClassName("about-footer");
+    footer.add(new Icon(VaadinIcon.INFO_CIRCLE_O),
+               new Text("Demo UI built with Vaadin Flow & Lumo"));
 
     container.add(hero, grid, footer);
     root.add(container);
   }
 
-  // Helpers
+  private static @NonNull HorizontalLayout getHorizontalLayout() {
+    HorizontalLayout header = new HorizontalLayout();
+    header.setAlignItems(Alignment.CENTER);
+    header.setSpacing(true);
+
+    Image portrait = new Image("images/portrait-sven.jpg", "Sven Ruppert");
+    portrait.addClassName("about-avatar");
+
+    VerticalLayout headerText = new VerticalLayout();
+    headerText.setSpacing(false);
+    headerText.setPadding(false);
+
+    H2 authorName = new H2("Sven Ruppert");
+    Span role = new Span("Developer Advocate • Java • Secure Coding");
+
+    headerText.add(authorName, role);
+    header.add(portrait, headerText);
+    return header;
+  }
 
   private VerticalLayout card() {
     VerticalLayout card = new VerticalLayout();
+    card.addClassName(C_CARD);
     card.setPadding(true);
     card.setSpacing(true);
     card.setAlignItems(Alignment.START);
-    card.getStyle()
-        .set("background", "var(--lumo-base-color)")
-        .set("border-radius", "var(--lumo-border-radius-l)")
-        .set("box-shadow", "var(--lumo-box-shadow-s)")
-        .set("padding", "var(--lumo-space-l)");
     return card;
   }
 
@@ -206,58 +166,27 @@ public class AboutView
     return s;
   }
 
-  private Component withIcon(VaadinIcon vaadinIcon, String text) {
+  private Component withIcon(VaadinIcon icon, String text) {
     HorizontalLayout row = new HorizontalLayout();
+    row.addClassName(C_ICONROW);
     row.setSpacing(true);
     row.setAlignItems(Alignment.CENTER);
-    Icon icon = new Icon(vaadinIcon);
-    icon.getStyle().set("width", "var(--lumo-icon-size-s)").set("height", "var(--lumo-icon-size-s)");
-    row.add(icon, new Text(text));
+    row.add(new Icon(icon), new Text(text));
     return row;
   }
 
-  private Anchor themedLink(String href, String label, VaadinIcon vaadinIcon) {
+  private Anchor themedLink(String href, String label, Component icon) {
     Anchor a = new Anchor(href, "");
+    a.addClassName(C_LINK);
     a.setTarget("_blank");
     a.getElement().setAttribute("aria-label", label);
-    a.getStyle()
-        .set("display", "inline-flex")
-        .set("align-items", "center")
-        .set("gap", "0.4rem")
-        .set("text-decoration", "none")
-        .set("padding", "0.35rem 0.7rem")
-        .set("border-radius", "999px")
-        .set("background", "var(--lumo-contrast-5pct)")
-        .set("box-shadow", "var(--lumo-box-shadow-xs)");
-    Icon icon = new Icon(vaadinIcon);
-    Span text = new Span(label);
-    a.add(icon, text);
-    return a;
-  }
-  private Anchor themedLink(String href, String label, Component leadingIcon) {
-    Anchor a = new Anchor(href, "");
-    a.setTarget("_blank");
-    a.getElement().setAttribute("aria-label", label);
-    a.getStyle()
-        .set("display", "inline-flex")
-        .set("align-items", "center")
-        .set("gap", "0.45rem")
-        .set("text-decoration", "none")
-        .set("padding", "0.35rem 0.7rem")
-        .set("border-radius", "999px")
-        .set("background", "var(--lumo-contrast-5pct)")
-        .set("box-shadow", "var(--lumo-box-shadow-xs)");
-    Span text = new Span(label);
-    a.add(leadingIcon, text);
+    a.add(icon, new Span(label));
     return a;
   }
 
   private Image imgIcon(String src, String alt) {
     Image img = new Image(src, alt);
-    img.setWidth("18px");
-    img.setHeight("18px");
-    img.getStyle().set("display", "inline-block");
+    img.addClassName(C_IMG_ICON);
     return img;
   }
-
 }
