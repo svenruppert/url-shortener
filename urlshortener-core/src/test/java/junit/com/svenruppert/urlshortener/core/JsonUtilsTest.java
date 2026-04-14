@@ -3,8 +3,8 @@ package junit.com.svenruppert.urlshortener.core;
 
 import com.svenruppert.urlshortener.core.JsonUtils;
 import org.junit.jupiter.api.Test;
-import com.fasterxml.jackson.core.exc.StreamReadException;
-import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.core.exc.StreamReadException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

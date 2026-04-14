@@ -1,5 +1,6 @@
 package com.svenruppert.urlshortener.client;
 
+
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.core.AliasPolicy;
 import com.svenruppert.urlshortener.core.JacksonJson;
@@ -14,8 +15,8 @@ import com.svenruppert.urlshortener.core.urlmapping.ToggleActive.ToggleActiveReq
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
 import com.svenruppert.urlshortener.core.urlmapping.imports.ImportResult;
 import com.svenruppert.urlshortener.core.validation.UrlValidator;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
