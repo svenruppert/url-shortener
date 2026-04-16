@@ -3,7 +3,7 @@ package com.svenruppert.urlshortener.core;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
 import org.jetbrains.annotations.NotNull;
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.type.TypeReference;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -101,11 +101,7 @@ public final class JsonUtils
    * (No longer restricted to "flat"; nested structures work correctly.)
    */
   public static String toJson(Map<String, ?> map) {
-    try {
       return JacksonJson.mapper().writeValueAsString(map);
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to serialize map to JSON", e);
-    }
   }
 
   /**
@@ -113,22 +109,14 @@ public final class JsonUtils
    * Records, Optional, Instant etc. are supported by {@link JacksonJson} configuration.
    */
   public static String toJson(Object dto) {
-    try {
       return JacksonJson.mapper().writeValueAsString(dto);
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to serialize DTO to JSON", e);
-    }
   }
 
   /**
    * Preserved API: builds an array from a list of objects (maps).
    */
   public static String toJsonArrayOfObjects(List<Map<String, String>> items) {
-    try {
       return JacksonJson.mapper().writeValueAsString(items == null ? List.of() : items);
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to serialize list payload to JSON", e);
-    }
   }
 
   public static String toJsonListing(String mode, int count, List<Map<String, String>> items) {
@@ -264,10 +252,6 @@ public final class JsonUtils
     // If the server sends nested objects (e.g., maps), keep them as JSON string so existing
     // code that expects "columnInfos" or "changes" as JSON text can still function
     // until those call sites are migrated to proper typed DTOs.
-    try {
-      return JacksonJson.mapper().writeValueAsString(v);
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to serialize nested JSON value", e);
-    }
+    return JacksonJson.mapper().writeValueAsString(v);
   }
 }

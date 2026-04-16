@@ -1,12 +1,11 @@
 package com.svenruppert.urlshortener.core;
 
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,22 +32,14 @@ public final class JacksonJson {
    * Convenience: serialize any value to JSON string.
    */
   public static String toJson(Object value) {
-    try {
       return MAPPER.writeValueAsString(value);
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to serialize value to JSON", e);
-    }
   }
 
   /**
    * Convenience: deserialize JSON string into a target type.
    */
   public static <T> T fromJson(String json, Class<T> type) {
-    try {
       return MAPPER.readValue(json, type);
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Failed to deserialize JSON payload", e);
-    }
   }
 
   /**
@@ -98,8 +89,7 @@ public final class JacksonJson {
   private static ObjectMapper createMapperWithOptionalConstraints() {
     JsonFactory factory = createFactoryWithOptionalConstraints();
     ObjectMapper mapper = (factory == null) ? new ObjectMapper() : new ObjectMapper(factory);
-    mapper.registerModule(new JavaTimeModule());
-    mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    // Jackson3: mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     // >>> Wichtig für Klassen mit "record-style" Accessors: shortCode(), originalUrl(), ...
     //    mapper.(
