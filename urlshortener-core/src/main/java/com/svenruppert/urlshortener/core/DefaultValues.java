@@ -1,5 +1,9 @@
 package com.svenruppert.urlshortener.core;
 
+
+
+
+
 public final class DefaultValues {
   //TODO - must be editable by user
   public static final String SHORTCODE_BASE_URL = "https://3g3.eu/";
