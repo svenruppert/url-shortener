@@ -1,6 +1,6 @@
 # URL Shortener – Core Java + Vaadin Flow
 
-A fully self-contained **URL Shortener** implemented in **pure Java 24**, featuring a lightweight REST service, a Vaadin Flow–based administration UI, and a simple Java client SDK.  
+A fully self-contained **URL Shortener** implemented in **pure Java 26**, featuring a lightweight REST service, a Vaadin Flow–based administration UI, and a simple Java client SDK.  
 The project demonstrates how to build a secure, modular web application **without using any external frameworks** like Spring Boot or Jakarta EE.
 
 ---
@@ -14,7 +14,7 @@ The project demonstrates how to build a secure, modular web application **withou
 | **urlshortener-core** | Core logic, DTOs, encoding utilities, and validation policies. |
 | **urlshortener-server** | REST server for administration and redirection, implemented using `com.sun.net.httpserver.HttpServer`. |
 | **urlshortener-client** | Minimal Java client that communicates with the admin API. |
-| **urlshortener-ui** | Vaadin Flow 24.9.0 web application (WAR) providing a graphical interface for managing shortened URLs. |
+| **urlshortener-ui** | Vaadin Flow 25.1.1 web application (WAR) providing a graphical interface for managing shortened URLs. |
 
 ---
 
@@ -39,18 +39,19 @@ The project demonstrates how to build a secure, modular web application **withou
 └──────────────────────────────────────────────────────────────┘
 ```
 
-All data is currently stored **in-memory**.  
-Future extensions will include file-based persistence, access control, and live synchronization with the UI.
+Data is stored via **EclipseStore** (file-based persistence) when the server is started in persistent mode, with an in-memory fallback for tests and ephemeral runs. The admin API is protected by an authoritative REST security layer (token-based authentication, role/permission model, owner-aware authorization, audit pipeline). The public redirect endpoint remains unauthenticated by design.
 
 ---
 
 ## 🧰 Technology Stack
 
-- **Java 24**
-- **Vaadin Flow 24.9.0**
+- **Java 26**
+- **Vaadin Flow 25.1.1**
 - **Jetty 12 (WAR Deployment)** – for the UI
 - **Core JDK HttpServer** – for the REST and redirect endpoints
-- **No frameworks**, no Spring, no external dependencies
+- **EclipseStore 4.0.1** – file-based persistence for mappings, statistics, and preferences
+- **security-for-flow 00.60.00** – REST + Vaadin security stack (authentication, RBAC, audit, bootstrap)
+- **No frameworks**, no Spring, no Jakarta EE
 
 ---
 
@@ -135,13 +136,14 @@ mvn verify
 
 ## 🔒 Security Notes
 
-- The Admin API should **not be publicly accessible**.  
-  Restrict it to `localhost` or a private subnet.
-- Redirect endpoints are public by design.
-- Planned improvements:
-  - Authenticated admin interface
-  - Access control for administrative operations
-  - Secure configuration and API tokens
+- The admin API is authoritatively protected by the integrated `security-for-flow` stack:
+  - Token-based authentication (`POST /api/login` → bearer token, `POST /api/logout` revokes it).
+  - Role-based authorization with two roles (`ROLE_USER`, `ROLE_ADMIN`) and a fine-grained permission model (`link:*`, `user:*`, `admin:*`).
+  - Owner-aware checks for `:own`-scoped operations; admins with `:all` permissions bypass owner restrictions.
+  - Initial-administrator bootstrap via a one-time token written to `data/.bootstrap-token` (mode `PERSISTENT_FILE`).
+  - Login throttling, security audit pipeline, and operation discovery via `GET /api/operations` for the UI.
+- The Admin API should still **not be publicly accessible**; restrict it to `localhost` or a private subnet.
+- Redirect endpoints (`/{shortCode}` on the redirect server) are public by design and never require authentication.
 
 ---
 
@@ -177,4 +179,4 @@ Developer Advocate for Secure Coding and Vaadin Flow
 
 ## 📄 License
 
-Licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+Licensed under the [European Union Public Licence v1.2 (EUPL-1.2)](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12). See [`LICENSE`](LICENSE) for the full text.

@@ -3,6 +3,7 @@ package com.svenruppert.urlshortener.api.handler.urlmapping;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.api.security.CurrentSubject;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingFilter;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingLookup;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
@@ -131,7 +132,8 @@ public class ListHandler
         .createdTo(parseInstant(first(query, "to"), false).orElse(null))
         .active(parseBoolean(first(query, "active")).orElse(null))
         .sortBy(sortBy.orElse(null))
-        .direction(dir.orElse(null));
+        .direction(dir.orElse(null))
+        .ownerUsername(ownerFilter());
 
     // total for metadata (optional but helpful)
     final int total = store.count(baseBuilder.offset(0).limit(1).build());
@@ -221,6 +223,7 @@ public class ListHandler
         .limit(size)
         .sortBy(sortBy.orElse(null))
         .direction(dir.orElse(null))
+        .ownerUsername(ownerFilter())
         .build();
 
 
@@ -231,13 +234,30 @@ public class ListHandler
   }
 
   private String filterAndBuild(String mode, Predicate<ShortUrlMapping> predicate) {
+    String ownerFilter = ownerFilter();
     final var data = store
         .findAll()
         .stream()
+        .filter(m -> ownerFilter == null || ownerFilter.equals(m.ownerUsername()))
         .filter(predicate)
         .map(this::toDto)
         .toList();
     return JsonUtils.toJsonListing(mode, data.size(), data);
+  }
+
+  /**
+   * Returns the username to restrict the result to, or {@code null} if the
+   * current subject has the {@code link:read:all} permission and may see
+   * every owner.
+   */
+  private static String ownerFilter() {
+    if (CurrentSubject.current().isEmpty()) {
+      return null; // bypass / no auth context — do not filter
+    }
+    if (CurrentSubject.hasPermission("link:read:all")) {
+      return null;
+    }
+    return CurrentSubject.username().orElse(null);
   }
 
   private Map<String, String> toDto(ShortUrlMapping m) {

@@ -2,12 +2,16 @@ package com.svenruppert.urlshortener.api.store.provider.eclipsestore;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortCodeGenerator;
+import com.svenruppert.urlshortener.api.security.user.UserStore;
 import com.svenruppert.urlshortener.api.store.preferences.PreferencesStore;
 import com.svenruppert.urlshortener.api.store.provider.eclipsestore.patitions.EclipsePreferencesStore;
 import com.svenruppert.urlshortener.api.store.provider.eclipsestore.patitions.EclipseStatisticsStore;
 import com.svenruppert.urlshortener.api.store.provider.eclipsestore.patitions.EclipseUrlMappingStore;
+import com.svenruppert.urlshortener.api.store.provider.eclipsestore.patitions.EclipseUserStore;
 import com.svenruppert.urlshortener.api.store.statistics.StatisticsStore;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
+import com.svenruppert.vaadin.security.authentication.PasswordHasher;
+import com.svenruppert.vaadin.security.authorization.api.SecurityServiceResolver;
 import org.eclipse.store.storage.embedded.types.EmbeddedStorage;
 import org.eclipse.store.storage.types.StorageManager;
 
@@ -24,6 +28,7 @@ public final class EclipseStore
   private final EclipseUrlMappingStore eclipseUrlMappingStore;
   private final EclipsePreferencesStore preferencesStore;
   private final EclipseStatisticsStore statisticsStore;
+  private final EclipseUserStore userStore;
 
 
   public EclipseStore(String storageDir,
@@ -54,6 +59,12 @@ public final class EclipseStore
         storage.store(r.statisticsConfig());
         storage.storeRoot();
       }
+      // Ensure security fields are initialized (for backwards compatibility)
+      if (r.ensureSecurityInitialized()) {
+        logger().info("Initialized missing security fields in existing DataRoot");
+        storage.store(r.users());
+        storage.storeRoot();
+      }
     } else {
       logger().info("No DataRoot found, creating a new one...");
       storage.setRoot(new DataRoot());
@@ -63,6 +74,8 @@ public final class EclipseStore
     this.eclipseUrlMappingStore = new EclipseUrlMappingStore(storage, clock, generator);
     this.preferencesStore = new EclipsePreferencesStore(storage);
     this.statisticsStore = new EclipseStatisticsStore(storage, clock);
+    PasswordHasher hasher = SecurityServiceResolver.passwordHashingService();
+    this.userStore = new EclipseUserStore(storage, hasher, clock);
   }
 
   public UrlMappingStore getUrlMappingStore() {
@@ -75,6 +88,10 @@ public final class EclipseStore
 
   public StatisticsStore getStatisticsStore() {
     return statisticsStore;
+  }
+
+  public UserStore getUserStore() {
+    return userStore;
   }
 
   /**

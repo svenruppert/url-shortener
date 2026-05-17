@@ -37,7 +37,7 @@ import java.util.Optional;
 import static com.svenruppert.urlshortener.core.DefaultValues.SHORTCODE_BASE_URL;
 
 @Route(value = CreateView.PATH, layout = MainLayout.class)
-@VisibleFor(AppRole.USER)
+@VisibleFor(AppRole.ROLE_USER)
 @CssImport("./styles/create-view.css")
 public class CreateView extends VerticalLayout implements HasLogger, I18nSupport {
 
@@ -101,6 +101,7 @@ public class CreateView extends VerticalLayout implements HasLogger, I18nSupport
     });
     saveAllButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     resetButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(saveAllButton, "link.create");
 
     configureExpiryFields();
 

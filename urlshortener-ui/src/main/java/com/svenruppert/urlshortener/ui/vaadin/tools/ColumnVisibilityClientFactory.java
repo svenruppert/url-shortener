@@ -10,6 +10,8 @@ public class ColumnVisibilityClientFactory {
   }
 
   public static ColumnVisibilityClient newInstance() {
-    return new ColumnVisibilityClient();
+    ColumnVisibilityClient client = new ColumnVisibilityClient();
+    AuthTokenAccessor.currentToken().ifPresent(client::setAuthToken);
+    return client;
   }
 }

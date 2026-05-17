@@ -3,6 +3,7 @@ package junit.com.svenruppert.urlshortener.client;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
+import junit.com.svenruppert.urlshortener.client.support.ClientAuthSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,14 +29,17 @@ public class URLShortenerClientExportFileTest
   @BeforeEach
   void setUp()
       throws IOException {
+    ClientAuthSupport.enableTestBootstrap();
     server = new ShortenerServer();
     server.init();
     client = new URLShortenerClient();
+    client.setAuthToken(ClientAuthSupport.loginAdmin());
   }
 
   @AfterEach
   void tearDown() {
     server.shutdown();
+    ClientAuthSupport.disableTestBootstrap();
   }
 
   @Test

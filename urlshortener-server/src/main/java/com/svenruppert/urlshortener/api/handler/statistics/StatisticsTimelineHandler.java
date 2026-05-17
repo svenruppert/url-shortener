@@ -3,6 +3,7 @@ package com.svenruppert.urlshortener.api.handler.statistics;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.api.security.StatisticsOwnerGuard;
 import com.svenruppert.urlshortener.api.store.statistics.StatisticsReader;
 import com.svenruppert.urlshortener.api.utils.QueryUtils;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
@@ -40,9 +41,11 @@ public class StatisticsTimelineHandler
       "{\"error\":\"bad_request\",\"message\":\"from date must be before or equal to to date\"}";
 
   private final StatisticsReader statisticsReader;
+  private final StatisticsOwnerGuard ownerGuard;
 
-  public StatisticsTimelineHandler(StatisticsReader statisticsReader) {
+  public StatisticsTimelineHandler(StatisticsReader statisticsReader, StatisticsOwnerGuard ownerGuard) {
     this.statisticsReader = statisticsReader;
+    this.ownerGuard = ownerGuard;
   }
 
   @Override
@@ -57,6 +60,9 @@ public class StatisticsTimelineHandler
     logger().info("Shortcode {}", shortCode);
     if (shortCode == null || shortCode.isBlank()) {
       writeJson(exchange, fromCode(400), ERROR_MISSING_SHORT_CODE);
+      return;
+    }
+    if (ownerGuard != null && !ownerGuard.allow(exchange, shortCode)) {
       return;
     }
     var queryParams = QueryUtils.parseQueryParams(exchange.getRequestURI().getRawQuery());

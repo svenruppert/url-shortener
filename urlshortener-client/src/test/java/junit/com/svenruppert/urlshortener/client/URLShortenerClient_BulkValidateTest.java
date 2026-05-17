@@ -5,6 +5,7 @@ import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse;
 import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse.ValidationItemResult;
 import com.svenruppert.urlshortener.core.urlmapping.BulkValidateResponse.ValidationStatus;
+import junit.com.svenruppert.urlshortener.client.support.ClientAuthSupport;
 import org.junit.jupiter.api.*;
 
 import java.io.IOException;
@@ -24,6 +25,7 @@ class URLShortenerClient_BulkValidateTest {
 
   @BeforeAll
   static void startServer() throws IOException {
+    ClientAuthSupport.enableTestBootstrap();
     server = new ShortenerServer();
     server.init("localhost", 0);
     final int adminPort = server.getPortAdmin();
@@ -31,6 +33,7 @@ class URLShortenerClient_BulkValidateTest {
     final String adminUrl = "http://localhost:" + adminPort;
     final String redirectUrl = "http://localhost:" + redirectPort;
     client = new URLShortenerClient(adminUrl, redirectUrl);
+    client.setAuthToken(ClientAuthSupport.loginAdmin(adminUrl));
   }
 
   @AfterAll
@@ -38,6 +41,7 @@ class URLShortenerClient_BulkValidateTest {
     if (server != null) {
       server.shutdown();
     }
+    ClientAuthSupport.disableTestBootstrap();
   }
 
   // ── Happy path ───────────────────────────────────────────────────────────────

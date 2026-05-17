@@ -3,11 +3,16 @@ package com.svenruppert.urlshortener.api.handler.urlmapping;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.api.security.OwnerCheck;
+import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingLookup;
+import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingUpdater;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
 import com.svenruppert.urlshortener.core.AliasPolicy;
+import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import static com.svenruppert.dependencies.core.net.HttpStatus.fromCode;
 import static com.svenruppert.urlshortener.api.utils.JsonWriter.writeJson;
@@ -20,11 +25,14 @@ public final class DeleteMappingHandler
   private static final String BAD_REQUEST_ERROR_RESPONSE = "{\"error\":\"bad_request\",\"message\":\"expected DELETE /delete/{shortCode}\"}";
   private static final String INVALID_SHORT_CODE_ERROR_JSON = "{\"error\":\"bad_request\",\"message\":\"expected valid shortCode\"}";
   private static final String SHORT_CODE_NOT_FOUND = "{\"error\":\"not_found\",\"message\":\"shortCode not found\"}";
+  private static final String FORBIDDEN = "{\"error\":\"forbidden\"}";
   private static final String INTERNAL_ERROR = "{\"error\":\"internal_error\"}";
   private final UrlMappingUpdater updater;
+  private final UrlMappingLookup lookup;
 
-  public DeleteMappingHandler(UrlMappingUpdater updater) {
-    this.updater = updater;
+  public DeleteMappingHandler(UrlMappingStore store) {
+    this.updater = store;
+    this.lookup = store;
   }
 
   @Override
@@ -53,6 +61,16 @@ public final class DeleteMappingHandler
     }
 
     try {
+      Optional<ShortUrlMapping> existing = lookup.findByShortCode(shortCode);
+      if (existing.isEmpty()) {
+        writeJson(exchange, fromCode(404), SHORT_CODE_NOT_FOUND);
+        return;
+      }
+      if (!OwnerCheck.isOwnerOrHasAll(existing.get(), "link:delete:all")) {
+        logger().info("owner check failed for delete on '{}'", shortCode);
+        writeJson(exchange, fromCode(403), FORBIDDEN);
+        return;
+      }
       boolean removed = updater.delete(shortCode);
       if (removed) {
         exchange.sendResponseHeaders(204, -1); // No Content

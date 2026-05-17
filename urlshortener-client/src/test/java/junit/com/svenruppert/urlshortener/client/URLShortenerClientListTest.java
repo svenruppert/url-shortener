@@ -5,6 +5,7 @@ import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.urlmapping.ShortUrlMapping;
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
+import junit.com.svenruppert.urlshortener.client.support.ClientAuthSupport;
 import org.junit.jupiter.api.*;
 
 import java.io.IOException;
@@ -28,6 +29,7 @@ public class URLShortenerClientListTest
   @BeforeEach
   void setUp()
       throws IOException {
+    ClientAuthSupport.enableTestBootstrap();
     server = new ShortenerServer();
     server.init();
 
@@ -37,6 +39,7 @@ public class URLShortenerClientListTest
 
     // Initialise client with local server endpoints
     client = new URLShortenerClient(adminBase, redirectBase);
+    client.setAuthToken(ClientAuthSupport.loginAdmin(adminBase));
 
     logger().info("Test server started: admin={}, redirect={}", adminBase, redirectBase);
   }
@@ -47,6 +50,7 @@ public class URLShortenerClientListTest
       server.shutdown();
       logger().info("Test server stopped.");
     }
+    ClientAuthSupport.disableTestBootstrap();
   }
 
   @Test

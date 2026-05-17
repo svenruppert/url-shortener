@@ -10,7 +10,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.Route;
 
 @Route(value = YoutubeView.PATH, layout = MainLayout.class)
-@VisibleFor(AppRole.USER)
+@VisibleFor(AppRole.ROLE_USER)
 public class YoutubeView
     extends VerticalLayout {
 

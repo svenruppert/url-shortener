@@ -35,6 +35,7 @@ public final class UrlMappingFilter {
   private final SortBy sortBy;              // nullable -> unsorted
   private final Direction direction;        // nullable -> ASC default if sortBy != null
   private final Boolean active;
+  private final String ownerUsername;       // nullable - exact match
 
   private UrlMappingFilter(String codePart,
                            String urlPart,
@@ -44,7 +45,8 @@ public final class UrlMappingFilter {
                            Integer limit,
                            SortBy sortBy,
                            Direction direction,
-                           Boolean active) {
+                           Boolean active,
+                           String ownerUsername) {
     this.codePart = codePart;
     this.urlPart = urlPart;
     this.createdFrom = createdFrom;
@@ -54,6 +56,7 @@ public final class UrlMappingFilter {
     this.sortBy = sortBy;
     this.direction = direction;
     this.active = active;
+    this.ownerUsername = ownerUsername;
   }
 
   public static Builder builder() {
@@ -96,6 +99,10 @@ public final class UrlMappingFilter {
     return Optional.ofNullable(active);
   }
 
+  public Optional<String> ownerUsername() {
+    return Optional.ofNullable(ownerUsername);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -108,6 +115,7 @@ public final class UrlMappingFilter {
         Objects.equals(offset, f.offset) &&
         Objects.equals(limit, f.limit) &&
         Objects.equals(active, f.active) &&
+        Objects.equals(ownerUsername, f.ownerUsername) &&
         sortBy == f.sortBy &&
         direction == f.direction;
   }
@@ -115,7 +123,8 @@ public final class UrlMappingFilter {
   @Override
   public int hashCode() {
     return Objects.hash(codePart, urlPart,
-                        createdFrom, createdTo, offset, limit, sortBy, direction, active);
+                        createdFrom, createdTo, offset, limit, sortBy, direction, active,
+                        ownerUsername);
   }
 
   @Override
@@ -164,6 +173,11 @@ public final class UrlMappingFilter {
       sb.append(ACTIVE + "=").append(active);
     }
 
+    if (ownerUsername != null) {
+      if (sb.length() > 19) sb.append(", ");
+      sb.append("ownerUsername='").append(ownerUsername).append('\'');
+    }
+
     sb.append('}');
     return sb.toString();
   }
@@ -187,6 +201,7 @@ public final class UrlMappingFilter {
     private Direction direction;
 
     private Boolean active;
+    private String ownerUsername;
 
     /**
      * Substring for shortcode; preprocessed with AliasPolicy.normalize.
@@ -247,9 +262,16 @@ public final class UrlMappingFilter {
       return this;
     }
 
+    /** Restricts the result to mappings owned by the given user. Null = no owner constraint. */
+    public Builder ownerUsername(String username) {
+      this.ownerUsername = (username == null || username.isBlank()) ? null : username;
+      return this;
+    }
+
     public UrlMappingFilter build() {
       return new UrlMappingFilter(codePart, urlPart,
-                                  createdFrom, createdTo, offset, limit, sortBy, direction, active);
+                                  createdFrom, createdTo, offset, limit, sortBy, direction, active,
+                                  ownerUsername);
     }
   }
 }

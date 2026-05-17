@@ -1,6 +1,7 @@
 package com.svenruppert.urlshortener.api.store.provider.eclipsestore;
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.api.security.user.ShortenerUser;
 import com.svenruppert.urlshortener.core.statistics.DailyAggregate;
 import com.svenruppert.urlshortener.core.statistics.HourlyAggregate;
 import com.svenruppert.urlshortener.core.statistics.RedirectEvent;
@@ -20,7 +21,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class DataRoot
     implements Serializable , HasLogger {
   @Serial
-  private static final long serialVersionUID = 3L;  // Incremented for statistics fields
+  private static final long serialVersionUID = 4L;  // Incremented for security users field
 
   private final Map<String, Map<String, Map<String, Boolean>>> columnVisibilityByUserAndView
       = new ConcurrentHashMap<>();
@@ -46,15 +47,21 @@ public class DataRoot
   // Statistics configuration (hot window size, etc.)
   private StatisticsConfig statisticsConfig = new StatisticsConfig();
 
+  // Security: persisted user accounts keyed by username.
+  // NOTE: tokens are intentionally NOT persisted — Bearer-Tokens bleiben in-memory.
+  private Map<String, ShortenerUser> users = new ConcurrentHashMap<>();
+
   /**
-   * Custom deserialization to handle DataRoot instances created before statistics were added.
-   * Ensures all statistics fields are initialized even if they were null in the serialized data.
+   * Custom deserialization to handle DataRoot instances created before statistics
+   * or security state were added. Ensures all such fields are initialized even
+   * if they were null in the serialized data.
    */
   @Serial
   private void readObject(ObjectInputStream in)
       throws IOException, ClassNotFoundException {
     in.defaultReadObject();
     ensureStatisticsInitialized();
+    ensureSecurityInitialized();
   }
 
   /**
@@ -107,6 +114,23 @@ public class DataRoot
 
   public StatisticsConfig statisticsConfig() {
     return statisticsConfig;
+  }
+
+  public Map<String, ShortenerUser> users() {
+    return users;
+  }
+
+  /**
+   * Ensures security-related fields are initialized after deserialization.
+   * Returns true if any field was created and the storage root needs to be
+   * re-stored.
+   */
+  public boolean ensureSecurityInitialized() {
+    if (users == null) {
+      users = new ConcurrentHashMap<>();
+      return true;
+    }
+    return false;
   }
 
   /**

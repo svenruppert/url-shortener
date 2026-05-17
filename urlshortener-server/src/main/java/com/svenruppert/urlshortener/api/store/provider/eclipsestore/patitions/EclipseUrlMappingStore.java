@@ -43,17 +43,17 @@ public class EclipseUrlMappingStore
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(Instant createdAt, String shortCode, String originalUrl, Instant expiredAt, Boolean active) {
-    logger().info("createMapping - createdAt: {} - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", createdAt, shortCode, originalUrl, expiredAt, active);
+  public Result<ShortUrlMapping> createMapping(Instant createdAt, String shortCode, String originalUrl, Instant expiredAt, Boolean active, String ownerUsername) {
+    logger().info("createMapping - createdAt: {} - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {} - owner: {}", createdAt, shortCode, originalUrl, expiredAt, active, ownerUsername);
     var originalOrDefaultActive = active != null ? active : true;
-    return creator.create(createdAt, shortCode, originalUrl, expiredAt, originalOrDefaultActive);
+    return creator.create(createdAt, shortCode, originalUrl, expiredAt, originalOrDefaultActive, ownerUsername);
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt, Boolean active) {
-    logger().info("createMapping - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", shortCode, originalUrl, expiredAt, active);
+  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt, Boolean active, String ownerUsername) {
+    logger().info("createMapping - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {} - owner: {}", shortCode, originalUrl, expiredAt, active, ownerUsername);
     var originalOrDefaultActive = active != null ? active : true;
-    return creator.create(shortCode, originalUrl, expiredAt, originalOrDefaultActive);
+    return creator.create(shortCode, originalUrl, expiredAt, originalOrDefaultActive, ownerUsername);
   }
 
   @Override
@@ -65,7 +65,7 @@ public class EclipseUrlMappingStore
       var shortUrlMappingOLD = urlMappings.get(shortCode);
       var originalOrNewUrl = url != null ? url : shortUrlMappingOLD.originalUrl();
       var originalOrNewActive = active != null ? active : shortUrlMappingOLD.active();
-      var shortUrlMapping = new ShortUrlMapping(shortCode, originalOrNewUrl, shortUrlMappingOLD.createdAt(), expiredAt, originalOrNewActive);
+      var shortUrlMapping = new ShortUrlMapping(shortCode, originalOrNewUrl, shortUrlMappingOLD.createdAt(), expiredAt, originalOrNewActive, shortUrlMappingOLD.ownerUsername());
       urlMappings.put(shortUrlMapping.shortCode(), shortUrlMapping);
       storage.store(dataRoot().shortUrlMappings());
       return Result.success(shortUrlMapping);
@@ -94,6 +94,23 @@ public class EclipseUrlMappingStore
       logger().info("Statistics data removed for shortCode '{}'", normalized);
     }
     return removed;
+  }
+
+  @Override
+  public Result<ShortUrlMapping> assignOwner(String shortCode, String ownerUsername) {
+    if (shortCode == null || shortCode.isBlank()) {
+      return Result.failure("shortCode must not be blank");
+    }
+    String normalized = normalize(shortCode);
+    var urlMappings = dataRoot().shortUrlMappings();
+    ShortUrlMapping existing = urlMappings.get(normalized);
+    if (existing == null) {
+      return Result.failure("shortCode '" + shortCode + "' not found");
+    }
+    ShortUrlMapping updated = existing.withOwnerUsername(ownerUsername);
+    urlMappings.put(normalized, updated);
+    storage.store(urlMappings);
+    return Result.success(updated);
   }
 
   @Override

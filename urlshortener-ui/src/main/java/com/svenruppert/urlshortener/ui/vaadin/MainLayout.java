@@ -3,8 +3,8 @@ package com.svenruppert.urlshortener.ui.vaadin;
 
 
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.client.LoginClient;
 import com.svenruppert.urlshortener.ui.vaadin.components.StoreIndicator;
-import com.svenruppert.urlshortener.ui.vaadin.security.LoginConfig;
 import com.svenruppert.urlshortener.ui.vaadin.tools.AdminClientFactory;
 import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.svenruppert.urlshortener.ui.vaadin.tools.LocaleSelection;
@@ -14,8 +14,12 @@ import com.svenruppert.urlshortener.ui.vaadin.views.CreateView;
 import com.svenruppert.urlshortener.ui.vaadin.views.YoutubeView;
 import com.svenruppert.urlshortener.ui.vaadin.views.login.LoginView;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
+import com.svenruppert.urlshortener.ui.vaadin.views.profile.ProfileView;
 import com.svenruppert.urlshortener.ui.vaadin.views.statistics.StatisticsView;
-import com.svenruppert.vaadin.security.authorization.api.SessionAccessor;
+import com.svenruppert.urlshortener.ui.vaadin.views.users.UserManagementView;
+import com.svenruppert.urlshortener.ui.vaadin.security.AppRole;
+import com.svenruppert.urlshortener.ui.vaadin.security.AppUser;
+import com.svenruppert.vaadin.security.authorization.api.SubjectStores;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
@@ -59,6 +63,8 @@ public class MainLayout
   private static final String K_NAV_STATISTICS = "nav.statistics";
   private static final String K_NAV_YOUTUBE = "nav.youtube";
   private static final String K_NAV_ABOUT = "nav.about";
+  private static final String K_NAV_USERS = "nav.users";
+  private static final String K_NAV_PROFILE = "nav.profile";
 
   Component languageSwitch = createLanguageSwitch();
 
@@ -87,16 +93,15 @@ public class MainLayout
     Span spacer = new Span();
     spacer.addClassName(C_SPACER);
 
-    if (LoginConfig.isLoginEnabled()) {
-      var logoutButton = new Button(tr(K_LOGOUT, "Logout"), _ -> {
-        SessionAccessor.deleteCurrentSubject();
-        UI.getCurrent().navigate(LoginView.class);
-      });
-      logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
-      headerRow = new HorizontalLayout(toggle, appTitle, spacer, languageSwitch, storeIndicator, logoutButton);
-    } else {
-      headerRow = new HorizontalLayout(toggle, appTitle, spacer, languageSwitch, storeIndicator);
-    }
+    var logoutButton = new Button(tr(K_LOGOUT, "Logout"), _ -> {
+      SubjectStores.subjectStore().currentSubject(AppUser.class)
+          .map(AppUser::accessToken)
+          .ifPresent(token -> new LoginClient().logout(token));
+      SubjectStores.subjectStore().deleteCurrentSubject(AppUser.class);
+      UI.getCurrent().navigate(LoginView.class);
+    });
+    logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+    headerRow = new HorizontalLayout(toggle, appTitle, spacer, languageSwitch, storeIndicator, logoutButton);
 
     headerRow.addClassName(C_HEADER_ROW);
     headerRow.setWidthFull();
@@ -125,7 +130,21 @@ public class MainLayout
         new SideNavItem(tr(K_NAV_YOUTUBE, "Youtube"), "/" + YoutubeView.PATH, CART.create()),
         new SideNavItem(tr(K_NAV_ABOUT, "About"), "/" + AboutView.PATH, USER_HEART.create())
     );
+    sideNav.addItem(
+        new SideNavItem(tr(K_NAV_PROFILE, "Profile"), "/" + ProfileView.PATH, USER.create())
+    );
+    if (currentUserHasRole(AppRole.ROLE_ADMIN)) {
+      sideNav.addItem(
+          new SideNavItem(tr(K_NAV_USERS, "Users"), "/" + UserManagementView.PATH, USERS.create())
+      );
+    }
     return sideNav;
+  }
+
+  private static boolean currentUserHasRole(AppRole role) {
+    return SubjectStores.subjectStore().currentSubject(AppUser.class)
+        .map(u -> u.roles().contains(role))
+        .orElse(false);
   }
 
   private Component createLanguageSwitch() {

@@ -11,6 +11,8 @@ public class AdminClientFactory {
   }
 
   public static AdminClient newInstance() {
-    return new AdminClient(DefaultValues.ADMIN_SERVER_URL);
+    AdminClient client = new AdminClient(DefaultValues.ADMIN_SERVER_URL);
+    AuthTokenAccessor.currentToken().ifPresent(client::setAuthToken);
+    return client;
   }
 }

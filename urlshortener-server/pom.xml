@@ -18,6 +18,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.svenruppert</groupId>
+            <artifactId>security-rest</artifactId>
+            <version>00.60.00</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.eclipse.store</groupId>
             <artifactId>storage-embedded</artifactId>
         </dependency>

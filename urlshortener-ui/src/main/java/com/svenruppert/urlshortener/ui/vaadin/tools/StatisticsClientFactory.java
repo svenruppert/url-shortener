@@ -10,6 +10,8 @@ public class StatisticsClientFactory {
   }
 
   public static StatisticsClient newInstance() {
-    return new StatisticsClient();
+    StatisticsClient client = new StatisticsClient();
+    AuthTokenAccessor.currentToken().ifPresent(client::setAuthToken);
+    return client;
   }
 }

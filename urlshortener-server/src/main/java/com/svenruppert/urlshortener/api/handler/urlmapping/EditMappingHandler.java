@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.functional.model.Result;
+import com.svenruppert.urlshortener.api.security.OwnerCheck;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 import com.svenruppert.urlshortener.api.utils.ErrorResponses;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
@@ -64,6 +65,12 @@ public class EditMappingHandler
       Optional<ShortUrlMapping> currentOpt = urlMappingStore.findByShortCode(shortCode);
       if (currentOpt.isEmpty()) {
         ErrorResponses.notFound(ex, "shortCode not found");
+        return;
+      }
+
+      if (!OwnerCheck.isOwnerOrHasAll(currentOpt.get(), "link:update:all")) {
+        logger().info("owner check failed for edit on '{}'", shortCode);
+        ErrorResponses.withStatus(ex, 403, "forbidden");
         return;
       }
 

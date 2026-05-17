@@ -175,6 +175,12 @@ public class BulkActionsBar
     bulkClearExpiryBtn.addClickListener(_ -> confirmBulkClearExpirySelected());
     bulkActivateBtn.addClickListener(_ -> confirmBulkActivateSelected());
     bulkDeactivateBtn.addClickListener(_ -> confirmBulkDeactivateSelected());
+
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(bulkDeleteBtn, "link.delete-own");
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(bulkSetExpiryBtn, "link.update-own");
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(bulkClearExpiryBtn, "link.update-own");
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(bulkActivateBtn, "link.update-own");
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(bulkDeactivateBtn, "link.update-own");
   }
 
   public void confirmBulkDeleteSelected() {

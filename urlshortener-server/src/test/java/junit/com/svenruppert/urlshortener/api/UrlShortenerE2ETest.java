@@ -4,6 +4,7 @@ import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.core.JsonUtils;
 import com.svenruppert.urlshortener.core.urlmapping.ShortenRequest;
+import junit.com.svenruppert.urlshortener.api.security.support.SecurityTestSupport;
 import org.junit.jupiter.api.*;
 
 import java.net.URI;
@@ -11,7 +12,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 
 import static com.svenruppert.dependencies.core.net.HttpStatus.*;
 import static com.svenruppert.urlshortener.core.DefaultValues.*;
@@ -26,10 +26,12 @@ public class UrlShortenerE2ETest
   private static String baseUrlREDIRECT;
   private static String baseUrlADMIN;
   private static HttpClient http;
+  private static String adminToken;
 
   @BeforeAll
   static void startServer()
       throws Exception {
+    SecurityTestSupport.enableTestBootstrap();
     // Server auf Port 0 starten -> Ephemeral-Port, kollisionsfrei
     server = new ShortenerServer();
     server.init(DEFAULT_SERVER_HOST, 0);
@@ -37,15 +39,14 @@ public class UrlShortenerE2ETest
     var portAdmin = server.getPortAdmin();
     baseUrlREDIRECT = DEFAULT_SERVER_PROTOCOL + "://" + DEFAULT_SERVER_HOST + ":" + portRedirect;
     baseUrlADMIN = ADMIN_SERVER_PROTOCOL + "://" + ADMIN_SERVER_HOST + ":" + portAdmin;
-    http = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(3))
-        .followRedirects(HttpClient.Redirect.NEVER)    // Redirects selbst prüfen
-        .build();
+    http = SecurityTestSupport.newClient();
+    adminToken = SecurityTestSupport.loginAdmin(http, baseUrlADMIN);
   }
 
   @AfterAll
   static void stopServer() {
     if (server != null) server.shutdown();
+    SecurityTestSupport.disableTestBootstrap();
   }
 
   // --- Helper ---------------------------------------------------------------
@@ -54,19 +55,20 @@ public class UrlShortenerE2ETest
       throws Exception {
     var uri = URI.create(baseUrlADMIN + path);
     logger().info("POST Path - {}", uri);
-    var req = HttpRequest.newBuilder(uri)
+    var builder = HttpRequest.newBuilder(uri)
         .header(CONTENT_TYPE, JSON_CONTENT_TYPE)
-        .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8))
-        .build();
-    return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8));
+    SecurityTestSupport.authorize(builder, adminToken);
+    return http.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
   }
 
   private HttpResponse<String> GET(String path)
       throws Exception {
     var uri = URI.create(baseUrlADMIN + path);
     logger().info("GET Path - {}", uri);
-    var req = HttpRequest.newBuilder(uri).GET().build();
-    return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    var builder = HttpRequest.newBuilder(uri).GET();
+    SecurityTestSupport.authorize(builder, adminToken);
+    return http.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
   }
 
   private HttpResponse<String> GET_REDIRECT(String path)
@@ -81,8 +83,9 @@ public class UrlShortenerE2ETest
       throws Exception {
     var uri = URI.create(baseUrlADMIN + path);
     logger().info("DELETE Path - {}", uri);
-    var req = HttpRequest.newBuilder(uri).DELETE().build();
-    return http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    var builder = HttpRequest.newBuilder(uri).DELETE();
+    SecurityTestSupport.authorize(builder, adminToken);
+    return http.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
   }
 
   // --- Tests ----------------------------------------------------------------

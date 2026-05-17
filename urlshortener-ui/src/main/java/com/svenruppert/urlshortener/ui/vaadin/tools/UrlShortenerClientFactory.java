@@ -10,7 +10,9 @@ public class UrlShortenerClientFactory {
   }
 
   public static URLShortenerClient newInstance() {
-    return new URLShortenerClient();
+    URLShortenerClient client = new URLShortenerClient();
+    AuthTokenAccessor.currentToken().ifPresent(client::setAuthToken);
+    return client;
   }
 
 }

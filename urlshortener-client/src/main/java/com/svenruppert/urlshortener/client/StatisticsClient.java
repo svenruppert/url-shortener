@@ -34,6 +34,7 @@ public class StatisticsClient
   private static final int READ_TIMEOUT = 5_000;
 
   private final URI serverBaseAdmin;
+  private volatile String authToken;
 
   /**
    * Creates a client with default admin server URL.
@@ -51,6 +52,10 @@ public class StatisticsClient
         : serverBaseUrlAdmin + "/";
     logger().info("StatisticsClient initialized with server URL: {}", urlToServerAdmin);
     this.serverBaseAdmin = URI.create(urlToServerAdmin);
+  }
+
+  public void setAuthToken(String token) {
+    this.authToken = (token == null || token.isBlank()) ? null : token;
   }
 
   // ============================================================================
@@ -302,7 +307,7 @@ public class StatisticsClient
     URI uri = serverBaseAdmin.resolve(path);
     HttpURLConnection con = openConnection(uri, "GET", APPLICATION_ZIP, null);
     try {
-      int code = con.getResponseCode();
+      int code = observe(con.getResponseCode());
       if (code != 200) {
         String err = readErrorBody(con, code);
         throw new IOException("HTTP " + code + " for GET " + uri + " body=" + err);
@@ -382,6 +387,10 @@ public class StatisticsClient
     con.setReadTimeout(READ_TIMEOUT);
     con.setRequestProperty("Accept", APPLICATION_JSON);
     con.setRequestProperty("Content-Type", APPLICATION_ZIP);
+    String token = authToken;
+    if (token != null) {
+      con.setRequestProperty("Authorization", "Bearer " + token);
+    }
     con.setDoOutput(true);
     con.setFixedLengthStreamingMode(zipBytes.length);
 
@@ -389,7 +398,7 @@ public class StatisticsClient
       try (OutputStream os = con.getOutputStream()) {
         os.write(zipBytes);
       }
-      int code = con.getResponseCode();
+      int code = observe(con.getResponseCode());
       String body = readBody(con, code);
       if (code != 200) {
         throw new IOException("HTTP " + code + " for POST " + uri + " body=" + body);
@@ -417,7 +426,7 @@ public class StatisticsClient
 
     HttpURLConnection con = openConnection(uri, "GET");
     try {
-      int code = con.getResponseCode();
+      int code = observe(con.getResponseCode());
       String body = readResponse(con, code);
       logger().info("GET - responseBody {}", body);
       if (code == 200) {
@@ -439,7 +448,7 @@ public class StatisticsClient
 
     HttpURLConnection con = openConnection(uri, "GET");
     try {
-      int code = con.getResponseCode();
+      int code = observe(con.getResponseCode());
       String body = readResponse(con, code);
       logger().info("executeGetOptional - body {}", body);
       if (code == 200) {
@@ -475,7 +484,7 @@ public class StatisticsClient
         os.write(payload);
       }
 
-      int code = con.getResponseCode();
+      int code = observe(con.getResponseCode());
       String body = readResponse(con, code);
 
       if (code == 200) {
@@ -495,7 +504,16 @@ public class StatisticsClient
     con.setConnectTimeout(CONNECT_TIMEOUT);
     con.setReadTimeout(READ_TIMEOUT);
     con.setRequestProperty("Accept", APPLICATION_JSON);
+    String token = authToken;
+    if (token != null) {
+      con.setRequestProperty("Authorization", "Bearer " + token);
+    }
     return con;
+  }
+
+  static int observe(int code) {
+    AuthFailureRegistry.notifyIfUnauthorized(code);
+    return code;
   }
 
   private String readResponse(HttpURLConnection con, int code)
@@ -543,7 +561,7 @@ public class StatisticsClient
     HttpURLConnection con = openConnection(uri, "GET", APPLICATION_ZIP, null);
     int code;
     try {
-      code = con.getResponseCode();
+      code = observe(con.getResponseCode());
     } catch (IOException e) {
       con.disconnect();
       throw e;
@@ -564,7 +582,7 @@ public class StatisticsClient
     URI uri = serverBaseAdmin.resolve(relativePath);
     HttpURLConnection con = openConnection(uri, "HEAD", APPLICATION_ZIP, null);
     try {
-      int code = con.getResponseCode();
+      int code = observe(con.getResponseCode());
       if (code != 200) {
         String err = readErrorBody(con, code);
         throw new IOException("HTTP " + code + " for HEAD " + uri + " body=" + err);
@@ -588,6 +606,10 @@ public class StatisticsClient
     con.setReadTimeout(READ_TIMEOUT);
     if (accept != null) con.setRequestProperty("Accept", accept);
     if (contentType != null) con.setRequestProperty("Content-Type", contentType);
+    String token = authToken;
+    if (token != null) {
+      con.setRequestProperty("Authorization", "Bearer " + token);
+    }
     return con;
   }
 

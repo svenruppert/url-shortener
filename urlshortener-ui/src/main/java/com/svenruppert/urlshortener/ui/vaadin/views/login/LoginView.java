@@ -2,23 +2,27 @@ package com.svenruppert.urlshortener.ui.vaadin.views.login;
 
 
 
+import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.client.OperationsClient;
+import com.svenruppert.urlshortener.core.DefaultValues;
 import com.svenruppert.urlshortener.ui.vaadin.security.AppCredentials;
 import com.svenruppert.urlshortener.ui.vaadin.security.AppUser;
-import com.svenruppert.urlshortener.ui.vaadin.security.LoginConfig;
 import com.svenruppert.urlshortener.ui.vaadin.tools.I18nSupport;
 import com.svenruppert.urlshortener.ui.vaadin.views.Notifications;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
-import com.svenruppert.vaadin.security.authorization.api.AuthenticationService;
+import com.svenruppert.vaadin.security.authentication.AuthenticationService;
 import com.svenruppert.vaadin.security.authorization.api.SecurityServiceResolver;
-import com.svenruppert.vaadin.security.authorization.api.SessionAccessor;
+import com.svenruppert.vaadin.security.authorization.api.SubjectStores;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.router.HasDynamicTitle;
 import com.vaadin.flow.router.Route;
 
+import java.io.IOException;
+
 @Route(LoginView.PATH)
 public class LoginView
     extends com.svenruppert.vaadin.security.authorization.LoginView
-    implements I18nSupport, HasDynamicTitle {
+    implements I18nSupport, HasDynamicTitle, HasLogger {
 
   public static final String PATH = "login";
 
@@ -30,24 +34,28 @@ public class LoginView
 
   @Override
   public boolean checkCredentials() {
-    if (!LoginConfig.isLoginEnabled()) {
-      Notifications.loginCurrentlyDisabled();
-      return false;
-    }
-    if (!LoginConfig.isLoginConfigured()) {
-      Notifications.loginCurrentlyNotConfigured();
-      return false;
-    }
-
     AppCredentials credentials = new AppCredentials(username(), password());
     boolean permitted = authenticationService.checkCredentials(credentials);
 
     if (permitted) {
       AppUser user = authenticationService.loadSubject(credentials);
-      SessionAccessor.setCurrentSubject(user);
+      user = enrichWithOperations(user);
+      SubjectStores.subjectStore().setCurrentSubject(user, AppUser.class);
     }
 
     return permitted;
+  }
+
+  private AppUser enrichWithOperations(AppUser user) {
+    if (user.accessToken() == null) return user;
+    OperationsClient ops = new OperationsClient(DefaultValues.ADMIN_SERVER_URL);
+    ops.setAuthToken(user.accessToken());
+    try {
+      return user.withOperations(ops.fetch());
+    } catch (IOException ioe) {
+      logger().warn("operations fetch failed: {}", ioe.getMessage());
+      return user;
+    }
   }
 
   @Override

@@ -7,6 +7,7 @@ import com.svenruppert.urlshortener.core.urlmapping.BulkShortenRequest;
 import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse;
 import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse.BulkShortenItemResult;
 import com.svenruppert.urlshortener.core.urlmapping.BulkShortenResponse.ItemStatus;
+import junit.com.svenruppert.urlshortener.client.support.ClientAuthSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,7 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
 
   @BeforeEach
   void startServer() throws Exception {
+    ClientAuthSupport.enableTestBootstrap();
     server = new ShortenerServer();
     server.init(DEFAULT_SERVER_HOST, 0);
     waitUntilOpen(DEFAULT_SERVER_HOST, server.getPortRedirect(), Duration.ofSeconds(3));
@@ -55,11 +57,13 @@ class URLShortenerClient_BulkShortenTest implements HasLogger {
     final String adminUrl    = "http://" + ADMIN_SERVER_HOST + ":" + server.getPortAdmin()    + "/";
     final String redirectUrl = "http://" + DEFAULT_SERVER_HOST + ":" + server.getPortRedirect() + "/";
     client = new URLShortenerClient(adminUrl, redirectUrl);
+    client.setAuthToken(ClientAuthSupport.loginAdmin(adminUrl));
   }
 
   @AfterEach
   void stopServer() {
     if (server != null) server.shutdown();
+    ClientAuthSupport.disableTestBootstrap();
   }
 
   private static void waitUntilOpen(String host, int port, Duration timeout) throws Exception {

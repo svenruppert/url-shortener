@@ -15,11 +15,6 @@ public class AppLoginListener extends LoginListener<AppUser> {
   }
 
   @Override
-  public Class<VisibleFor> restrictionAnnotation() {
-    return VisibleFor.class;
-  }
-
-  @Override
   public Class<? extends com.svenruppert.vaadin.security.authorization.LoginView> loginNavigationTarget() {
     return LoginView.class;
   }

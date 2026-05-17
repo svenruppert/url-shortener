@@ -48,6 +48,7 @@ public class URLShortenerClient implements HasLogger {
 
   private final URI serverBaseAdmin;
   private final URI serverBaseRedirect;
+  private volatile String authToken;
 
   public URLShortenerClient(String serverBaseUrlAdmin,
                             String serverBaseUrlRedirect) {
@@ -68,6 +69,20 @@ public class URLShortenerClient implements HasLogger {
 
   public URLShortenerClient() {
     this(ADMIN_SERVER_URL, DEFAULT_SERVER_URL);
+  }
+
+  /**
+   * Sets the bearer token attached to every request as
+   * {@code Authorization: Bearer <token>}. Pass {@code null} to clear it.
+   * Thread-safe.
+   */
+  public void setAuthToken(String token) {
+    this.authToken = (token == null || token.isBlank()) ? null : token;
+  }
+
+  /** Returns the currently configured bearer token, or {@code null}. */
+  public String getAuthToken() {
+    return authToken;
   }
 
   private static String readAllAsString(InputStream is) throws IOException {
@@ -190,6 +205,7 @@ public class URLShortenerClient implements HasLogger {
 
   private static void requireStatus(HttpURLConnection con, int expected) throws IOException {
     int code = con.getResponseCode();
+    AuthFailureRegistry.notifyIfUnauthorized(code);
     if (code != expected) {
       byte[] body = readResponseBytes(con, code);
       String snippet = new String(body, java.nio.charset.StandardCharsets.UTF_8);
@@ -208,6 +224,7 @@ public class URLShortenerClient implements HasLogger {
     try {
       writeBytes(con, jsonBody.getBytes(UTF_8));
       int code = con.getResponseCode();
+      AuthFailureRegistry.notifyIfUnauthorized(code);
       String body = new String(readResponseBytes(con, code), UTF_8);
       return new Response(code, body);
     } finally {
@@ -418,6 +435,7 @@ public class URLShortenerClient implements HasLogger {
     final HttpURLConnection con = openConnection(uri, "HEAD", APPLICATION_ZIP, null);
     try {
       int code = con.getResponseCode();
+      AuthFailureRegistry.notifyIfUnauthorized(code);
       if (code != OK.code()) {
         String err = readAllAsString(con.getErrorStream());
         throw new IOException("Unexpected HTTP " + code + " for HEAD " + url + " body=" + err);
@@ -450,6 +468,7 @@ public class URLShortenerClient implements HasLogger {
     final HttpURLConnection con = openConnection(uri, "GET", APPLICATION_ZIP, null);
     try {
       final int code = con.getResponseCode();
+      AuthFailureRegistry.notifyIfUnauthorized(code);
       if (code != OK.code()) {
         final InputStream es = con.getErrorStream();
         final String err = readAllAsString(es);
@@ -520,6 +539,7 @@ public class URLShortenerClient implements HasLogger {
       con.disconnect();
       throw e;
     }
+    AuthFailureRegistry.notifyIfUnauthorized(code);
 
     if (code != OK.code()) {
       try {
@@ -706,6 +726,7 @@ public class URLShortenerClient implements HasLogger {
     try {
       writeBytes(con, jsonBody.getBytes(UTF_8));
       final int code = con.getResponseCode();
+      AuthFailureRegistry.notifyIfUnauthorized(code);
       if (code == 404) {
         drainQuietly(con.getErrorStream());
         return false;
@@ -760,6 +781,7 @@ public class URLShortenerClient implements HasLogger {
     final HttpURLConnection con = openConnection(uri, "DELETE", APPLICATION_JSON, null);
     try {
       final int code = con.getResponseCode();
+      AuthFailureRegistry.notifyIfUnauthorized(code);
 
       if (code == 404) {
         drainQuietly(con.getErrorStream());
@@ -821,6 +843,10 @@ public class URLShortenerClient implements HasLogger {
     if (contentType != null && !contentType.isBlank()) {
       con.setRequestProperty("Content-Type", contentType);
     }
+    String token = authToken;
+    if (token != null) {
+      con.setRequestProperty("Authorization", "Bearer " + token);
+    }
     return con;
   }
 
@@ -836,6 +862,7 @@ public class URLShortenerClient implements HasLogger {
       }
 
       final int code = con.getResponseCode();
+      AuthFailureRegistry.notifyIfUnauthorized(code);
       if (code != expectedStatus) {
         final String err = readAllAsString(
             con.getErrorStream() != null ? con.getErrorStream() : con.getInputStream());
@@ -851,6 +878,7 @@ public class URLShortenerClient implements HasLogger {
 
   private void requireStatusOneOf(HttpURLConnection con, int... allowed) throws IOException {
     int code = con.getResponseCode();
+    AuthFailureRegistry.notifyIfUnauthorized(code);
     for (int a : allowed) if (code == a) return;
 
     byte[] body = readResponseBytes(con, code);

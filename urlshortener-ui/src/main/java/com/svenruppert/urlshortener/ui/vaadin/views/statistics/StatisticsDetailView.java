@@ -42,7 +42,7 @@ import java.util.*;
  */
 @PageTitle("Statistics Detail")
 @Route(value = StatisticsDetailView.PATH, layout = MainLayout.class)
-@VisibleFor(AppRole.USER)
+@VisibleFor(AppRole.ROLE_USER)
 @CssImport("./styles/statistics-detail-view.css")
 public class StatisticsDetailView
     extends VerticalLayout

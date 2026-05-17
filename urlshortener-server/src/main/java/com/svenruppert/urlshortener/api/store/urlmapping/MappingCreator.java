@@ -39,7 +39,11 @@ public final class MappingCreator
   }
 
   public Result<ShortUrlMapping> create(Instant createdAt, String alias, String url, Instant expiredAt, Boolean active) {
-    logger().info("create - createdAt='{}' alias='{}' / url='{}' / expiredAt='{}'", createdAt, alias, url, expiredAt);
+    return create(createdAt, alias, url, expiredAt, active, null);
+  }
+
+  public Result<ShortUrlMapping> create(Instant createdAt, String alias, String url, Instant expiredAt, Boolean active, String ownerUsername) {
+    logger().info("create - createdAt='{}' alias='{}' / url='{}' / expiredAt='{}' / owner='{}'", createdAt, alias, url, expiredAt, ownerUsername);
     final String shortCode;
     if (!isNullOrBlank(alias)) {
       var aliasCheck = AliasPolicy.validate(alias);
@@ -74,7 +78,7 @@ public final class MappingCreator
       shortCode = gen;
     }
 
-    var mapping = new ShortUrlMapping(shortCode, url, createdAt, expiredAt, active);
+    var mapping = new ShortUrlMapping(shortCode, url, createdAt, expiredAt, active, ownerUsername);
     logger().info("mapping to store .. {}", mapping);
     store.accept(mapping);
     logger().info("mapping stored .. {}", mapping);
@@ -85,9 +89,13 @@ public final class MappingCreator
    * Main method: creates mapping with optional alias.
    */
   public Result<ShortUrlMapping> create(String alias, String url, Instant expiredAt, Boolean active) {
-    logger().info("createMapping - alias='{}' / url='{}' / expiredAt='{}'", alias, url, expiredAt);
+    return create(alias, url, expiredAt, active, null);
+  }
+
+  public Result<ShortUrlMapping> create(String alias, String url, Instant expiredAt, Boolean active, String ownerUsername) {
+    logger().info("createMapping - alias='{}' / url='{}' / expiredAt='{}' / owner='{}'", alias, url, expiredAt, ownerUsername);
     var createdAt = Instant.now(clock);
-    return create(createdAt, alias, url, expiredAt, active);
+    return create(createdAt, alias, url, expiredAt, active, ownerUsername);
   }
 
   @FunctionalInterface

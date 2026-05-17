@@ -3,6 +3,7 @@ package junit.com.svenruppert.urlshortener.client;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.api.store.preferences.PreferencesStore;
 import com.svenruppert.urlshortener.client.ColumnVisibilityClient;
+import junit.com.svenruppert.urlshortener.client.support.ClientAuthSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,18 +24,18 @@ class ColumnVisibilityClientIT {
   @BeforeEach
   public void startServer()
       throws IOException {
+    ClientAuthSupport.enableTestBootstrap();
     server = new ShortenerServer();
     server.init();
+    String token = ClientAuthSupport.loginAdmin();
+    client = new ColumnVisibilityClient();
+    client.setAuthToken(token);
   }
 
   @AfterEach
   public void stopServer() {
     server.shutdown();
-  }
-
-  @BeforeEach
-  void setUp() {
-    client = new ColumnVisibilityClient();
+    ClientAuthSupport.disableTestBootstrap();
   }
 
   @Test

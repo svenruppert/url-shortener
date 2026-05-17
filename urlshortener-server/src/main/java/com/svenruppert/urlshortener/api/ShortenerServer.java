@@ -1,5 +1,6 @@
 package com.svenruppert.urlshortener.api;
 
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.filter.BlockBrowserPreflightFilter;
@@ -16,6 +17,12 @@ import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportApplyHa
 import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportConflictsListHandler;
 import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportInvalidListHandler;
 import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportValidateHandler;
+import com.svenruppert.urlshortener.api.security.LegacyOwnerMigration;
+import com.svenruppert.urlshortener.api.security.ShortenerSecurityModule;
+import com.svenruppert.urlshortener.api.security.StatisticsOwnerGuard;
+import com.svenruppert.urlshortener.api.security.handler.SelfChangePasswordHandler;
+import com.svenruppert.urlshortener.api.security.handler.UserManagementHandler;
+import com.svenruppert.urlshortener.api.security.user.UserStore;
 import com.svenruppert.urlshortener.api.store.imports.ImportStagingStore;
 import com.svenruppert.urlshortener.api.store.imports.InMemoryImportStagingStore;
 import com.svenruppert.urlshortener.api.store.preferences.PreferencesStore;
@@ -28,6 +35,8 @@ import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.concurrent.Executors;
@@ -85,6 +94,7 @@ public class ShortenerServer
     UrlMappingStore urlMappingStore;
     PreferencesStore preferencesStore;
     StatisticsStore statisticsStore;
+    UserStore userStore = null;
     ImportStagingStore importStagingStore = new InMemoryImportStagingStore();
 
     if (persistent) {
@@ -96,6 +106,7 @@ public class ShortenerServer
       urlMappingStore = eclipseStore.getUrlMappingStore();
       preferencesStore = eclipseStore.getPreferencesStore();
       statisticsStore = eclipseStore.getStatisticsStore();
+      userStore = eclipseStore.getUserStore();
 
       // Start background threads for statistics processing
       eclipseStore.start();
@@ -124,34 +135,68 @@ public class ShortenerServer
 
     logger().info("Starting URL Shortener server (admin) with parameters: host={}, port={}", ADMIN_SERVER_HOST, ADMIN_SERVER_PORT);
     this.serverAdmin = HttpServer.create(new InetSocketAddress(ADMIN_SERVER_HOST, ADMIN_SERVER_PORT), 0);
-    serverAdmin.createContext(PATH_ADMIN_VALIDATE_BULK, new BulkValidateHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_SHORTEN_BULK, new BulkShortenHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_SHORTEN, new ShortenHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_LIST, new ListHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_LIST_COUNT, new ListCountHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_EDIT, new EditMappingHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_DELETE, new DeleteMappingHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_TOGGLE_ACTIVE, new ToggleActiveHandler(urlMappingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_STORE_INFO, new StoreInfoHandler(urlMappingStore, startedAt)).getFilters().add(new BlockBrowserPreflightFilter());
 
-    serverAdmin.createContext(PATH_ADMIN_IMPORT_VALIDATE, new ImportValidateHandler(urlMappingStore, importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_IMPORT_APPLY, new ImportApplyHandler(urlMappingStore, importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_IMPORT_CONFLICTS, new ImportConflictsListHandler(importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_IMPORT_INVALID, new ImportInvalidListHandler(importStagingStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    Path storageRoot = Paths.get(STORAGE_DATA_PATH);
+    ShortenerSecurityModule security = new ShortenerSecurityModule(storageRoot, userStore);
 
-    serverAdmin.createContext(PATH_ADMIN_PREFERENCES_COLUMNS, new ColumnVisibilityHandler(preferencesStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_PREFERENCES_COLUMNS_EDIT, new ColumnVisibilityBulkHandler(preferencesStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_PREFERENCES_COLUMNS_SINGLE, new ColumnVisibilitySingleHandler(preferencesStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    // Optional one-shot legacy-owner migration, gated by system property.
+    // No-op when the property is absent or the target user does not exist.
+    new LegacyOwnerMigration(urlMappingStore, security.userStore()).runIfConfigured();
 
-    serverAdmin.createContext(PATH_ADMIN_STATISTICS_COUNT, new StatisticsCountHandler(statisticsStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_STATISTICS_HOURLY, new StatisticsHourlyHandler(statisticsStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_STATISTICS_DAILY, new StatisticsDailyHandler(statisticsStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_STATISTICS_TIMELINE, new StatisticsTimelineHandler(statisticsStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_STATISTICS_CONFIG, new StatisticsConfigHandler(statisticsStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_STATISTICS_DEBUG, new StatisticsDebugHandler(statisticsStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_STATISTICS_EXPORT, new StatisticsExportHandler(statisticsStore)).getFilters().add(new BlockBrowserPreflightFilter());
-    serverAdmin.createContext(PATH_ADMIN_STATISTICS_IMPORT, new StatisticsImportHandler(statisticsStore)).getFilters().add(new BlockBrowserPreflightFilter());
+    register(PATH_ADMIN_VALIDATE_BULK, security.wrap(new BulkValidateHandler(urlMappingStore), "bulkValidateLinks"));
+    register(PATH_ADMIN_SHORTEN_BULK, security.wrap(new BulkShortenHandler(urlMappingStore), "bulkCreateLinks"));
+    register(PATH_ADMIN_SHORTEN, security.wrap(new ShortenHandler(urlMappingStore), "createLink"));
+    register(PATH_ADMIN_LIST, security.wrap(new ListHandler(urlMappingStore), "listLinks"));
+    register(PATH_ADMIN_LIST_COUNT, security.wrap(new ListCountHandler(urlMappingStore), "listLinksCount"));
+    register(PATH_ADMIN_EDIT, security.wrap(new EditMappingHandler(urlMappingStore), "editLink"));
+    register(PATH_ADMIN_DELETE, security.wrap(new DeleteMappingHandler(urlMappingStore), "deleteLink"));
+    register(PATH_ADMIN_TOGGLE_ACTIVE, security.wrap(new ToggleActiveHandler(urlMappingStore), "toggleActive"));
+    register(PATH_ADMIN_STORE_INFO, security.wrap(new StoreInfoHandler(urlMappingStore, startedAt), "storeInfo"));
+
+    register(PATH_ADMIN_IMPORT_VALIDATE, security.wrap(new ImportValidateHandler(urlMappingStore, importStagingStore), "importValidate"));
+    register(PATH_ADMIN_IMPORT_APPLY, security.wrap(new ImportApplyHandler(urlMappingStore, importStagingStore), "importApply"));
+    register(PATH_ADMIN_IMPORT_CONFLICTS, security.wrap(new ImportConflictsListHandler(importStagingStore), "importConflicts"));
+    register(PATH_ADMIN_IMPORT_INVALID, security.wrap(new ImportInvalidListHandler(importStagingStore), "importInvalid"));
+
+    register(PATH_ADMIN_PREFERENCES_COLUMNS, security.wrap(new ColumnVisibilityHandler(preferencesStore), "preferencesColumns"));
+    register(PATH_ADMIN_PREFERENCES_COLUMNS_EDIT, security.wrap(new ColumnVisibilityBulkHandler(preferencesStore), "preferencesColumnsBulk"));
+    register(PATH_ADMIN_PREFERENCES_COLUMNS_SINGLE, security.wrap(new ColumnVisibilitySingleHandler(preferencesStore), "preferencesColumnsSingle"));
+
+    StatisticsOwnerGuard statsGuard = new StatisticsOwnerGuard(urlMappingStore);
+    register(PATH_ADMIN_STATISTICS_COUNT, security.wrap(new StatisticsCountHandler(statisticsStore, statsGuard), "statisticsCount"));
+    register(PATH_ADMIN_STATISTICS_HOURLY, security.wrap(new StatisticsHourlyHandler(statisticsStore, statsGuard), "statisticsHourly"));
+    register(PATH_ADMIN_STATISTICS_DAILY, security.wrap(new StatisticsDailyHandler(statisticsStore, statsGuard), "statisticsDaily"));
+    register(PATH_ADMIN_STATISTICS_TIMELINE, security.wrap(new StatisticsTimelineHandler(statisticsStore, statsGuard), "statisticsTimeline"));
+    register(PATH_ADMIN_STATISTICS_CONFIG, security.wrap(new StatisticsConfigHandler(statisticsStore), "statisticsConfig"));
+    register(PATH_ADMIN_STATISTICS_DEBUG, security.wrap(new StatisticsDebugHandler(statisticsStore), "statisticsDebug"));
+    register(PATH_ADMIN_STATISTICS_EXPORT, security.wrap(new StatisticsExportHandler(statisticsStore), "statisticsExport"));
+    register(PATH_ADMIN_STATISTICS_IMPORT, security.wrap(new StatisticsImportHandler(statisticsStore), "statisticsImport"));
     logger().info("Statistics API handlers registered");
+
+    // User-management endpoints. Coarse filter checks user:read; mutating
+    // branches in the handler verify finer permissions (user:create,
+    // user:update, user:delete, user:role:assign).
+    register(PATH_API_USERS, security.wrap(
+        new UserManagementHandler(security.userStore(), security.tokenStore()),
+        "listUsers"));
+    serverAdmin.createContext(PATH_API_ME_PASSWORD,
+        new SelfChangePasswordHandler(security.userStore(), security.tokenStore()))
+        .getFilters().add(new BlockBrowserPreflightFilter());
+
+    // Unauthenticated bootstrap endpoints and public auth endpoints.
+    serverAdmin.createContext(ShortenerSecurityModule.PATH_API_BOOTSTRAP_STATUS, security.bootstrapStatusHandler())
+        .getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(ShortenerSecurityModule.PATH_API_BOOTSTRAP_ADMIN, security.bootstrapAdminHandler())
+        .getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(ShortenerSecurityModule.PATH_API_LOGIN, security.loginHandler())
+        .getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(ShortenerSecurityModule.PATH_API_LOGOUT, security.logoutHandler())
+        .getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(ShortenerSecurityModule.PATH_API_ME, security.meHandler())
+        .getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(ShortenerSecurityModule.PATH_API_OPERATIONS, security.operationsHandler())
+        .getFilters().add(new BlockBrowserPreflightFilter());
+    logger().info("Security endpoints registered");
 
 
     var execRedirect = Executors.newVirtualThreadPerTaskExecutor();
@@ -171,6 +216,10 @@ public class ShortenerServer
 
 
     Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+  }
+
+  private void register(String path, HttpHandler handler) {
+    serverAdmin.createContext(path, handler).getFilters().add(new BlockBrowserPreflightFilter());
   }
 
   public void shutdown() {

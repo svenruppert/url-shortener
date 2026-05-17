@@ -59,7 +59,7 @@ import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CE
 
 @PageTitle("Overview")
 @Route(value = OverviewView.PATH, layout = MainLayout.class)
-@VisibleFor(AppRole.USER)
+@VisibleFor(AppRole.ROLE_USER)
 @CssImport("./styles/overview-view.css")
 public class OverviewView
     extends VerticalLayout

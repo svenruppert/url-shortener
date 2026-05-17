@@ -16,6 +16,7 @@ public class AdminClient
     implements HasLogger {
 
   private final URI serverBaseAdmin;
+  private volatile String authToken;
 
   public AdminClient() {
     this(ADMIN_SERVER_URL);
@@ -30,6 +31,10 @@ public class AdminClient
     this.serverBaseAdmin = URI.create(urlToServerAdmin);
   }
 
+  public void setAuthToken(String token) {
+    this.authToken = (token == null || token.isBlank()) ? null : token;
+  }
+
   public StoreInfo getStoreInfo()
       throws java.io.IOException {
     URL url = serverBaseAdmin.resolve(PATH_ADMIN_STORE_INFO).toURL();
@@ -37,7 +42,16 @@ public class AdminClient
     con.setRequestMethod("GET");
     con.setConnectTimeout(3000);
     con.setReadTimeout(3000);
+    String token = authToken;
+    if (token != null) {
+      con.setRequestProperty("Authorization", "Bearer " + token);
+    }
 
+    try {
+      AuthFailureRegistry.notifyIfUnauthorized(con.getResponseCode());
+    } catch (IOException ignored) {
+      // fall through to the input-stream read below which propagates the real cause
+    }
     try (var in = con.getInputStream()) {
       var json = new String(in.readAllBytes(), UTF_8);
       logger().info("getStoreInfo - json response from server - {}", json);

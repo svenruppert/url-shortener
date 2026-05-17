@@ -37,6 +37,7 @@ public final class ColumnVisibilityClient
 
   private final String baseUrl;      // e.g. "http://localhost:8080"
   private final HttpClient http;
+  private volatile String authToken;
 
   public ColumnVisibilityClient() {
     this(ADMIN_SERVER_URL);
@@ -85,6 +86,7 @@ public final class ColumnVisibilityClient
         .build();
 
     var resp = http.send(req, HttpResponse.BodyHandlers.ofString(UTF_8));
+    AuthFailureRegistry.notifyIfUnauthorized(resp.statusCode());
     if (resp.statusCode() == 200) {
       // Response is a flat JSON map: { "columnKey": true/false, ... }
       var body = resp.body();
@@ -119,6 +121,7 @@ public final class ColumnVisibilityClient
         .build();
     logger().info("editBulk - req(URI) {}", req.uri());
     var resp = http.send(req, HttpResponse.BodyHandlers.ofString(UTF_8));
+    AuthFailureRegistry.notifyIfUnauthorized(resp.statusCode());
     if (resp.statusCode() != HttpStatus.NO_CONTENT.code()) {
       throw new IOException("Unexpected HTTP " + resp.statusCode() + " on bulk edit: " + resp.body());
     }
@@ -135,6 +138,7 @@ public final class ColumnVisibilityClient
         .build();
 
     var resp = http.send(req, HttpResponse.BodyHandlers.ofString(UTF_8));
+    AuthFailureRegistry.notifyIfUnauthorized(resp.statusCode());
     if (resp.statusCode() != 200) {
       throw new IOException("Unexpected HTTP " + resp.statusCode() + " on single edit: " + resp.body());
     }
@@ -151,6 +155,7 @@ public final class ColumnVisibilityClient
         .build();
 
     var resp = http.send(req, HttpResponse.BodyHandlers.ofString(UTF_8));
+    AuthFailureRegistry.notifyIfUnauthorized(resp.statusCode());
     if (resp.statusCode() != 204) {
       throw new IOException("Unexpected HTTP " + resp.statusCode() + " on delete-all: " + resp.body());
     }
@@ -170,16 +175,26 @@ public final class ColumnVisibilityClient
         .build();
 
     var resp = http.send(req, HttpResponse.BodyHandlers.ofString(UTF_8));
+    AuthFailureRegistry.notifyIfUnauthorized(resp.statusCode());
     if (resp.statusCode() != 204) {
       throw new IOException("Unexpected HTTP " + resp.statusCode() + " on delete-single: " + resp.body());
     }
   }
 
+  public void setAuthToken(String token) {
+    this.authToken = (token == null || token.isBlank()) ? null : token;
+  }
+
   private HttpRequest.Builder requestBuilder(String path) {
-    return HttpRequest.newBuilder()
+    HttpRequest.Builder builder = HttpRequest.newBuilder()
         .uri(URI.create(baseUrl + path))
         .header(CONTENT_TYPE, JSON_CONTENT_TYPE)
         .timeout(Duration.ofSeconds(10));
+    String token = authToken;
+    if (token != null) {
+      builder.header("Authorization", "Bearer " + token);
+    }
+    return builder;
   }
 
 

@@ -4,6 +4,7 @@ import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.AdminClient;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.StoreInfo;
+import junit.com.svenruppert.urlshortener.client.support.ClientAuthSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,15 +22,20 @@ public class AdminClientTest {
   @BeforeEach
   public void startServer()
       throws IOException {
+    ClientAuthSupport.enableTestBootstrap();
     server = new ShortenerServer();
     server.init();
+    String token = ClientAuthSupport.loginAdmin();
     adminClient = new AdminClient();
+    adminClient.setAuthToken(token);
     client = new URLShortenerClient();
+    client.setAuthToken(token);
   }
 
   @AfterEach
   public void stopServer() {
     server.shutdown();
+    ClientAuthSupport.disableTestBootstrap();
   }
 
   @Test

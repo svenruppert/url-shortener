@@ -2,6 +2,7 @@ package junit.com.svenruppert.urlshortener.client;
 
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
+import junit.com.svenruppert.urlshortener.client.support.ClientAuthSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ public class URLShortenerClient_CreateCustomMappingTest {
   @BeforeEach
   void startServer()
       throws Exception {
+    ClientAuthSupport.enableTestBootstrap();
     server = new ShortenerServer();
     server.init(DEFAULT_SERVER_HOST, 0); // 0 = auto-assign
     waitUntilOpen(DEFAULT_SERVER_HOST, server.getPortRedirect(), Duration.ofSeconds(2));
@@ -47,6 +49,7 @@ public class URLShortenerClient_CreateCustomMappingTest {
     baseUrlAdmin = "http://" + ADMIN_SERVER_HOST + ":" + server.getPortAdmin() + "/";
     baseUrlRedirect = "http://" + DEFAULT_SERVER_HOST + ":" + server.getPortRedirect() + "/";
     client = new URLShortenerClient(baseUrlAdmin,baseUrlRedirect);
+    client.setAuthToken(ClientAuthSupport.loginAdmin(baseUrlAdmin));
   }
 
   @AfterEach
@@ -54,6 +57,7 @@ public class URLShortenerClient_CreateCustomMappingTest {
     if (server != null) {
       server.shutdown();
     }
+    ClientAuthSupport.disableTestBootstrap();
   }
 
   @Test

@@ -3,6 +3,7 @@ package com.svenruppert.urlshortener.api.handler.statistics;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.api.security.StatisticsOwnerGuard;
 import com.svenruppert.urlshortener.api.store.statistics.StatisticsReader;
 import com.svenruppert.urlshortener.api.utils.QueryUtils;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
@@ -31,9 +32,11 @@ public class StatisticsCountHandler
   private static final String ERROR_INVALID_DATE = "{\"error\":\"bad_request\",\"message\":\"Invalid date format. Use ISO format: yyyy-MM-dd\"}";
 
   private final StatisticsReader statisticsReader;
+  private final StatisticsOwnerGuard ownerGuard;
 
-  public StatisticsCountHandler(StatisticsReader statisticsReader) {
+  public StatisticsCountHandler(StatisticsReader statisticsReader, StatisticsOwnerGuard ownerGuard) {
     this.statisticsReader = statisticsReader;
+    this.ownerGuard = ownerGuard;
   }
 
   @Override
@@ -49,6 +52,9 @@ public class StatisticsCountHandler
     logger().info(" shortCode from request {}", shortCode);
     if (shortCode == null || shortCode.isBlank()) {
       writeJson(exchange, fromCode(400), ERROR_MISSING_SHORT_CODE);
+      return;
+    }
+    if (ownerGuard != null && !ownerGuard.allow(exchange, shortCode)) {
       return;
     }
 

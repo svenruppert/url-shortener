@@ -7,10 +7,10 @@ import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
 import com.svenruppert.vaadin.security.authorization.api.AccessEvaluator;
 import com.svenruppert.vaadin.security.authorization.api.AuthorizationService;
 import com.svenruppert.vaadin.security.authorization.api.SecurityServiceResolver;
-import com.svenruppert.vaadin.security.authorization.api.SessionAccessor;
+import com.svenruppert.vaadin.security.authorization.api.SubjectStores;
 import com.svenruppert.vaadin.security.authorization.api.roles.RoleName;
-import com.svenruppert.vaadin.security.authorization.navigation.AuthorizationDecision;
-import com.vaadin.flow.router.Location;
+import com.svenruppert.vaadin.security.authorization.navigation.AccessContext;
+import com.svenruppert.vaadin.security.authorization.navigation.AccessDecision;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -19,10 +19,7 @@ import java.util.stream.Collectors;
 public class AppRoleAccessEvaluator implements AccessEvaluator<VisibleFor> {
 
   @Override
-  public AuthorizationDecision evaluateAccess(
-      Location location,
-      Class<?> navigationTarget,
-      VisibleFor annotation) {
+  public AccessDecision evaluate(AccessContext context, VisibleFor annotation) {
 
     Set<RoleName> requiredRoles = Arrays.stream(annotation.value())
         .map(Enum::name)
@@ -30,12 +27,12 @@ public class AppRoleAccessEvaluator implements AccessEvaluator<VisibleFor> {
         .collect(Collectors.toSet());
 
     if (requiredRoles.isEmpty()) {
-      return AuthorizationDecision.granted();
+      return AccessDecision.granted();
     }
 
-    var currentSubject = SessionAccessor.<AppUser>currentSubject();
-    if (currentSubject.isAbsent()) {
-      return AuthorizationDecision.denied(LoginView.PATH, false);
+    var currentSubject = SubjectStores.subjectStore().currentSubject(AppUser.class);
+    if (currentSubject.isEmpty()) {
+      return AccessDecision.denied(LoginView.PATH, false);
     }
 
     AuthorizationService<AppUser> authorizationService =
@@ -47,9 +44,9 @@ public class AppRoleAccessEvaluator implements AccessEvaluator<VisibleFor> {
         .anyMatch(requiredRoles::contains);
 
     if (hasRole) {
-      return AuthorizationDecision.granted();
+      return AccessDecision.granted();
     }
 
-    return AuthorizationDecision.denied(OverviewView.PATH, true);
+    return AccessDecision.denied(OverviewView.PATH, true);
   }
 }

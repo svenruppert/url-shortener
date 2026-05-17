@@ -51,7 +51,7 @@ import static com.svenruppert.urlshortener.core.DefaultValues.APPLICATION_ZIP;
  */
 @PageTitle("Statistics")
 @Route(value = StatisticsView.PATH, layout = MainLayout.class)
-@VisibleFor(AppRole.USER)
+@VisibleFor(AppRole.ROLE_USER)
 @CssImport("./styles/statistics-view.css")
 public class StatisticsView
     extends VerticalLayout

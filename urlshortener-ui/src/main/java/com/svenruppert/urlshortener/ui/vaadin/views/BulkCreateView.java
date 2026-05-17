@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
  * automatic re-validation of the edited row) and remove rows at any time.
  */
 @Route(value = BulkCreateView.PATH, layout = MainLayout.class)
-@VisibleFor(AppRole.USER)
+@VisibleFor(AppRole.ROLE_USER)
 public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSupport {
 
   public static final String PATH = "bulk-create";
@@ -163,6 +163,7 @@ public class BulkCreateView extends VerticalLayout implements HasLogger, I18nSup
     // Primary button — label and style change dynamically
     primaryButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     primaryButton.addClickListener(_ -> onPrimaryButtonClick());
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(primaryButton, "link.create");
 
     resetButton.setText(tr(K_BTN_RESET, "Reset"));
     resetButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);

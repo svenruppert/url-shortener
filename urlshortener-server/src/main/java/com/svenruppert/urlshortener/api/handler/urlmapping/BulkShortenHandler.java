@@ -3,6 +3,7 @@ package com.svenruppert.urlshortener.api.handler.urlmapping;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.api.security.CurrentSubject;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 import com.svenruppert.urlshortener.api.utils.ErrorResponses;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
@@ -81,6 +82,7 @@ public class BulkShortenHandler implements HttpHandler, HasLogger {
 
       final Instant expiresAt    = req.getDefaultExpiresAt();
       final boolean active       = req.effectiveActive();
+      final String owner         = CurrentSubject.username().orElse(null);
       final List<BulkShortenItemResult> results = new ArrayList<>(req.getUrls().size());
 
       for (int i = 0; i < req.getUrls().size(); i++) {
@@ -108,7 +110,7 @@ public class BulkShortenHandler implements HttpHandler, HasLogger {
         }
 
         // ── store ────────────────────────────────────────────────────────────
-        final var mappingResult = store.createMapping(null, url, expiresAt, active);
+        final var mappingResult = store.createMapping(null, url, expiresAt, active, owner);
 
         if (mappingResult.isPresent()) {
           final var mapping   = mappingResult.get();

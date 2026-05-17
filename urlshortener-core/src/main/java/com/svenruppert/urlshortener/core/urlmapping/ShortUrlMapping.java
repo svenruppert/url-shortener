@@ -14,6 +14,7 @@ public final class ShortUrlMapping {
   private  Instant createdAt;
   private  Instant expiresAt;
   private  boolean active;
+  private  String ownerUsername;
 
   public ShortUrlMapping() {
   }
@@ -25,11 +26,23 @@ public final class ShortUrlMapping {
       Instant expiresAt,
       boolean active
   ) {
+    this(shortCode, originalUrl, createdAt, expiresAt, active, null);
+  }
+
+  public ShortUrlMapping(
+      String shortCode,
+      String originalUrl,
+      Instant createdAt,
+      Instant expiresAt,
+      boolean active,
+      String ownerUsername
+  ) {
     this.shortCode = shortCode;
     this.originalUrl = originalUrl;
     this.createdAt = createdAt;
     this.expiresAt = expiresAt;
     this.active = active;
+    this.ownerUsername = ownerUsername;
   }
 
   public String getShortCode() {
@@ -72,25 +85,37 @@ public final class ShortUrlMapping {
     return active;
   }
 
+  public String getOwnerUsername() {
+    return ownerUsername;
+  }
+
+  public String ownerUsername() {
+    return ownerUsername;
+  }
+
   // --- COPY-WITH methods ---
   public ShortUrlMapping withShortCode(String shortCode) {
-    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active, ownerUsername);
   }
 
   public ShortUrlMapping withOriginalUrl(String originalUrl) {
-    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active, ownerUsername);
   }
 
   public ShortUrlMapping withCreatedAt(Instant createdAt) {
-    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active, ownerUsername);
   }
 
   public ShortUrlMapping withExpiresAt(Instant expiresAt) {
-    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active, ownerUsername);
   }
 
   public ShortUrlMapping withActive(boolean active) {
-    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active);
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active, ownerUsername);
+  }
+
+  public ShortUrlMapping withOwnerUsername(String ownerUsername) {
+    return new ShortUrlMapping(shortCode, originalUrl, createdAt, expiresAt, active, ownerUsername);
   }
 
 
@@ -103,12 +128,13 @@ public final class ShortUrlMapping {
         Objects.equals(this.originalUrl, that.originalUrl) &&
         Objects.equals(this.createdAt, that.createdAt) &&
         Objects.equals(this.expiresAt, that.expiresAt) &&
-        this.active == that.active;
+        this.active == that.active &&
+        Objects.equals(this.ownerUsername, that.ownerUsername);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(shortCode, originalUrl, createdAt, expiresAt, active);
+    return Objects.hash(shortCode, originalUrl, createdAt, expiresAt, active, ownerUsername);
   }
 
   @Override
@@ -118,7 +144,8 @@ public final class ShortUrlMapping {
         "originalUrl=" + originalUrl + ", " +
         "createdAt=" + createdAt + ", " +
         "expiresAt=" + expiresAt + ", " +
-        "active=" + active +
+        "active=" + active + ", " +
+        "ownerUsername=" + ownerUsername +
         ']';
   }
 

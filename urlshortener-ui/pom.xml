@@ -68,8 +68,8 @@
 
         <dependency>
             <groupId>com.svenruppert</groupId>
-            <artifactId>security-for-flow</artifactId>
-            <version>00.50.00</version>
+            <artifactId>security-vaadin</artifactId>
+            <version>00.60.00</version>
         </dependency>
 
     </dependencies>
@@ -85,6 +85,19 @@
                 <groupId>org.eclipse.jetty.ee11</groupId>
                 <artifactId>jetty-ee11-maven-plugin</artifactId>
                 <version>${jetty.version}</version>
+                <!--
+                  Jetty 12 calls Logger.atDebug() which only exists in slf4j-api
+                  2.x. Some transitive plugin deps drag in 1.7.36 and may win
+                  during plugin classpath resolution, causing NoSuchMethodError
+                  at runtime. Pin the plugin to slf4j-api 2.x explicitly.
+                -->
+                <dependencies>
+                    <dependency>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-api</artifactId>
+                        <version>2.0.17</version>
+                    </dependency>
+                </dependencies>
                 <configuration>
                     <!-- If using IntelliJ IDEA with autocompilation, this
                     might cause lots of unnecessary compilations in the

@@ -21,7 +21,13 @@ public class UrlMappingFilterHelper {
   }
 
   public static boolean matches(UrlMappingFilter f, ShortUrlMapping m) {
-    return matchActive(f, m) && matchCode(f, m) && matchUrl(f, m) && matchCreated(f, m);
+    return matchActive(f, m) && matchCode(f, m) && matchUrl(f, m) && matchCreated(f, m) && matchOwner(f, m);
+  }
+
+  private static boolean matchOwner(UrlMappingFilter f, ShortUrlMapping m) {
+    var owner = f.ownerUsername();
+    if (owner.isEmpty()) return true;
+    return owner.get().equals(m.ownerUsername());
   }
 
   private static boolean matchActive(UrlMappingFilter f, ShortUrlMapping m) {

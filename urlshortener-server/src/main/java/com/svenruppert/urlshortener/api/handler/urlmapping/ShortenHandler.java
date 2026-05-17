@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.functional.model.Result;
+import com.svenruppert.urlshortener.api.security.CurrentSubject;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingStore;
 import com.svenruppert.urlshortener.api.utils.ErrorResponses;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
@@ -63,10 +64,12 @@ public class ShortenHandler
 
 
       logger().info("ShortenHandler - createMapping start");
+      String owner = CurrentSubject.username().orElse(null);
       final Result<ShortUrlMapping> urlMappingResult = store.createMapping(req.getShortURL(),
                                                                            req.getUrl(),
                                                                            req.getExpiresAt(),
-                                                                           req.getActive());
+                                                                           req.getActive(),
+                                                                           owner);
       logger().info("ShortenHandler - createMapping stop");
       urlMappingResult
           .ifPresentOrElse(success -> logger().info("mapping created success {}", success.toString()),

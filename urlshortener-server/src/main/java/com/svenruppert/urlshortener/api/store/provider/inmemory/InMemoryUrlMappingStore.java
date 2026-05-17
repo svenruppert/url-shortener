@@ -78,6 +78,21 @@ public class InMemoryUrlMappingStore
   }
 
   @Override
+  public Result<ShortUrlMapping> assignOwner(String shortCode, String ownerUsername) {
+    if (shortCode == null || shortCode.isBlank()) {
+      return Result.failure("shortCode must not be blank");
+    }
+    String normalized = normalize(shortCode);
+    ShortUrlMapping existing = store.get(normalized);
+    if (existing == null) {
+      return Result.failure("shortCode '" + shortCode + "' not found");
+    }
+    ShortUrlMapping updated = existing.withOwnerUsername(ownerUsername);
+    store.put(normalized, updated);
+    return Result.success(updated);
+  }
+
+  @Override
   public Result<ToggleActiveResponse> toggleActive(String shortCode, boolean newActiveValue) {
     if (shortCode == null || shortCode.isBlank())
       return Result.failure("shortCode '" + shortCode + "' is  valid");
@@ -92,17 +107,17 @@ public class InMemoryUrlMappingStore
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(Instant createdAt, String shortCode, String originalUrl, Instant expiredAt, Boolean active) {
-    logger().info("createMapping - createdAt: {} - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", createdAt, shortCode, originalUrl, expiredAt, active);
+  public Result<ShortUrlMapping> createMapping(Instant createdAt, String shortCode, String originalUrl, Instant expiredAt, Boolean active, String ownerUsername) {
+    logger().info("createMapping - createdAt: {} - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {} - owner: {}", createdAt, shortCode, originalUrl, expiredAt, active, ownerUsername);
     var originalOrDefaultActive = active != null ? active : true;
-    return creator.create(createdAt, shortCode, originalUrl, expiredAt, originalOrDefaultActive);
+    return creator.create(createdAt, shortCode, originalUrl, expiredAt, originalOrDefaultActive, ownerUsername);
   }
 
   @Override
-  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt, Boolean active) {
-    logger().info("createMapping - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {}", shortCode, originalUrl, expiredAt, active);
+  public Result<ShortUrlMapping> createMapping(String shortCode, String originalUrl, Instant expiredAt, Boolean active, String ownerUsername) {
+    logger().info("createMapping - shortCode: {} - originalUrl: {} - expiredAt: {} - active: {} - owner: {}", shortCode, originalUrl, expiredAt, active, ownerUsername);
     var originalOrDefaultActive = active != null ? active : true;
-    return creator.create(shortCode, originalUrl, expiredAt, originalOrDefaultActive);
+    return creator.create(shortCode, originalUrl, expiredAt, originalOrDefaultActive, ownerUsername);
   }
 
   @Override
@@ -118,7 +133,8 @@ public class InMemoryUrlMappingStore
           originalOrNewUrl,
           shortUrlMappingOLD.createdAt(),
           expiredAt,
-          originalOrNewActive);
+          originalOrNewActive,
+          shortUrlMappingOLD.ownerUsername());
       store.put(shortUrlMapping.shortCode(), shortUrlMapping);
       return Result.success(shortUrlMapping);
     } else {

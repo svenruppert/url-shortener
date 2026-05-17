@@ -3,6 +3,7 @@ package com.svenruppert.urlshortener.api.handler.statistics;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.api.security.StatisticsOwnerGuard;
 import com.svenruppert.urlshortener.api.store.statistics.StatisticsReader;
 import com.svenruppert.urlshortener.api.utils.QueryUtils;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
@@ -37,9 +38,11 @@ public class StatisticsHourlyHandler
       "{\"error\":\"not_found\",\"message\":\"Hourly data not available. Date is outside hot window.\"}";
 
   private final StatisticsReader statisticsReader;
+  private final StatisticsOwnerGuard ownerGuard;
 
-  public StatisticsHourlyHandler(StatisticsReader statisticsReader) {
+  public StatisticsHourlyHandler(StatisticsReader statisticsReader, StatisticsOwnerGuard ownerGuard) {
     this.statisticsReader = statisticsReader;
+    this.ownerGuard = ownerGuard;
   }
 
   @Override
@@ -53,6 +56,9 @@ public class StatisticsHourlyHandler
     String shortCode = extractShortCode(path);
     if (shortCode == null || shortCode.isBlank()) {
       writeJson(exchange, fromCode(400), ERROR_MISSING_SHORT_CODE);
+      return;
+    }
+    if (ownerGuard != null && !ownerGuard.allow(exchange, shortCode)) {
       return;
     }
 

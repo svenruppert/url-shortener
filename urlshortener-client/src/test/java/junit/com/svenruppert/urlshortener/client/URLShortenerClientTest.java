@@ -4,6 +4,7 @@ import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.ShortenerServer;
 import com.svenruppert.urlshortener.client.URLShortenerClient;
 import com.svenruppert.urlshortener.core.urlmapping.UrlMappingListRequest;
+import junit.com.svenruppert.urlshortener.client.support.ClientAuthSupport;
 import org.junit.jupiter.api.*;
 
 import java.io.IOException;
@@ -22,14 +23,17 @@ public class URLShortenerClientTest
   @BeforeEach
   public void startServer()
       throws IOException {
+    ClientAuthSupport.enableTestBootstrap();
     server = new ShortenerServer();
     server.init();
     client = new URLShortenerClient();
+    client.setAuthToken(ClientAuthSupport.loginAdmin());
   }
 
   @AfterEach
   public void stopServer() {
     server.shutdown();
+    ClientAuthSupport.disableTestBootstrap();
   }
 
   @Test
@@ -300,9 +304,7 @@ public class URLShortenerClientTest
 
   @Test
   void toggleActive_nonExisting_returnsFalse() throws IOException {
-    Assertions.assertThrows(IOException.class, ()->{
-      var condition = client.toggleActive("no-such", true);
-    });
+    assertFalse(client.toggleActive("no-such", true));
   }
 
   @Test
@@ -356,10 +358,8 @@ public class URLShortenerClientTest
 
 
   @Test
-  void put_returnsFalse_on404_via_edit() {
-    Assertions.assertThrows(IOException.class, ()-> {
-      client.edit("does-not-exist", "https://example.org", null, true);
-    });
+  void put_returnsFalse_on404_via_edit() throws IOException {
+    assertFalse(client.edit("does-not-exist", "https://example.org", null, true));
   }
 
   @Test

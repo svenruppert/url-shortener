@@ -3,6 +3,7 @@ package com.svenruppert.urlshortener.api.handler.urlmapping;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
+import com.svenruppert.urlshortener.api.security.CurrentSubject;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingFilter;
 import com.svenruppert.urlshortener.api.store.urlmapping.UrlMappingLookup;
 import com.svenruppert.urlshortener.api.utils.RequestMethodUtils;
@@ -39,12 +40,20 @@ public final class ListCountHandler
     Map<String, List<String>> q = parseQueryParams(queryString);
 
     // sort/page/size not relevant
+    String ownerFilter;
+    if (CurrentSubject.current().isEmpty() || CurrentSubject.hasPermission("link:read:all")) {
+      ownerFilter = null;
+    } else {
+      ownerFilter = CurrentSubject.username().orElse(null);
+    }
+
     UrlMappingFilter filter = UrlMappingFilter.builder()
         .codePart(first(q, "code"))
         .urlPart(first(q, "url"))
         .createdFrom(parseInstant(first(q, "from"), true).orElse(null))
         .createdTo(parseInstant(first(q, "to"), false).orElse(null))
         .active(parseBoolean(first(q, "active")).orElse(null))
+        .ownerUsername(ownerFilter)
         .build();
 
     int total = store.count(filter);
