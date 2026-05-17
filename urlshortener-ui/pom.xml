@@ -72,6 +72,24 @@
             <version>00.60.00</version>
         </dependency>
 
+        <!-- Browserless Vaadin UI testing — free since Vaadin 25.1.
+             Pulls JUnit Jupiter 6.x transitively; coexists with the
+             Jupiter 5.x stack already on the test classpath. -->
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>browserless-test-junit6</artifactId>
+            <version>1.0.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Real REST server in-process for browserless integration tests. -->
+        <dependency>
+            <groupId>com.svenruppert.urlshortener</groupId>
+            <artifactId>server</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
 

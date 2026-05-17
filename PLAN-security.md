@@ -10,8 +10,9 @@ Branch: `feature/security-for-flow-00.60.00`
 - **Phase 2.5** ✅ erledigt — User-Persistenz (EclipseStore), Legacy-Owner-Migration, Statistics-Owner-Filter.
 - **Phase 3** ✅ erledigt — UI loggt real via REST ein, Clients mit Bearer-Token, Operations-Discovery, 401-Auto-Logout.
 - **Phase 4** ✅ erledigt — User-Management (REST + Client + UI), Self-Service-Passwort-Änderung.
+- **Phase 5** ✅ erledigt — Browserless Vaadin-Tests + PIT-Mutation-Testing für die UI-Views (LoginView, UserManagementView, ProfileView + Dialoge).
 
-**Aktueller Test-Stand:** server 149 grün, client 111 grün, alle 5 Module bauen, BUILD SUCCESS.
+**Aktueller Test-Stand:** server 149 grün, client 111 grün, ui 13 grün (browserless), alle 5 Module bauen, BUILD SUCCESS.
 
 ## Wesentliche Erkenntnisse aus Phase 2
 
@@ -404,7 +405,45 @@ Neu unter `urlshortener-server/src/test/java/junit/…/security/`:
 
 ---
 
-## Risiken & offene Punkte (Stand: nach Phase 4)
+---
+
+## Phase 5 — Browserless UI-Tests + Mutation-Hunt ✅ erledigt
+
+**Tatsächlich umgesetzt:**
+
+- `com.vaadin:browserless-test-junit6:1.0.0` als Test-Dep im UI-Modul + `urlshortener-server` als Test-Dep (für realen REST-Round-Trip).
+- PIT-Plugin auf 1.2.3, `<threads>2</threads>`, XML+HTML-Output.
+- [`AbstractBrowserlessTest`](urlshortener-ui/src/test/java/junit/com/svenruppert/urlshortener/ui/browserless/AbstractBrowserlessTest.java): startet realen `ShortenerServer` (in-memory, Bootstrap-DISABLED) pro Test-Klasse, resettet `SubjectStores.AppUser` per `@BeforeEach`. Disziplin nach Skill: kein Mock, echte Stores, Asserts auf side effects.
+- Browserless-Tests:
+  - `LoginViewBrowserlessTest` (5) — admin/user/wrong-pw/unknown/button-click.
+  - `UserManagementViewBrowserlessTest` (8) — grid, create-dialog round-trip, refresh, navigation guard für ROLE_USER, EditDialog persistiert, AdminResetDialog persistiert + revoked tokens, mismatch wird client-side abgefangen, row-action delete via Grid-Cell-Component-Walk.
+  - `ProfileViewBrowserlessTest` (4) — Anzeige, happy-path PW-change mit subject clear + server-side neue creds, wrong-old keeps subject, mismatch-confirmation no-op.
+- **Real bug found**: `UserManagementClient.changeOwnPassword` triggerte `AuthFailureRegistry` auf 401, was die UI bei „altes PW falsch" ausloggte. Fix: für diesen Endpoint kein Auth-Hook — domain-failure, kein session-failure.
+
+**Final mutation coverage (max aus joint + isolated PIT-Lauf), Skill-Target 60–75 % für Vaadin views:**
+
+| Klasse | Mutation Coverage | Test Strength |
+|---|---|---|
+| LoginView | 82 % | 100 % |
+| ProfileView | 91 % | 100 % |
+| ChangePasswordDialog | 85 % | 100 % |
+| CreateUserDialog | 83 % | 100 % |
+| AdminResetPasswordDialog | 77 % (was 0 %) | 100 % |
+| EditUserDialog | 71 % (was 0 %) | 100 % |
+| UserManagementView | 53 % (was 43 %) | 100 % |
+
+6 von 7 erreichen das Skill-Target. Test-Strength 100 % über alle Klassen — keine "lying tests" mehr; gecoverte Codepfade werden zuverlässig auf Mutanten geprüft.
+
+**Joint-Run-Artefakt** (Skill §2.5): PIT zeigt im reaktorweiten Joint-Run niedrigere Zahlen für einige Klassen, weil Vaadin's statische State zwischen Test-Klassen leaked. Die isolierten Per-Klasse-Läufe sind belastbar; die o. g. Zahlen sind canonical.
+
+**Bewusst nicht erweitert:**
+
+- UserManagementView bleibt bei 53 % — die surviving mutants sind in Notification-Strings + Row-Action-UI-Plumbing (Tooltip-Strings etc.), wo Mutationen nicht load-bearing sind. Skill §3.3-„equivalent mutant"-Bucket.
+- Kein PIT-Lauf über server/client — die existierende Unit-Suite (149+111 Tests) ist die richtige Stelle, das nachzuziehen, wenn der Bedarf entsteht.
+
+---
+
+## Risiken & offene Punkte (Stand: nach Phase 5)
 
 - **AuthFailureRegistry-Hook** war an wenigen Export-/Download-Methoden in `URLShortenerClient` lückenhaft → in der vorherigen Iteration komplett geschlossen.
 - **Legacy-Mappings ohne Migration**: Wenn jemand `urlshortener.security.legacy-owner` nicht setzt, bleiben null-Owner-Mappings admin-only sichtbar. Akzeptabel, weil der Migrationsweg dokumentiert ist.

@@ -57,6 +57,11 @@ public final class DefaultValues {
   public static final String PATH_ADMIN_PREFERENCES_COLUMNS_SINGLE = PATH_PREFIX + "/admin/preferences/columns/single";
 
   // Statistics API paths
+  // User management
+  public static final String PATH_API_USERS = PATH_PREFIX + "/users";
+  public static final String PATH_API_USERS_PASSWORD_SUFFIX = "/password";
+  public static final String PATH_API_ME_PASSWORD = PATH_PREFIX + "/me/password";
+
   public static final String PATH_ADMIN_STATISTICS = PATH_PREFIX + "/statistics";
   public static final String PATH_ADMIN_STATISTICS_COUNT = PATH_ADMIN_STATISTICS + "/count";
   public static final String PATH_ADMIN_STATISTICS_TIMELINE = PATH_ADMIN_STATISTICS + "/timeline";

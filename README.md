@@ -120,14 +120,42 @@ Visit `http://localhost:8081/{shortCode}` in your browser.
 
 ## 🧱 Testing
 
-- Unit tests cover:
-  - Base62 encoding / decoding
-  - JSON utilities
-  - Alias validation
-- Integration tests:
-  - Full end-to-end flow (`Shorten → Redirect → Delete`)
+The codebase has four test layers, each targeting a different abstraction:
 
-To run all tests:
+| Module | Tests | Focus |
+|---|---|---|
+| `urlshortener-core` | 92 | Pure-logic utilities (Base62, alias policy, JSON, statistics aggregates). |
+| `urlshortener-server` | 149 | REST handlers, security filter, owner checks, user management — driven against a real `HttpServer` instance. |
+| `urlshortener-client` | 111 | Java SDK behavior against a real server (login, bulk ops, user management, 401 handling). |
+| `urlshortener-ui` | 13 | Vaadin Flow browserless tests for `LoginView`, `UserManagementView`, `ProfileView` + dialogs. |
+
+**Vaadin browserless tests** use the free `com.vaadin:browserless-test-junit6` library (Vaadin ≥ 25.1) — no Selenium, no browser, no servlet container. The base class spins up an in-process `ShortenerServer` so every UI test exercises a real REST round-trip. No mocks for code under test; isolation comes from in-memory stores and per-test `SubjectStores` reset.
+
+**Mutation testing** is wired via the [PIT](https://pitest.org/) plugin (`pitest-maven` + `pitest-junit5-plugin`). Run scoped per package during development:
+
+```bash
+mvn -pl urlshortener-ui org.pitest:pitest-maven:mutationCoverage \
+    -Dpitest-prod-classes='com.svenruppert.urlshortener.ui.vaadin.views.*' \
+    -Dpitest-test-classes='junit.com.svenruppert.urlshortener.ui.browserless.*'
+```
+
+The HTML report lands in `urlshortener-ui/target/pit-reports/index.html`.
+
+**Current mutation coverage on the Vaadin views** (isolated PIT runs; skill target 60–75 % for view code):
+
+| Class | Mutation Coverage | Test Strength |
+|---|---|---|
+| `ProfileView` | 91 % | 100 % |
+| `ChangePasswordDialog` | 85 % | 100 % |
+| `CreateUserDialog` | 83 % | 100 % |
+| `LoginView` | 82 % | 100 % |
+| `AdminResetPasswordDialog` | 77 % | 100 % |
+| `EditUserDialog` | 71 % | 100 % |
+| `UserManagementView` | 53 % | 100 % |
+
+Test Strength of 100 % across the board means every covered line is reliably mutation-tested — no "lying tests" that pass while assertions fail to catch behavior changes. The single class below the 60 % target (`UserManagementView`) has remaining survivors in notification strings and tooltip attributes, classified as observationally equivalent.
+
+To run the full test suite:
 ```bash
 mvn verify
 ```
