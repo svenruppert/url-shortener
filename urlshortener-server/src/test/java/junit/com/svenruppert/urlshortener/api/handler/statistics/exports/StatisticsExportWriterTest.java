@@ -136,8 +136,23 @@ class StatisticsExportWriterTest {
   }
 
   @Test
-  @DisplayName("empty shortCodes parameter exports all known codes")
-  void emptyShortCodesExportsAll() throws IOException {
+  @DisplayName("null shortCodes parameter exports all known codes (no filter)")
+  void nullShortCodesExportsAll() throws IOException {
+    Instant ts = LocalDateTime.of(2024, 1, 15, 9, 0, 0).toInstant(ZoneOffset.UTC);
+    store.recordEvent(RedirectEvent.minimal("a", ts));
+    store.recordEvent(RedirectEvent.minimal("b", ts));
+
+    var out = new ByteArrayOutputStream();
+    var result = writer.writeNdjsonTo(out, exportedAt, null, null, null);
+
+    assertEquals(2, result.eventCount());
+    assertNotNull(result.from());
+    assertNotNull(result.to());
+  }
+
+  @Test
+  @DisplayName("empty shortCodes set produces an empty export (no codes match)")
+  void emptyShortCodesExportsNothing() throws IOException {
     Instant ts = LocalDateTime.of(2024, 1, 15, 9, 0, 0).toInstant(ZoneOffset.UTC);
     store.recordEvent(RedirectEvent.minimal("a", ts));
     store.recordEvent(RedirectEvent.minimal("b", ts));
@@ -145,9 +160,8 @@ class StatisticsExportWriterTest {
     var out = new ByteArrayOutputStream();
     var result = writer.writeNdjsonTo(out, exportedAt, null, null, Set.of());
 
-    assertEquals(2, result.eventCount());
-    assertNotNull(result.from());
-    assertNotNull(result.to());
+    assertEquals(0, result.eventCount(),
+        "empty filter set must yield zero events, not a global dump");
   }
 
   private static List<String> lines(ByteArrayOutputStream out) {

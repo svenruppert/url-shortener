@@ -48,3 +48,5 @@ build/
 /urlshortener-server/data/
 /urlshortener-ui/src/main/bundles/dev.bundle
 /urlshortener-ui/src/main/bundles/prod.bundle
+/urlshortener-ui/node_modules/
+/urlshortener-client/data/.bootstrap-token

@@ -37,7 +37,12 @@ public final class StatisticsExportWriter
                               Collection<String> shortCodes)
       throws IOException {
 
-    List<String> codes = (shortCodes == null || shortCodes.isEmpty())
+    // Contract: null = "no filter" (export ALL known shortCodes).
+    //           empty set = "filter resulted in no codes" (empty export).
+    // The previous behavior treated null and empty identically; callers that
+    // need owner-aware filtering must now distinguish the two explicitly to
+    // avoid accidentally promoting an empty filter into a full dump.
+    List<String> codes = (shortCodes == null)
         ? new ArrayList<>(reader.getKnownShortCodes())
         : new ArrayList<>(shortCodes);
 

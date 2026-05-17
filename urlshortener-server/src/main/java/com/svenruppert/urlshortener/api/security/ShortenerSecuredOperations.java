@@ -106,7 +106,7 @@ public final class ShortenerSecuredOperations {
   public static void statisticsDebug() {
   }
 
-  @RequiresPermission("link:stats:all")
+  @RequiresPermission("link:stats:own")
   public static void statisticsExport() {
   }
 

@@ -169,7 +169,7 @@ public class ShortenerServer
     register(PATH_ADMIN_STATISTICS_TIMELINE, security.wrap(new StatisticsTimelineHandler(statisticsStore, statsGuard), "statisticsTimeline"));
     register(PATH_ADMIN_STATISTICS_CONFIG, security.wrap(new StatisticsConfigHandler(statisticsStore), "statisticsConfig"));
     register(PATH_ADMIN_STATISTICS_DEBUG, security.wrap(new StatisticsDebugHandler(statisticsStore), "statisticsDebug"));
-    register(PATH_ADMIN_STATISTICS_EXPORT, security.wrap(new StatisticsExportHandler(statisticsStore), "statisticsExport"));
+    register(PATH_ADMIN_STATISTICS_EXPORT, security.wrap(new StatisticsExportHandler(statisticsStore, urlMappingStore), "statisticsExport"));
     register(PATH_ADMIN_STATISTICS_IMPORT, security.wrap(new StatisticsImportHandler(statisticsStore), "statisticsImport"));
     logger().info("Statistics API handlers registered");
 

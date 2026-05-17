@@ -125,9 +125,9 @@ The codebase has four test layers, each targeting a different abstraction:
 | Module | Tests | Focus |
 |---|---|---|
 | `urlshortener-core` | 92 | Pure-logic utilities (Base62, alias policy, JSON, statistics aggregates). |
-| `urlshortener-server` | 149 | REST handlers, security filter, owner checks, user management — driven against a real `HttpServer` instance. |
+| `urlshortener-server` | 153 | REST handlers, security filter, owner checks, user management, owner-filtered statistics export — driven against a real `HttpServer` instance. |
 | `urlshortener-client` | 111 | Java SDK behavior against a real server (login, bulk ops, user management, 401 handling). |
-| `urlshortener-ui` | 13 | Vaadin Flow browserless tests for `LoginView`, `UserManagementView`, `ProfileView` + dialogs. |
+| `urlshortener-ui` | 17 | Vaadin Flow browserless tests for `LoginView`, `UserManagementView`, `ProfileView` + dialogs. |
 
 **Vaadin browserless tests** use the free `com.vaadin:browserless-test-junit6` library (Vaadin ≥ 25.1) — no Selenium, no browser, no servlet container. The base class spins up an in-process `ShortenerServer` so every UI test exercises a real REST round-trip. No mocks for code under test; isolation comes from in-memory stores and per-test `SubjectStores` reset.
 

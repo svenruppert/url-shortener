@@ -12,7 +12,7 @@ Branch: `feature/security-for-flow-00.60.00`
 - **Phase 4** ✅ erledigt — User-Management (REST + Client + UI), Self-Service-Passwort-Änderung.
 - **Phase 5** ✅ erledigt — Browserless Vaadin-Tests + PIT-Mutation-Testing für die UI-Views (LoginView, UserManagementView, ProfileView + Dialoge).
 
-**Aktueller Test-Stand:** server 149 grün, client 111 grün, ui 13 grün (browserless), alle 5 Module bauen, BUILD SUCCESS.
+**Aktueller Test-Stand:** server 153 grün, client 111 grün, ui 17 grün (browserless), core 92 grün, alle 5 Module bauen, BUILD SUCCESS.
 
 ## Wesentliche Erkenntnisse aus Phase 2
 
@@ -456,6 +456,6 @@ Neu unter `urlshortener-server/src/test/java/junit/…/security/`:
 
 1. **Smoke-Test-Strecke** dokumentieren (`curl`-Sequenz: Bootstrap-Status, Admin anlegen, Login, geschützter Endpoint).
 2. **Operations-Visibility breiter ausrollen** — aktuell 7 Buttons. Sinnvoll, wenn eine Read-only-Rolle dazukommt.
-3. **UI-Integrationstests** mit Vaadin TestBench / Karibu-Testing (Phase 3.5).
-4. **Bootstrap-Token-File-Berechtigungen** auf POSIX `0600` setzen — geht nur via NIO + `PosixFilePermissions`. Verifizieren ob das security-core schon erledigt.
-5. **Owner-gefilterter Statistics-Export** falls User selbst Exports brauchen (heute admin-only).
+3. ~~UI-Integrationstests~~ → erledigt in Phase 5 (browserless).
+4. ~~Bootstrap-Token-File-Berechtigungen 0600~~ → bereits korrekt in `security-core` 00.60.00 (`FileBootstrapTokenStore` erstellt mit `PosixFilePermissions.asFileAttribute(OWNER_RW)` über `Files.newByteChannel(..., CREATE_NEW, attrs)`; auf macOS verifiziert: `-rw-------`).
+5. ~~Owner-gefilterter Statistics-Export~~ → erledigt. `statisticsExport` ist wieder `link:stats:own`; der Handler filtert Anfragen nicht-admin-Caller per `UrlMappingStore` auf Owner. Foreign-shortCodes werden silent gedroppt (kein Existenz-Leak). Vertrag des Writers geändert: `null` = "alle Codes", leerer Set = "leerer Export". Coverage: `StatisticsExportOwnerFilterIntegrationTest` (3) + `StatisticsExportWriterTest` (+1 für den neuen null-vs-empty-Vertrag).
