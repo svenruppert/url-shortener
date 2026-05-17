@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpHandler;
 import com.svenruppert.dependencies.core.logger.HasLogger;
 import com.svenruppert.urlshortener.api.security.CurrentSubject;
 import com.svenruppert.urlshortener.api.security.LastAdminGuard;
+import com.svenruppert.urlshortener.api.security.UnlockableLoginAttemptPolicy;
 import com.svenruppert.urlshortener.api.security.adapter.HttpExchangeRestRequest;
 import com.svenruppert.urlshortener.api.security.adapter.HttpExchangeRestResponse;
 import com.svenruppert.urlshortener.api.security.permissions.ShortenerRole;
@@ -16,6 +17,8 @@ import com.svenruppert.urlshortener.core.users.AdminResetPasswordRequest;
 import com.svenruppert.urlshortener.core.users.CreateUserRequest;
 import com.svenruppert.urlshortener.core.users.UpdateUserRequest;
 import com.svenruppert.urlshortener.core.users.UserSummary;
+import com.svenruppert.vaadin.security.bruteforce.LoginAttemptContext;
+import com.svenruppert.vaadin.security.bruteforce.LoginAttemptPolicy;
 import com.svenruppert.vaadin.security.logout.SubjectId;
 
 import java.io.IOException;
@@ -26,6 +29,7 @@ import java.util.Objects;
 
 import static com.svenruppert.urlshortener.core.DefaultValues.PATH_API_USERS;
 import static com.svenruppert.urlshortener.core.DefaultValues.PATH_API_USERS_PASSWORD_SUFFIX;
+import static com.svenruppert.urlshortener.core.DefaultValues.PATH_API_USERS_UNLOCK_SUFFIX;
 
 /**
  * Single dispatcher for the {@code /api/users} surface. The outer
@@ -45,10 +49,18 @@ public final class UserManagementHandler implements HttpHandler, HasLogger {
 
   private final UserStore userStore;
   private final InMemoryTokenStore tokenStore;
+  private final LoginAttemptPolicy loginAttemptPolicy;
 
   public UserManagementHandler(UserStore userStore, InMemoryTokenStore tokenStore) {
+    this(userStore, tokenStore, null);
+  }
+
+  public UserManagementHandler(UserStore userStore,
+                               InMemoryTokenStore tokenStore,
+                               LoginAttemptPolicy loginAttemptPolicy) {
     this.userStore = Objects.requireNonNull(userStore, "userStore");
     this.tokenStore = Objects.requireNonNull(tokenStore, "tokenStore");
+    this.loginAttemptPolicy = loginAttemptPolicy;
   }
 
   @Override
@@ -78,6 +90,17 @@ public final class UserManagementHandler implements HttpHandler, HasLogger {
           badRequest(response, "username_required");
         } else {
           resetPassword(exchange, response, username);
+        }
+      } else if (remainder.endsWith(PATH_API_USERS_UNLOCK_SUFFIX.substring(1))) {
+        // {username}/unlock
+        String username = remainder.substring(0, remainder.length()
+            - PATH_API_USERS_UNLOCK_SUFFIX.substring(1).length() - 1);
+        if (!"POST".equals(method)) {
+          methodNotAllowed(response);
+        } else if (username.isBlank()) {
+          badRequest(response, "username_required");
+        } else {
+          unlockUser(response, username);
         }
       } else if (!remainder.contains("/")) {
         // {username}
@@ -211,6 +234,25 @@ public final class UserManagementHandler implements HttpHandler, HasLogger {
       return;
     }
     tokenStore.clearAll(SubjectId.of(username));
+    response.status(204);
+    response.body("");
+  }
+
+  private void unlockUser(HttpExchangeRestResponse response, String username) {
+    if (!CurrentSubject.hasPermission("user:update")) {
+      forbidden(response);
+      return;
+    }
+    if (userStore.findByUsername(username).isEmpty()) {
+      writeJson(response, 404, Map.of("error", "user_not_found"));
+      return;
+    }
+    if (loginAttemptPolicy instanceof UnlockableLoginAttemptPolicy unlockable) {
+      unlockable.unlock(username);
+    } else if (loginAttemptPolicy != null) {
+      // Fallback for non-unlockable policies — clears only the username-only key.
+      loginAttemptPolicy.recordSuccess(LoginAttemptContext.now(username, null, null));
+    }
     response.status(204);
     response.body("");
   }

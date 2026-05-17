@@ -173,6 +173,7 @@ public class OverviewView
 
     btnImport.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     btnImport.addClickListener(_ -> new ImportDialog(urlShortenerClient, this::safeRefresh).open());
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(btnImport, "link.create");
 
     exportAnchor.addClassName(C_EXPORT_ANCHOR);
 
@@ -500,6 +501,7 @@ public class OverviewView
     Button delete = new Button(new Icon(VaadinIcon.TRASH));
     delete.addThemeVariants(LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
     delete.addClickListener(_ -> confirmDelete(m.shortCode()));
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(delete, "link.delete-own");
 
     var details = new Button(new Icon(VaadinIcon.SEARCH));
     details.addThemeVariants(LUMO_TERTIARY_INLINE);
@@ -513,6 +515,7 @@ public class OverviewView
             ui.navigate(StatisticsDetailView.class, m.shortCode())
         )
     );
+    com.svenruppert.urlshortener.ui.vaadin.tools.OperationVisibility.applyTo(statistics, "link.stats-own");
 
     var row = new HorizontalLayout(details, statistics, delete);
     row.addClassName(C_ROW_ACTIONS);

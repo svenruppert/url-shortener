@@ -67,6 +67,7 @@ public final class ShortenerSecurityModule implements HasLogger {
   private final OperationsHandler operationsHandler;
   private final BootstrapStatusHandler bootstrapStatusHandler;
   private final BootstrapAdminHandler bootstrapAdminHandler;
+  private LoginAttemptPolicy loginAttemptPolicy;
 
   public ShortenerSecurityModule(Path storageRoot) {
     this(storageRoot, null);
@@ -94,6 +95,8 @@ public final class ShortenerSecurityModule implements HasLogger {
             com.svenruppert.urlshortener.api.security.permissions.ShortenerRole.ROLE_ADMIN);
         inMemory.create("user", "user", "Standard User",
             com.svenruppert.urlshortener.api.security.permissions.ShortenerRole.ROLE_USER);
+        inMemory.create("viewer", "viewer", "Read-only Viewer",
+            com.svenruppert.urlshortener.api.security.permissions.ShortenerRole.ROLE_VIEWER);
       }
       this.userStore = inMemory;
     }
@@ -103,7 +106,9 @@ public final class ShortenerSecurityModule implements HasLogger {
     this.resolver = new ShortenerRestSubjectResolver(tokenStore, mapping);
     this.authorizationFilter = new RestAuthorizationFilter(resolver);
 
-    LoginAttemptPolicy loginAttempts = new InMemoryLoginAttemptPolicy();
+    LoginAttemptPolicy loginAttempts = new UnlockableLoginAttemptPolicy(
+        new InMemoryLoginAttemptPolicy());
+    this.loginAttemptPolicy = loginAttempts;
     LoginAttemptPolicy bootstrapAttempts = new InMemoryLoginAttemptPolicy(
         LoginAttemptConfiguration.strictBootstrap(),
         Clock.systemUTC(),
@@ -174,6 +179,10 @@ public final class ShortenerSecurityModule implements HasLogger {
 
   public InMemoryTokenStore tokenStore() {
     return tokenStore;
+  }
+
+  public LoginAttemptPolicy loginAttemptPolicy() {
+    return loginAttemptPolicy;
   }
 
   public static final String SYSPROP_BOOTSTRAP_MODE = "urlshortener.security.bootstrap.mode";

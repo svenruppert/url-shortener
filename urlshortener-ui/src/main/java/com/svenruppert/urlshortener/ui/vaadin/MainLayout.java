@@ -12,6 +12,7 @@ import com.svenruppert.urlshortener.ui.vaadin.views.AboutView;
 import com.svenruppert.urlshortener.ui.vaadin.views.BulkCreateView;
 import com.svenruppert.urlshortener.ui.vaadin.views.CreateView;
 import com.svenruppert.urlshortener.ui.vaadin.views.YoutubeView;
+import com.svenruppert.urlshortener.ui.vaadin.views.audit.AuditView;
 import com.svenruppert.urlshortener.ui.vaadin.views.login.LoginView;
 import com.svenruppert.urlshortener.ui.vaadin.views.overview.OverviewView;
 import com.svenruppert.urlshortener.ui.vaadin.views.profile.ProfileView;
@@ -135,7 +136,8 @@ public class MainLayout
     );
     if (currentUserHasRole(AppRole.ROLE_ADMIN)) {
       sideNav.addItem(
-          new SideNavItem(tr(K_NAV_USERS, "Users"), "/" + UserManagementView.PATH, USERS.create())
+          new SideNavItem(tr(K_NAV_USERS, "Users"), "/" + UserManagementView.PATH, USERS.create()),
+          new SideNavItem("Audit", "/" + AuditView.PATH, ARCHIVE.create())
       );
     }
     return sideNav;

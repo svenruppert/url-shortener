@@ -12,6 +12,9 @@ import static com.svenruppert.urlshortener.api.security.permissions.ShortenerPer
 public final class ShortenerRolePermissionMapping implements RolePermissionMapping {
 
   private final StaticRolePermissionMapping delegate = StaticRolePermissionMapping.builder()
+      .put(ShortenerRole.ROLE_VIEWER.roleName(), Set.of(
+          LINK_READ_OWN.permissionName(),
+          LINK_STATS_OWN.permissionName()))
       .put(ShortenerRole.ROLE_USER.roleName(), Set.of(
           LINK_READ_OWN.permissionName(),
           LINK_CREATE.permissionName(),

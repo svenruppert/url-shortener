@@ -5,6 +5,7 @@ import com.svenruppert.urlshortener.core.JacksonJson;
 import com.svenruppert.urlshortener.core.users.AdminResetPasswordRequest;
 import com.svenruppert.urlshortener.core.users.CreateUserRequest;
 import com.svenruppert.urlshortener.core.users.SelfChangePasswordRequest;
+import com.svenruppert.urlshortener.core.users.SelfProfileUpdateRequest;
 import com.svenruppert.urlshortener.core.users.UpdateUserRequest;
 import com.svenruppert.urlshortener.core.users.UserSummary;
 import tools.jackson.core.type.TypeReference;
@@ -20,8 +21,10 @@ import java.util.List;
 import static com.svenruppert.urlshortener.core.DefaultValues.ADMIN_SERVER_URL;
 import static com.svenruppert.urlshortener.core.DefaultValues.JSON_CONTENT_TYPE;
 import static com.svenruppert.urlshortener.core.DefaultValues.PATH_API_ME_PASSWORD;
+import static com.svenruppert.urlshortener.core.DefaultValues.PATH_API_ME_PROFILE;
 import static com.svenruppert.urlshortener.core.DefaultValues.PATH_API_USERS;
 import static com.svenruppert.urlshortener.core.DefaultValues.PATH_API_USERS_PASSWORD_SUFFIX;
+import static com.svenruppert.urlshortener.core.DefaultValues.PATH_API_USERS_UNLOCK_SUFFIX;
 
 /**
  * REST client for the user-management surface and the self-service password
@@ -113,6 +116,22 @@ public class UserManagementClient implements HasLogger {
     }
   }
 
+  /** Admin-only unlock for a locked-out account. Returns {@code true} on 204, {@code false} on 404. */
+  public boolean unlockUser(String username) throws IOException {
+    HttpURLConnection con = open(
+        PATH_API_USERS + "/" + encode(username) + PATH_API_USERS_UNLOCK_SUFFIX,
+        "POST", null);
+    try {
+      int code = con.getResponseCode();
+      AuthFailureRegistry.notifyIfUnauthorized(code);
+      if (code == 204) return true;
+      if (code == 404) return false;
+      throw new IOException("unlockUser failed: HTTP " + code + " body=" + readBody(con));
+    } finally {
+      con.disconnect();
+    }
+  }
+
   /** Admin-only force reset. Returns {@code true} on 204, {@code false} on 404. */
   public boolean resetPassword(String username, String newPassword) throws IOException {
     HttpURLConnection con = open(
@@ -131,6 +150,49 @@ public class UserManagementClient implements HasLogger {
   }
 
   // ---------- self-service ----------
+
+  /**
+   * Returns the caller's own profile (username, display name, role,
+   * enabled). Authentication is via the bearer token; no special
+   * permission is required.
+   */
+  public UserSummary fetchOwnProfile() throws IOException {
+    HttpURLConnection con = open(PATH_API_ME_PROFILE, "GET", null);
+    try {
+      int code = con.getResponseCode();
+      AuthFailureRegistry.notifyIfUnauthorized(code);
+      if (code == 200) {
+        try (InputStream in = con.getInputStream()) {
+          return JacksonJson.mapper().readValue(in, UserSummary.class);
+        }
+      }
+      throw new IOException("fetchOwnProfile failed: HTTP " + code + " body=" + readBody(con));
+    } finally {
+      con.disconnect();
+    }
+  }
+
+  /**
+   * Updates the caller's own display name. Returns the refreshed
+   * {@link UserSummary}. Authentication is via the bearer token; no
+   * special permission is required.
+   */
+  public UserSummary updateOwnProfile(String displayName) throws IOException {
+    HttpURLConnection con = open(PATH_API_ME_PROFILE, "PUT", JSON_CONTENT_TYPE);
+    try {
+      writeJson(con, new SelfProfileUpdateRequest(displayName));
+      int code = con.getResponseCode();
+      AuthFailureRegistry.notifyIfUnauthorized(code);
+      if (code == 200) {
+        try (InputStream in = con.getInputStream()) {
+          return JacksonJson.mapper().readValue(in, UserSummary.class);
+        }
+      }
+      throw new IOException("updateOwnProfile failed: HTTP " + code + " body=" + readBody(con));
+    } finally {
+      con.disconnect();
+    }
+  }
 
   /**
    * Returns {@code true} on success (204). Returns {@code false} on 401,

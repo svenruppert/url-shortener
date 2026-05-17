@@ -134,6 +134,14 @@ public final class ShortenerSecuredOperations {
   public static void resetUserPassword() {
   }
 
+  @RequiresPermission("user:update")
+  public static void unlockUser() {
+  }
+
+  @RequiresPermission("admin:access")
+  public static void listAudit() {
+  }
+
   public static Method method(String name) {
     try {
       return ShortenerSecuredOperations.class.getDeclaredMethod(name);

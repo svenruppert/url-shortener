@@ -38,6 +38,8 @@ public final class OperationsHandler implements HttpHandler {
       new Op("user.update", "Update user", ShortenerPermission.USER_UPDATE),
       new Op("user.delete", "Delete user", ShortenerPermission.USER_DELETE),
       new Op("user.role-assign", "Assign role to user", ShortenerPermission.USER_ROLE_ASSIGN),
+      new Op("user.unlock", "Unlock locked-out user", ShortenerPermission.USER_UPDATE),
+      new Op("audit.list", "View security audit log", ShortenerPermission.ADMIN_ACCESS),
       new Op("admin.dashboard", "Admin dashboard", ShortenerPermission.ADMIN_ACCESS)
   );
 

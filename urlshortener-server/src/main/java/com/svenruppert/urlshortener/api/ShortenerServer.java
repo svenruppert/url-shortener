@@ -20,7 +20,9 @@ import com.svenruppert.urlshortener.api.handler.urlmapping.imports.ImportValidat
 import com.svenruppert.urlshortener.api.security.LegacyOwnerMigration;
 import com.svenruppert.urlshortener.api.security.ShortenerSecurityModule;
 import com.svenruppert.urlshortener.api.security.StatisticsOwnerGuard;
+import com.svenruppert.urlshortener.api.security.handler.AuditHandler;
 import com.svenruppert.urlshortener.api.security.handler.SelfChangePasswordHandler;
+import com.svenruppert.urlshortener.api.security.handler.SelfProfileUpdateHandler;
 import com.svenruppert.urlshortener.api.security.handler.UserManagementHandler;
 import com.svenruppert.urlshortener.api.security.user.UserStore;
 import com.svenruppert.urlshortener.api.store.imports.ImportStagingStore;
@@ -177,11 +179,17 @@ public class ShortenerServer
     // branches in the handler verify finer permissions (user:create,
     // user:update, user:delete, user:role:assign).
     register(PATH_API_USERS, security.wrap(
-        new UserManagementHandler(security.userStore(), security.tokenStore()),
+        new UserManagementHandler(security.userStore(), security.tokenStore(),
+            security.loginAttemptPolicy()),
         "listUsers"));
     serverAdmin.createContext(PATH_API_ME_PASSWORD,
         new SelfChangePasswordHandler(security.userStore(), security.tokenStore()))
         .getFilters().add(new BlockBrowserPreflightFilter());
+    serverAdmin.createContext(PATH_API_ME_PROFILE,
+        new SelfProfileUpdateHandler(security.userStore(), security.tokenStore()))
+        .getFilters().add(new BlockBrowserPreflightFilter());
+
+    register(PATH_API_AUDIT, security.wrap(new AuditHandler(), "listAudit"));
 
     // Unauthenticated bootstrap endpoints and public auth endpoints.
     serverAdmin.createContext(ShortenerSecurityModule.PATH_API_BOOTSTRAP_STATUS, security.bootstrapStatusHandler())

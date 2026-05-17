@@ -60,7 +60,10 @@ public final class DefaultValues {
   // User management
   public static final String PATH_API_USERS = PATH_PREFIX + "/users";
   public static final String PATH_API_USERS_PASSWORD_SUFFIX = "/password";
+  public static final String PATH_API_USERS_UNLOCK_SUFFIX = "/unlock";
   public static final String PATH_API_ME_PASSWORD = PATH_PREFIX + "/me/password";
+  public static final String PATH_API_ME_PROFILE = PATH_PREFIX + "/me/profile";
+  public static final String PATH_API_AUDIT = PATH_PREFIX + "/audit";
 
   public static final String PATH_ADMIN_STATISTICS = PATH_PREFIX + "/statistics";
   public static final String PATH_ADMIN_STATISTICS_COUNT = PATH_ADMIN_STATISTICS + "/count";

@@ -12,7 +12,14 @@ Branch: `feature/security-for-flow-00.60.00`
 - **Phase 4** ✅ erledigt — User-Management (REST + Client + UI), Self-Service-Passwort-Änderung.
 - **Phase 5** ✅ erledigt — Browserless Vaadin-Tests + PIT-Mutation-Testing für die UI-Views (LoginView, UserManagementView, ProfileView + Dialoge).
 
-**Aktueller Test-Stand:** server 153 grün, client 111 grün, ui 17 grün (browserless), core 92 grün, alle 5 Module bauen, BUILD SUCCESS.
+**Aktueller Test-Stand:** server 167 grün, client 111 grün, ui 18 grün (browserless), core 92 grün, alle 5 Module bauen, BUILD SUCCESS.
+
+## Phase 6 — Read-only-Rolle, Self-Service-Profil, Admin-Unlock, Audit-Viewer ✅ erledigt
+
+- **ROLE_VIEWER**: neue Rolle mit nur `link:read:own` + `link:stats:own`. `OperationVisibility` zusätzlich auf `OverviewView`-Row-Action-Delete und Import-Button verdrahtet. Test: `ViewerRoleIntegrationTest` (5).
+- **Self-Service-Profil**: `GET/PUT /api/me/profile` (authenticated only). `SelfProfileUpdateRequest` DTO, `UserManagementClient.fetchOwnProfile() / updateOwnProfile()`, `ProfileView` mit editierbarem Display-Name. Browserless-Test ergänzt.
+- **Admin-Unlock**: `POST /api/users/{username}/unlock` (Permission `user:update`). `UnlockableLoginAttemptPolicy` wrappt `InMemoryLoginAttemptPolicy` und merkt sich gesehene `(username, clientAddress)`-Paare, damit der Unlock auch den combined-Key räumt — nicht nur den username-only-Key. Test: `AdminUnlockIntegrationTest` (3).
+- **Audit-Viewer**: `GET /api/audit?type=&subject=&from=&to=&limit=` (Permission `admin:access`). Nutzt das bereits in `security-core` vorhandene `RingBufferAuditSink` (256 events default). `AuditHandler` projiziert die 16 sealed `AuditEvent`-Varianten in eine flache `AuditEventView(timestamp, type, subject, target, detail)`. `AuditClient` im SDK, `AuditView` in der UI (admin-only Nav-Eintrag). Test: `AuditEndpointIntegrationTest` (6).
 
 ## Wesentliche Erkenntnisse aus Phase 2
 

@@ -64,6 +64,35 @@ class ProfileViewBrowserlessTest extends AbstractBrowserlessTest {
   }
 
   @Test
+  @DisplayName("Save updates the display name via PUT /api/me/profile")
+  void edit_display_name_persists() throws IOException {
+    String username = "profile-rename";
+    signInFreshUser(username, "profile-pw-1");
+
+    navigate(ProfileView.class);
+
+    com.vaadin.flow.component.textfield.TextField field =
+        $view(com.vaadin.flow.component.textfield.TextField.class)
+            .withCaption("Display name").single();
+    field.setValue("New Display Name");
+    test($view(com.vaadin.flow.component.button.Button.class).withText("Save").single()).click();
+
+    // Server-side: a fresh listUsers call must now show the renamed user
+    String adminToken = new com.svenruppert.urlshortener.client.LoginClient(
+        com.svenruppert.urlshortener.core.DefaultValues.ADMIN_SERVER_URL)
+        .login("admin", "admin").token();
+    com.svenruppert.urlshortener.client.UserManagementClient adminClient =
+        new com.svenruppert.urlshortener.client.UserManagementClient(
+            com.svenruppert.urlshortener.core.DefaultValues.ADMIN_SERVER_URL);
+    adminClient.setAuthToken(adminToken);
+    com.svenruppert.urlshortener.core.users.UserSummary updated =
+        adminClient.listUsers().stream()
+            .filter(u -> username.equals(u.username()))
+            .findFirst().orElseThrow();
+    assertEquals("New Display Name", updated.displayName());
+  }
+
+  @Test
   @DisplayName("Change-password dialog: correct old PW clears subject and changes credentials")
   void change_password_happy_path() throws IOException {
     String username = "profile-pw-happy";
